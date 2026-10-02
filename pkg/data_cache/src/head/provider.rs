@@ -30,9 +30,10 @@ use futures::StreamExt;
 use futures::stream::iter;
 use iceberg::TableIdent;
 use iceberg::expr::Predicate;
-use iceberg::io::FileIO;
+use iceberg::io::FileIOBuilder;
 use iceberg::scan::{FileScanTask, FileScanTaskStream};
 use iceberg::table::{StaticTable, Table};
+use iceberg_storage_opendal::OpenDalResolvingStorageFactory;
 use std::any::Any;
 use std::fmt::Formatter;
 use std::sync::Arc;
@@ -91,10 +92,7 @@ impl DataFileTableProvider {
         arrow_schema: SchemaRef,
         num_workers: usize,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let file_io = FileIO::from_path(metadata_loc)
-            .map_err(|e| format!("Failed to create FileIO: {}", e))?
-            .build()
-            .map_err(|e| format!("Failed to build FileIO: {}", e))?;
+        let file_io = FileIOBuilder::new(Arc::new(OpenDalResolvingStorageFactory::new())).build();
         let table_indent = TableIdent::from_strs([schema_name, table_name])
             .map_err(|e| format!("Failed to create table ident: {}", e))?;
         let static_table = StaticTable::from_metadata_file(metadata_loc, table_indent, file_io)
@@ -195,19 +193,19 @@ pub struct DataFileTableExec {
     _predicates: Option<Predicate>,
     schema: SchemaRef,
     partitions: Arc<Vec<TaskGroup>>,
-    plan_properties: PlanProperties,
+    plan_properties: Arc<PlanProperties>,
 }
 
 impl DataFileTableExec {
     fn new(schema: SchemaRef, partitions: Arc<Vec<TaskGroup>>) -> Self {
         // TODO:// revisit plan_properties
-        let eq_properties = EquivalenceProperties::new_with_orderings(schema.clone(), &[]);
-        let plan_properties = PlanProperties::new(
+        let eq_properties = EquivalenceProperties::new(schema.clone());
+        let plan_properties = Arc::new(PlanProperties::new(
             eq_properties,
             Partitioning::UnknownPartitioning(partitions.len()), // TODO:// address partitioning during scan
             EmissionType::Both,
             Boundedness::Bounded,
-        );
+        ));
         Self {
             _projection: None,
             _predicates: None,
@@ -241,7 +239,7 @@ impl ExecutionPlan for DataFileTableExec {
         self
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.plan_properties
     }
 
@@ -318,6 +316,17 @@ impl RecordBatchBuilder {
         Ok(())
     }
 
+    /// Records an assignment for a worker that was given no data files.
+    ///
+    /// The row carries an empty file list and a degenerate row range, so the
+    /// worker loads an empty memtable and claims no rows.
+    fn add_empty_task(&mut self, index: usize, start_index: u64) {
+        self.file_paths.push(Vec::new());
+        self.row_start_indexes.push(start_index);
+        self.row_end_indexes.push(start_index);
+        self.worker_ids.push(index as u64);
+    }
+
     fn build(self) -> Result<RecordBatch> {
         let worker_ids: ArrayRef = Arc::new(UInt64Array::from(self.worker_ids));
         let row_start_indexes: ArrayRef = Arc::new(UInt64Array::from(self.row_start_indexes));
@@ -345,6 +354,22 @@ impl RecordBatchBuilder {
         ])?;
         Ok(rb)
     }
+}
+
+/// Builds the assignment RecordBatch for a worker that was given no data files.
+///
+/// `partition_tasks` balances the table's data files across all workers, so a table
+/// with fewer data files than the cache has workers leaves the surplus workers
+/// without an assignment. A worker registers its memtable only while handling a
+/// `do_put`, so it has to be told that it owns nothing; otherwise its readiness
+/// probe fails for the lifetime of the pod.
+///
+/// `start_index` is the first row index past the end of the cached data, which
+/// gives the worker a range that matches no row.
+pub(crate) fn empty_assignment(worker_id: u64, start_index: u64) -> Result<RecordBatch> {
+    let mut builder = RecordBatchBuilder::new();
+    builder.add_empty_task(worker_id as usize, start_index);
+    builder.build()
 }
 
 /// Groups of file scan tasks assigned to a specific worker node in the distributed system.
@@ -418,12 +443,15 @@ async fn partition_tasks(
         groups[min_group_index].tasks.push(task);
     }
 
-    let mut end = 0;
-    for (i, elem) in groups.iter_mut().enumerate() {
-        let start = end;
-        end += group_sizes[i];
-        elem.start_index = start;
-        elem.end_index = if end > 0 { end - 1 } else { 0 };
+    let mut next_start = 0;
+    for (group, group_size) in groups.iter_mut().zip(group_sizes.iter()) {
+        group.start_index = next_start;
+        // `end_index` is inclusive, so a group that was assigned no rows cannot be
+        // described by `next_start - 1`: that places `end_index` one below
+        // `start_index`. Such a group keeps a degenerate `start_index == end_index`
+        // range and is identified by its empty task list.
+        group.end_index = next_start + group_size.saturating_sub(1);
+        next_start += group_size;
     }
     Ok(Arc::new(groups))
 }
@@ -431,8 +459,10 @@ async fn partition_tasks(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arrow::array::ListArray;
     use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::prelude::SessionContext;
+    use futures::TryStreamExt;
     use iceberg::spec::DataFileFormat;
 
     fn create_test_schema() -> SchemaRef {
@@ -465,12 +495,17 @@ mod tests {
             start: 0,
             length: record_count,
             record_count: Some(record_count),
+            file_size_in_bytes: record_count,
             data_file_path: String::from(file_path),
             schema: create_iceberg_schema(),
             project_field_ids: vec![],
             predicate: None,
             data_file_format: DataFileFormat::Parquet,
             deletes: vec![],
+            partition: None,
+            partition_spec: None,
+            name_mapping: None,
+            case_sensitive: true,
         }
     }
 
@@ -649,5 +684,98 @@ mod tests {
         }
 
         Ok(())
+    }
+    #[tokio::test]
+    async fn test_partition_tasks_with_fewer_files_than_workers()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use futures::stream;
+
+        // Two data files spread over three workers leaves the third worker empty.
+        let tasks = vec![
+            create_test_file_scan_task_with_record_count(100, "/test/file1.parquet"),
+            create_test_file_scan_task_with_record_count(50, "/test/file2.parquet"),
+        ];
+        let stream = stream::iter(tasks.into_iter().map(Ok));
+        let result = partition_tasks(Box::pin(stream), 3).await?;
+
+        assert_eq!(result.len(), 3);
+        for (worker, group) in result.iter().enumerate() {
+            assert!(
+                group.start_index <= group.end_index,
+                "worker {} got an inverted range: start_index={} end_index={}",
+                worker,
+                group.start_index,
+                group.end_index
+            );
+        }
+
+        assert_eq!((result[0].start_index, result[0].end_index), (0, 99));
+        assert_eq!((result[1].start_index, result[1].end_index), (100, 149));
+
+        // The empty group keeps a degenerate range one past the end of the data.
+        assert!(result[2].tasks.is_empty());
+        assert_eq!((result[2].start_index, result[2].end_index), (150, 150));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_empty_group_produces_no_assignment_row() -> Result<(), Box<dyn std::error::Error>>
+    {
+        use futures::stream;
+
+        let tasks = vec![create_test_file_scan_task_with_record_count(
+            100,
+            "/test/file1.parquet",
+        )];
+        let stream = stream::iter(tasks.into_iter().map(Ok));
+        let groups = partition_tasks(Box::pin(stream), 2).await?;
+
+        let exec = DataFileTableExec::new(create_test_schema(), groups);
+        let ctx = SessionContext::new();
+
+        // The worker that holds data is routed to by its `worker_ids` row, the other
+        // one produces an empty batch and is handled by `assign_empty_partitions`.
+        let assigned: Vec<RecordBatch> = exec
+            .execute(0, ctx.task_ctx())?
+            .try_collect::<Vec<_>>()
+            .await?;
+        assert_eq!(assigned.iter().map(|b| b.num_rows()).sum::<usize>(), 1);
+
+        let unassigned: Vec<RecordBatch> = exec
+            .execute(1, ctx.task_ctx())?
+            .try_collect::<Vec<_>>()
+            .await?;
+        assert_eq!(unassigned.iter().map(|b| b.num_rows()).sum::<usize>(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_empty_assignment_carries_worker_id_and_no_files() -> Result<(), DataFusionError> {
+        let batch = empty_assignment(2, 150)?;
+
+        assert_eq!(batch.num_rows(), 1);
+        assert_eq!(column_values(&batch, "worker_ids")?, vec![2]);
+        assert_eq!(column_values(&batch, "row_start_indexes")?, vec![150]);
+        assert_eq!(column_values(&batch, "row_end_indexes")?, vec![150]);
+
+        let file_paths = batch
+            .column_by_name("file_paths")
+            .expect("file_paths column")
+            .as_any()
+            .downcast_ref::<ListArray>()
+            .expect("file_paths is a ListArray");
+        assert_eq!(file_paths.value_length(0), 0, "no files should be assigned");
+        Ok(())
+    }
+
+    fn column_values(batch: &RecordBatch, name: &str) -> Result<Vec<u64>, DataFusionError> {
+        Ok(batch
+            .column_by_name(name)
+            .ok_or_else(|| DataFusionError::Execution(format!("{name} column not found")))?
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .ok_or_else(|| DataFusionError::Execution("Failed to downcast".to_string()))?
+            .values()
+            .to_vec())
     }
 }

@@ -31,10 +31,11 @@ use datafusion::physical_plan::{
 use futures::{Stream, StreamExt, TryStreamExt};
 use iceberg::TableIdent;
 use iceberg::arrow::schema_to_arrow_schema;
-use iceberg::io::FileIO;
+use iceberg::io::FileIOBuilder;
 use iceberg::scan::{FileScanTask, FileScanTaskStream};
 use iceberg::table::{StaticTable, Table};
 use iceberg_datafusion::{from_datafusion_error, to_datafusion_error};
+use iceberg_storage_opendal::OpenDalResolvingStorageFactory;
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::future;
@@ -107,10 +108,7 @@ impl WorkerDataSource {
         file_urls: Vec<String>,
         start_index: u64,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let file_io = FileIO::from_path(&metadata_loc)
-            .map_err(|e| format!("Failed to create FileIO: {}", e))?
-            .build()
-            .map_err(|e| format!("Failed to build FileIO: {}", e))?;
+        let file_io = FileIOBuilder::new(Arc::new(OpenDalResolvingStorageFactory::new())).build();
         let table_indent = TableIdent::from_strs([schema_name, table_name])
             .map_err(|e| format!("Failed to create table ident: {}", e))?;
         let static_table =
@@ -228,18 +226,18 @@ pub struct WorkerExec {
     file_urls: Vec<String>,
     inner: Table,
     schema: SchemaRef,
-    plan_properties: PlanProperties,
+    plan_properties: Arc<PlanProperties>,
 }
 
 impl WorkerExec {
     fn new(file_urls: Vec<String>, inner: Table, schema: SchemaRef) -> Self {
-        let eq_properties = EquivalenceProperties::new_with_orderings(schema.clone(), &[]);
-        let plan_properties = PlanProperties::new(
+        let eq_properties = EquivalenceProperties::new(schema.clone());
+        let plan_properties = Arc::new(PlanProperties::new(
             eq_properties, // Equivalence Properties
             datafusion::physical_expr::Partitioning::UnknownPartitioning(1), // Output Partitioning
             EmissionType::Both,
             Boundedness::Bounded, // Execution Mode
-        );
+        ));
         Self {
             file_urls,
             inner,
@@ -277,7 +275,7 @@ impl ExecutionPlan for WorkerExec {
         self
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.plan_properties
     }
 
@@ -350,19 +348,19 @@ impl ExecutionPlan for WorkerExec {
 pub struct IndexColumnExec {
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
-    plan_properties: PlanProperties,
+    plan_properties: Arc<PlanProperties>,
     start_index: u64,
 }
 
 impl IndexColumnExec {
     fn new(input: Arc<dyn ExecutionPlan>, schema: SchemaRef, start_index: u64) -> Self {
-        let eq_properties = EquivalenceProperties::new_with_orderings(schema.clone(), &[]);
-        let plan_properties = PlanProperties::new(
+        let eq_properties = EquivalenceProperties::new(schema.clone());
+        let plan_properties = Arc::new(PlanProperties::new(
             eq_properties, // Equivalence Properties
             datafusion::physical_expr::Partitioning::UnknownPartitioning(1), // Output Partitioning
             EmissionType::Both,
             Boundedness::Bounded, // Execution Mode
-        );
+        ));
         Self {
             input,
             schema,
@@ -400,7 +398,7 @@ impl ExecutionPlan for IndexColumnExec {
         self
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.plan_properties
     }
 
@@ -515,8 +513,8 @@ async fn read_stream(
     // limit the number of files to read in parallel to support streaming from replicas
     let stream = reader
         .read(filter_and_create_stream(Ok(files), Arc::new(file_urls.clone())).await?)
-        .await
         .map_err(to_datafusion_error)?
+        .stream()
         .map_err(to_datafusion_error);
     Ok(Box::pin(stream))
 }
