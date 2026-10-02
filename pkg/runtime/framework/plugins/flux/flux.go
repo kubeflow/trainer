@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -142,7 +143,10 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 		trainJob.Spec.Trainer = &trainer.Trainer{}
 	}
 	trainJob.Spec.Trainer.Command = []string{"/bin/bash", "/etc/flux-config/entrypoint.sh", originalCmd}
-	trainJob.Spec.Trainer.Args = nil
+	// Empty rather than nil: the builder applies args only when they are non-nil, so an empty
+	// slice is what replaces the Runtime-declared ones on the container. A nil would leave them
+	// there for the entrypoint to concatenate onto the command it already wraps.
+	trainJob.Spec.Trainer.Args = []string{}
 
 	// Define the Init Container. This has a spack view with flux pre-built, and we add to an emptyDir
 	// with configuration that is then accessible to the application. The OS/version should match.
@@ -378,6 +382,7 @@ func getOriginalCommand(trainJob *trainer.TrainJob, info *runtime.Info) string {
 	trainerContainer := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node)
 	if trainerContainer != nil {
 		command = trainerContainer.Command
+		args = trainerContainer.Args
 	}
 
 	// Override if user defined them in the top-level Trainer spec
@@ -390,8 +395,9 @@ func getOriginalCommand(trainJob *trainer.TrainJob, info *runtime.Info) string {
 		}
 	}
 
-	// Combine into a single string for the shell script
-	fullCommand := strings.Join(append(command, args...), " ")
+	// Combine into a single string for the shell script. Concat rather than append: command and
+	// args alias the PodSet container's own slices.
+	fullCommand := strings.Join(slices.Concat(command, args), " ")
 	return strings.TrimSpace(fullCommand)
 }
 

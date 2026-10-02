@@ -428,31 +428,35 @@ func TestNewInfo(t *testing.T) {
 				Scheduler:   &Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
-		"image and command are extracted from containers and init containers": {
+		"image, command and args are extracted from containers and init containers": {
 			infoOpts: []InfoOption{
 				WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 2, corev1.PodSpec{
 					Containers: []corev1.Container{{
 						Name:    constants.Node,
 						Image:   "train:latest",
 						Command: []string{"python", "train.py"},
+						Args:    []string{"--epochs", "10"},
 					}},
 					InitContainers: []corev1.Container{{
 						Name:    "flux-installer",
 						Image:   "flux:v1",
 						Command: []string{"/bin/bash", "/etc/flux-config/init.sh"},
+						Args:    []string{"--verbose"},
 					}},
 				}, corev1ac.PodSpec().
 					WithContainers(
 						corev1ac.Container().
 							WithName(constants.Node).
 							WithImage("train:latest").
-							WithCommand("python", "train.py"),
+							WithCommand("python", "train.py").
+							WithArgs("--epochs", "10"),
 					).
 					WithInitContainers(
 						corev1ac.Container().
 							WithName("flux-installer").
 							WithImage("flux:v1").
-							WithCommand("/bin/bash", "/etc/flux-config/init.sh"),
+							WithCommand("/bin/bash", "/etc/flux-config/init.sh").
+							WithArgs("--verbose"),
 					),
 				),
 			},
@@ -470,11 +474,13 @@ func TestNewInfo(t *testing.T) {
 								Name:    constants.Node,
 								Image:   "train:latest",
 								Command: []string{"python", "train.py"},
+								Args:    []string{"--epochs", "10"},
 							}},
 							InitContainers: []Container{{
 								Name:    "flux-installer",
 								Image:   "flux:v1",
 								Command: []string{"/bin/bash", "/etc/flux-config/init.sh"},
+								Args:    []string{"--verbose"},
 							}},
 							SinglePodRequests: corev1.ResourceList{},
 						},
