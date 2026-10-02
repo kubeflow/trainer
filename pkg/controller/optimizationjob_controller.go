@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"maps"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -68,13 +70,34 @@ type OptimizationJobReconciler struct {
 	Log                   logr.Logger
 	Recorder              events.EventRecorder
 	SearchAlgorithmClient SearchAlgorithmClient
+	APIReader             client.Reader
+	clock                 clock.PassiveClock
+	expectationsMu        sync.Mutex
+	pendingTrials         map[types.NamespacedName]*trialCreationExpectations
 }
+
+// trialCreationExpectations is in-memory and best-effort: it is cleared on controller restart.
+// uid pins the map to a specific OptimizationJob generation so that entries are discarded when
+// the OptimizationJob is recreated with the same namespace/name.
+// names maps each pending trial name to the local time the Create call was issued, which is used
+// to identify overdue expectations that need live-API verification.
+type trialCreationExpectations struct {
+	uid   types.UID
+	names map[string]time.Time
+}
+
+const (
+	trialCacheRequeueDelay = time.Second
+	// Read the live API only after the cache has had time to observe a created trial.
+	trialExpectationVerifyDelay = 30 * time.Second
+)
 
 func NewOptimizationJobReconciler(
 	client client.Client,
 	scheme *runtime.Scheme,
 	recorder events.EventRecorder,
 	algorithmClient SearchAlgorithmClient,
+	apiReader client.Reader,
 ) *OptimizationJobReconciler {
 	if algorithmClient == nil {
 		algorithmClient = &DefaultSearchAlgorithmClient{}
@@ -86,10 +109,112 @@ func NewOptimizationJobReconciler(
 		Log:                   ctrl.Log.WithName("optimizationjob-controller"),
 		Recorder:              recorder,
 		SearchAlgorithmClient: algorithmClient,
+		APIReader:             apiReader,
+		clock:                 clock.RealClock{},
+		pendingTrials:         make(map[types.NamespacedName]*trialCreationExpectations),
 	}
 }
 
 const jobOwnerKey = ".metadata.controller"
+
+func (r *OptimizationJobReconciler) expectTrialCreation(key types.NamespacedName, uid types.UID, name string) {
+	r.expectationsMu.Lock()
+	defer r.expectationsMu.Unlock()
+
+	if r.pendingTrials == nil {
+		r.pendingTrials = make(map[types.NamespacedName]*trialCreationExpectations)
+	}
+	expectations := r.pendingTrials[key]
+	if expectations == nil || expectations.uid != uid {
+		expectations = &trialCreationExpectations{uid: uid, names: make(map[string]time.Time)}
+		r.pendingTrials[key] = expectations
+	}
+	c := r.clock
+	if c == nil {
+		c = clock.RealClock{}
+	}
+	expectations.names[name] = c.Now()
+}
+
+func (r *OptimizationJobReconciler) forgetTrialCreation(key types.NamespacedName, name string) {
+	r.expectationsMu.Lock()
+	defer r.expectationsMu.Unlock()
+
+	if expectations := r.pendingTrials[key]; expectations != nil {
+		delete(expectations.names, name)
+		if len(expectations.names) == 0 {
+			delete(r.pendingTrials, key)
+		}
+	}
+}
+
+func (r *OptimizationJobReconciler) observeTrialCreations(key types.NamespacedName, uid types.UID, trainJobs []trainer.TrainJob) []string {
+	r.expectationsMu.Lock()
+	defer r.expectationsMu.Unlock()
+
+	expectations := r.pendingTrials[key]
+	if expectations == nil {
+		return nil
+	}
+	if expectations.uid != uid {
+		delete(r.pendingTrials, key)
+		return nil
+	}
+	for _, trainJob := range trainJobs {
+		delete(expectations.names, trainJob.Name)
+	}
+	if len(expectations.names) == 0 {
+		delete(r.pendingTrials, key)
+	}
+	c := r.clock
+	if c == nil {
+		c = clock.RealClock{}
+	}
+	var overdue []string
+	for name, createdAt := range expectations.names {
+		if c.Since(createdAt) >= trialExpectationVerifyDelay {
+			overdue = append(overdue, name)
+		}
+	}
+	return overdue
+}
+
+func (r *OptimizationJobReconciler) verifyPendingTrialCreations(ctx context.Context, optJob *trainer.OptimizationJob, overdue []string) (int32, error) {
+	key := client.ObjectKeyFromObject(optJob)
+	reader := r.APIReader
+	if reader == nil {
+		reader = r.Client
+	}
+	for _, name := range overdue {
+		trainJob := &trainer.TrainJob{}
+		err := reader.Get(ctx, types.NamespacedName{Namespace: optJob.Namespace, Name: name}, trainJob)
+		if errors.IsNotFound(err) {
+			ctrl.LoggerFrom(ctx).Info("Pending trial not found, releasing expectation", "trainJob", name)
+			r.forgetTrialCreation(key, name)
+			continue
+		}
+		if err != nil {
+			return 0, fmt.Errorf("verify pending trial %q: %w", name, err)
+		}
+		if owner := metav1.GetControllerOf(trainJob); owner == nil || owner.UID != optJob.UID {
+			ctrl.LoggerFrom(ctx).Info("Pending trial is not owned by this OptimizationJob, releasing expectation", "trainJob", name)
+			r.forgetTrialCreation(key, name)
+		}
+	}
+
+	r.expectationsMu.Lock()
+	defer r.expectationsMu.Unlock()
+	if expectations := r.pendingTrials[key]; expectations != nil && expectations.uid == optJob.UID {
+		return int32(len(expectations.names)), nil
+	}
+	return 0, nil
+}
+
+func (r *OptimizationJobReconciler) clearTrialExpectations(key types.NamespacedName) {
+	r.expectationsMu.Lock()
+	defer r.expectationsMu.Unlock()
+	delete(r.pendingTrials, key)
+}
 
 func SetupIndexes(ctx context.Context, indexer client.FieldIndexer) error {
 	return indexer.IndexField(ctx, &trainer.TrainJob{}, jobOwnerKey, func(rawObj client.Object) []string {
@@ -114,6 +239,9 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	optJob := &trainer.OptimizationJob{}
 	if getErr := r.Get(ctx, req.NamespacedName, optJob); getErr != nil {
+		if errors.IsNotFound(getErr) {
+			r.clearTrialExpectations(req.NamespacedName)
+		}
 		return ctrl.Result{}, client.IgnoreNotFound(getErr)
 	}
 
@@ -179,7 +307,12 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			activeTrials++
 		}
 	}
-	totalTrials := activeTrials + succeededTrials + failedTrials
+	overdueTrials := r.observeTrialCreations(req.NamespacedName, optJob.UID, trainJobs)
+	pendingTrials, verifyErr := r.verifyPendingTrialCreations(ctx, optJob, overdueTrials)
+	if verifyErr != nil {
+		return ctrl.Result{}, verifyErr
+	}
+	totalTrials := activeTrials + succeededTrials + failedTrials + pendingTrials
 
 	// 2. Continuous Best Result Tracking
 	if len(validTrainJobs) > 0 {
@@ -190,11 +323,13 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// 3. Ignore completed jobs and trigger cleanup
 	if isJobCompleted(optJob) {
+		r.clearTrialExpectations(req.NamespacedName)
 		return ctrl.Result{}, r.cleanupAlgorithmService(ctx, optJob)
 	}
 
 	// 4. Check for Overall Experiment Failure (Phase 1 logic)
 	if invalidMetricErr != nil {
+		r.clearTrialExpectations(req.NamespacedName)
 		reason := "ObjectiveMetricInvalid"
 		if stderrors.Is(invalidMetricErr, optimizationjob.ErrObjectiveMetricMissing) {
 			reason = "ObjectiveMetricMissing"
@@ -208,6 +343,7 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 	if failedTrials > 0 {
+		r.clearTrialExpectations(req.NamespacedName)
 		log.Info("A trial failed. Marking OptimizationJob Failed.")
 		meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
 			Type:    constants.OptimizationJobFailed,
@@ -219,7 +355,8 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// 5. Check for Overall Experiment Completion
-	if totalTrials >= optJob.Spec.NumTrials && activeTrials == 0 {
+	if totalTrials >= optJob.Spec.NumTrials && activeTrials+pendingTrials == 0 {
+		r.clearTrialExpectations(req.NamespacedName)
 		log.Info("All trials finished. Marking OptimizationJob Complete.")
 		meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
 			Type:    constants.OptimizationJobComplete,
@@ -232,6 +369,7 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// 6. Only "Random" is supported for Phase1.
 	if optJob.Spec.SearchAlgorithm == nil || optJob.Spec.SearchAlgorithm.Random == nil {
+		r.clearTrialExpectations(req.NamespacedName)
 		log.Info("Unsupported search algorithm. Only 'random' is supported in phase 1.")
 		meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
 			Type:    constants.OptimizationJobFailed,
@@ -242,7 +380,14 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
-	// 7. Ensure the Algorithm Service is Running
+	// 7. Scale Up New Trials based on Budget Constraints
+	if pendingTrials > 0 {
+		// Wait until the cache observes every successful Create before requesting more trials.
+		log.V(1).Info("Waiting for cache to observe created trials before spawning more", "pendingTrials", pendingTrials)
+		return ctrl.Result{RequeueAfter: trialCacheRequeueDelay}, nil
+	}
+
+	// 8. Ensure the Algorithm Service is Running
 	isServiceReady, srvErr := r.createAlgorithmServiceIfNecessary(ctx, optJob)
 	if srvErr != nil {
 		return ctrl.Result{}, srvErr
@@ -261,7 +406,6 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		})
 	}
 
-	// 8. Scale Up New Trials based on Budget Constraints
 	if activeTrials >= optJob.Spec.ParallelTrials {
 		// We are at maximum concurrency, exit early.
 		return ctrl.Result{}, nil
@@ -274,11 +418,12 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		trialsToSpawn = trialsRemaining
 	}
 
-	// TODO: Implement cache Expectations to prevent over-spawning trials due to cache sync delays.
 	if trialsToSpawn > 0 {
 		if spawnErr := r.createTrainJobs(ctx, optJob, trainJobs, trialsToSpawn); spawnErr != nil {
 			return ctrl.Result{}, spawnErr
 		}
+		// Recheck even if no watch event arrives for a newly created TrainJob.
+		return ctrl.Result{RequeueAfter: trialCacheRequeueDelay}, nil
 	}
 
 	return ctrl.Result{}, nil
@@ -383,11 +528,35 @@ func (r *OptimizationJobReconciler) createTrainJobs(ctx context.Context, optJob 
 			errMsgs = append(errMsgs, msg)
 			continue
 		}
+		r.expectTrialCreation(client.ObjectKeyFromObject(optJob), optJob.UID, newTrainJob.Name)
 		if err := r.Create(ctx, newTrainJob); err != nil {
 			if errors.IsAlreadyExists(err) {
+				r.forgetTrialCreation(client.ObjectKeyFromObject(optJob), newTrainJob.Name)
 				continue
 			}
-			msg := fmt.Sprintf("Failed to create TrainJob trial: %v", err)
+			// An API timeout can occur after the Create was committed. Keep the
+			// expectation unless a live read confirms this trial does not exist
+			// or is not owned by this OptimizationJob.
+			current := &trainer.TrainJob{}
+			var reader client.Reader = r.Client
+			if r.APIReader != nil {
+				reader = r.APIReader
+			}
+			getErr := reader.Get(ctx, client.ObjectKeyFromObject(newTrainJob), current)
+			switch {
+			case errors.IsNotFound(getErr):
+				r.forgetTrialCreation(client.ObjectKeyFromObject(optJob), newTrainJob.Name)
+			case getErr != nil:
+				log.Error(getErr, "Failed to verify TrainJob trial after Create error", "trainJob", newTrainJob.Name)
+			default:
+				if owner := metav1.GetControllerOf(current); owner == nil || owner.UID != optJob.UID {
+					r.forgetTrialCreation(client.ObjectKeyFromObject(optJob), newTrainJob.Name)
+				} else {
+					// The Create was committed despite the error.
+					continue
+				}
+			}
+			msg := fmt.Sprintf("Failed to create TrainJob trial %q: %v", newTrainJob.Name, err)
 			log.Error(err, msg)
 			r.Recorder.Eventf(optJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "Creating", "%s", msg)
 			errMsgs = append(errMsgs, msg)
