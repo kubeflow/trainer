@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -26,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
@@ -897,6 +899,99 @@ var _ = ginkgo.Describe("OptimizationJob e2e", func() {
 	})
 
 	ginkgo.When("Creating OptimizationJob with random search algorithm", func() {
+		ginkgo.It("should keep trial counts within parallel and total limits during rapid reconciles", func() {
+			optJob := testingutil.MakeOptimizationJobWrapper(ns.Name, "e2e-cache-expectations").
+				NumTrials(3).
+				ParallelTrials(2).
+				SearchAlgorithm(&trainer.SearchAlgorithm{Random: &trainer.RandomAlgorithm{}}).
+				Objectives(trainer.Objective{Metric: "accuracy", Direction: trainer.ObjectiveDirectionMaximize}).
+				Parameters(trainer.Parameter{
+					Name: "learning_rate",
+					SearchSpace: &trainer.SearchSpace{Uniform: trainer.UniformSpace{
+						Min: "0.001", Max: "0.1", Type: trainer.ParameterTypeFloat,
+					}},
+				}).
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{Spec: trainer.TrainJobSpec{
+					Suspend: ptr.To(true),
+					RuntimeRef: trainer.RuntimeRef{
+						Name: torchRuntime, APIGroup: ptr.To(trainer.GroupVersion.Group), Kind: ptr.To(trainer.ClusterTrainingRuntimeKind),
+					},
+					Trainer: &trainer.Trainer{Command: []string{"python3", "-c"}, Args: []string{statusUpdateScript}},
+				}}).
+				Obj()
+			gomega.Expect(k8sClient.Create(ctx, optJob)).To(gomega.Succeed())
+
+			listTrials := func(g gomega.Gomega) []trainer.TrainJob {
+				var trainJobs trainer.TrainJobList
+				g.Expect(k8sClient.List(ctx, &trainJobs, client.InNamespace(ns.Name), client.MatchingLabels{
+					constants.OptimizationJobNameLabel: optJob.Name,
+				})).To(gomega.Succeed())
+				return trainJobs.Items
+			}
+			resumeTrial := func(name string) {
+				gomega.Eventually(func(g gomega.Gomega) {
+					trainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: ns.Name, Name: name}, trainJob)).To(gomega.Succeed())
+					trainJob.Spec.Suspend = ptr.To(false)
+					g.Expect(k8sClient.Update(ctx, trainJob)).To(gomega.Succeed())
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			}
+			var update int
+			assertTrialCountUnderReconciles := func(want int, duration time.Duration) {
+				gomega.Consistently(func(g gomega.Gomega) {
+					update++
+					patch := client.RawPatch(types.MergePatchType, []byte(fmt.Sprintf(
+						`{"metadata":{"annotations":{"trainer.kubeflow.org/test-reconcile":"%d"}}}`, update)))
+					g.Expect(k8sClient.Patch(ctx, optJob, patch)).To(gomega.Succeed())
+					g.Expect(listTrials(g)).To(gomega.HaveLen(want))
+				}, duration, util.Interval).Should(gomega.Succeed())
+			}
+
+			var initialTrials []trainer.TrainJob
+			ginkgo.By("Waiting for two suspended trials", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					initialTrials = listTrials(g)
+					g.Expect(initialTrials).To(gomega.HaveLen(2))
+					for _, trial := range initialTrials {
+						g.Expect(trial.Spec.Suspend).To(gomega.Equal(ptr.To(true)))
+					}
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Forcing rapid reconciles while neither trial can complete", func() {
+				assertTrialCountUnderReconciles(2, 5*time.Second)
+			})
+
+			ginkgo.By("Completing one trial and admitting exactly one replacement", func() {
+				resumeTrial(initialTrials[0].Name)
+				gomega.Eventually(func(g gomega.Gomega) {
+					completed := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&initialTrials[0]), completed)).To(gomega.Succeed())
+					g.Expect(meta.IsStatusConditionTrue(completed.Status.Conditions, trainer.TrainJobComplete)).To(gomega.BeTrue())
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					trials := listTrials(g)
+					g.Expect(trials).To(gomega.HaveLen(3))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+				assertTrialCountUnderReconciles(3, 3*time.Second)
+			})
+
+			ginkgo.By("Completing the remaining trials without exceeding the total budget", func() {
+				for _, trial := range listTrials(gomega.Default) {
+					if trial.Name != initialTrials[0].Name {
+						resumeTrial(trial.Name)
+					}
+				}
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotOptJob := &trainer.OptimizationJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(optJob), gotOptJob)).To(gomega.Succeed())
+					g.Expect(gotOptJob.Status).NotTo(gomega.BeNil())
+					g.Expect(meta.IsStatusConditionTrue(gotOptJob.Status.Conditions, constants.OptimizationJobComplete)).To(gomega.BeTrue())
+					g.Expect(listTrials(g)).To(gomega.HaveLen(3))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+		})
+
 		ginkgo.It("should provision algorithm service, run trials to completion, record best result, and perform cleanup", func() {
 			optJob := testingutil.MakeOptimizationJobWrapper(ns.Name, "e2e-random-optjob").
 				NumTrials(1).
