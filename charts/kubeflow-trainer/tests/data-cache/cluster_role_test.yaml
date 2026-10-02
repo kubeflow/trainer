@@ -81,3 +81,31 @@ tests:
             resources:
               - serviceaccounts
             verbs: ["create", "delete", "get", "list", "watch"]
+
+  - it: Should have correct rules for trainjobs
+    set:
+      dataCache:
+        enabled: true
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - trainer.kubeflow.org
+            resources:
+              - trainjobs
+            verbs: ["get"]
+
+  - it: Should have correct rules for trainjobs finalizers
+    set:
+      dataCache:
+        enabled: true
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - trainer.kubeflow.org
+            resources:
+              - trainjobs/finalizers
+            verbs: ["update"]
