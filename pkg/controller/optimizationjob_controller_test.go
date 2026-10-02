@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -46,17 +47,57 @@ import (
 
 type mockFailingClient struct {
 	client.Client
-	failPatchDeploy    bool
-	failCreateTrainJob bool
+	failPatchDeploy                bool
+	failCreateTrainJob             bool
+	failCreateTrainJobAfterPersist bool
+	failTrainJobCreateNumber       int
+	trainJobCreateCalls            int
+}
+
+type delayedTrainJobListClient struct {
+	client.Client
+	visibleNames map[string]bool
+}
+
+func (c *delayedTrainJobListClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	if err := c.Client.List(ctx, list, opts...); err != nil {
+		return err
+	}
+	trainJobs, ok := list.(*trainer.TrainJobList)
+	if !ok {
+		return nil
+	}
+	visible := trainJobs.Items[:0]
+	for _, trainJob := range trainJobs.Items {
+		if c.visibleNames[trainJob.Name] {
+			visible = append(visible, trainJob)
+		}
+	}
+	trainJobs.Items = visible
+	return nil
 }
 
 func (m *mockFailingClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if _, ok := obj.(*trainer.TrainJob); ok {
+		m.trainJobCreateCalls++
+		if m.trainJobCreateCalls == m.failTrainJobCreateNumber {
+			return fmt.Errorf("mock trainjob creation failed on call %d", m.trainJobCreateCalls)
+		}
+	}
 	if m.failCreateTrainJob {
 		if _, ok := obj.(*trainer.TrainJob); ok {
 			return fmt.Errorf("mock trainjob creation failed")
 		}
 	}
-	return m.Client.Create(ctx, obj, opts...)
+	if err := m.Client.Create(ctx, obj, opts...); err != nil {
+		return err
+	}
+	if m.failCreateTrainJobAfterPersist {
+		if _, ok := obj.(*trainer.TrainJob); ok {
+			return fmt.Errorf("mock trainjob response failed after persistence")
+		}
+	}
+	return nil
 }
 
 func (m *mockFailingClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
@@ -552,7 +593,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 					{{Name: "lr", Value: "0.03"}},
 				},
 			},
-			wantRequeue: false,
+			wantRequeue: true,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
 				job.Status = &trainer.OptimizationJobStatus{
@@ -585,6 +626,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			wantRequestNumber:   2,
 			wantSuggestionCalls: 1,
 			wantTrainJobs:       2,
+			wantRequeue:         true,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
 				job.Spec.ParallelTrials = 2
@@ -1228,6 +1270,316 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestReconcile_TrialCreationExpectations(t *testing.T) {
+	ctx := context.Background()
+	optJob := getBaseOptJob()
+	optJob.Spec.NumTrials = 3
+	optJob.Spec.ParallelTrials = 2
+	serviceName := optimizationjob.GetAlgorithmServiceName(optJob)
+	deploy := &appsv1.Deployment{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: optJob.Namespace},
+		Status:     appsv1.DeploymentStatus{AvailableReplicas: 1},
+	}
+	service := &corev1.Service{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
+		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: optJob.Namespace},
+	}
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := trainer.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	builder := utiltesting.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&trainer.OptimizationJob{}, &trainer.TrainJob{}, &appsv1.Deployment{}).
+		WithObjects(optJob, deploy, service)
+	if err := SetupIndexes(ctx, utiltesting.AsIndex(builder)); err != nil {
+		t.Fatal(err)
+	}
+	baseClient := builder.Build()
+	delayedClient := &delayedTrainJobListClient{Client: baseClient, visibleNames: make(map[string]bool)}
+	suggestions := &mockSearchAlgorithmClient{mockedAssignments: [][]trainer.ParameterAssignment{
+		{{Name: "lr", Value: "0.01"}},
+		{{Name: "lr", Value: "0.02"}},
+	}}
+	r := NewOptimizationJobReconciler(delayedClient, scheme, &events.FakeRecorder{}, suggestions)
+	r.APIReader = baseClient
+	request := reconcile.Request{NamespacedName: client.ObjectKeyFromObject(optJob)}
+	reconcileOnce := func() reconcile.Result {
+		t.Helper()
+		result, err := r.Reconcile(ctx, request)
+		if err != nil {
+			t.Fatalf("Reconcile() failed: %v", err)
+		}
+		return result
+	}
+	listCreated := func(want int) []trainer.TrainJob {
+		t.Helper()
+		var trainJobs trainer.TrainJobList
+		if err := baseClient.List(ctx, &trainJobs, client.InNamespace(optJob.Namespace)); err != nil {
+			t.Fatal(err)
+		}
+		if len(trainJobs.Items) != want {
+			t.Fatalf("created %d trials, want %d", len(trainJobs.Items), want)
+		}
+		return trainJobs.Items
+	}
+
+	// The API accepts two Creates, but the cache still returns an empty TrainJob list.
+	reconcileOnce()
+	firstTwo := listCreated(2)
+	for range 3 {
+		if result := reconcileOnce(); result.RequeueAfter != trialCacheRequeueDelay {
+			t.Fatalf("pending trial RequeueAfter = %v, want %v", result.RequeueAfter, trialCacheRequeueDelay)
+		}
+	}
+	listCreated(2)
+	if suggestions.calls != 1 {
+		t.Fatalf("suggestion calls before cache catch-up = %d, want 1", suggestions.calls)
+	}
+
+	// Seeing only one of two Creates must not free a slot for another suggestion.
+	delayedClient.visibleNames[firstTwo[0].Name] = true
+	for range 3 {
+		if result := reconcileOnce(); result.RequeueAfter != trialCacheRequeueDelay {
+			t.Fatalf("partially observed trials RequeueAfter = %v, want %v", result.RequeueAfter, trialCacheRequeueDelay)
+		}
+	}
+	listCreated(2)
+	if suggestions.calls != 1 {
+		t.Fatalf("suggestion calls with one trial still hidden = %d, want 1", suggestions.calls)
+	}
+
+	for _, trainJob := range firstTwo {
+		delayedClient.visibleNames[trainJob.Name] = true
+	}
+	reconcileOnce()
+	if suggestions.calls != 1 {
+		t.Fatalf("suggestion calls at parallel limit = %d, want 1", suggestions.calls)
+	}
+
+	// Once one visible trial completes, exactly one budget slot opens.
+	completed := firstTwo[0].DeepCopy()
+	completed.Status.Conditions = []metav1.Condition{{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue}}
+	completed.Status.TrainerStatus = &trainer.TrainerStatus{Metrics: []trainer.Metric{{Name: "accuracy", Value: "0.8"}}}
+	if err := baseClient.Status().Update(ctx, completed); err != nil {
+		t.Fatal(err)
+	}
+	reconcileOnce()
+	listCreated(3)
+	if suggestions.calls != 2 || suggestions.lastReq.CurrentRequestNumber != 1 {
+		t.Fatalf("suggestion calls = %d, last request count = %d; want 2 calls and one new trial", suggestions.calls, suggestions.lastReq.CurrentRequestNumber)
+	}
+
+	// The third Create remains invisible; rapid reconciles must not exceed numTrials.
+	for range 3 {
+		if result := reconcileOnce(); result.RequeueAfter != trialCacheRequeueDelay {
+			t.Fatalf("pending third trial RequeueAfter = %v, want %v", result.RequeueAfter, trialCacheRequeueDelay)
+		}
+	}
+	listCreated(3)
+	if suggestions.calls != 2 {
+		t.Fatalf("suggestion calls while third trial is hidden = %d, want 2", suggestions.calls)
+	}
+
+	// An overdue expectation remains pending while the live API still has the trial.
+	var third *trainer.TrainJob
+	for _, trainJob := range listCreated(3) {
+		if !delayedClient.visibleNames[trainJob.Name] {
+			third = trainJob.DeepCopy()
+			break
+		}
+	}
+	if third == nil {
+		t.Fatal("expected the third trial to remain hidden from the cache")
+	}
+	r.expectationsMu.Lock()
+	r.pendingTrials[request.NamespacedName].names[third.Name] = time.Now().Add(-trialExpectationVerifyDelay)
+	r.expectationsMu.Unlock()
+	reconcileOnce()
+	listCreated(3)
+	if suggestions.calls != 2 {
+		t.Fatalf("suggestion calls with live pending trial = %d, want 2", suggestions.calls)
+	}
+
+	// If that trial is deleted before cache visibility, live verification releases the slot.
+	if err := baseClient.Delete(ctx, third); err != nil {
+		t.Fatal(err)
+	}
+	reconcileOnce()
+	listCreated(3)
+	if suggestions.calls != 3 || suggestions.lastReq.CurrentRequestNumber != 1 {
+		t.Fatalf("suggestion calls after missing trial = %d, last request count = %d; want 3 calls and one replacement", suggestions.calls, suggestions.lastReq.CurrentRequestNumber)
+	}
+}
+
+func TestReconcile_TrialCreateErrorExpectations(t *testing.T) {
+	cases := map[string]struct {
+		persistBeforeError bool
+		wantCalls          int
+	}{
+		"create rejected":                 {wantCalls: 2},
+		"response lost after persistence": {persistBeforeError: true, wantCalls: 1},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			optJob := getBaseOptJob()
+			serviceName := optimizationjob.GetAlgorithmServiceName(optJob)
+			deploy := &appsv1.Deployment{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: optJob.Namespace},
+				Status:     appsv1.DeploymentStatus{AvailableReplicas: 1},
+			}
+			service := &corev1.Service{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Service"}, ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: optJob.Namespace}}
+			scheme := runtime.NewScheme()
+			_ = corev1.AddToScheme(scheme)
+			_ = appsv1.AddToScheme(scheme)
+			_ = trainer.AddToScheme(scheme)
+			builder := utiltesting.NewClientBuilder().
+				WithScheme(scheme).
+				WithStatusSubresource(&trainer.OptimizationJob{}, &trainer.TrainJob{}, &appsv1.Deployment{}).
+				WithObjects(optJob, deploy, service)
+			if err := SetupIndexes(ctx, utiltesting.AsIndex(builder)); err != nil {
+				t.Fatal(err)
+			}
+			baseClient := builder.Build()
+			delayedClient := &delayedTrainJobListClient{Client: baseClient, visibleNames: make(map[string]bool)}
+			clientWithFailure := &mockFailingClient{
+				Client:                         delayedClient,
+				failCreateTrainJob:             !tc.persistBeforeError,
+				failCreateTrainJobAfterPersist: tc.persistBeforeError,
+			}
+			suggestions := &mockSearchAlgorithmClient{mockedAssignments: [][]trainer.ParameterAssignment{{{Name: "lr", Value: "0.01"}}}}
+			r := NewOptimizationJobReconciler(clientWithFailure, scheme, &events.FakeRecorder{}, suggestions)
+			r.APIReader = baseClient
+			request := reconcile.Request{NamespacedName: client.ObjectKeyFromObject(optJob)}
+			if _, err := r.Reconcile(ctx, request); err == nil {
+				t.Fatal("expected first TrainJob create to fail")
+			}
+			clientWithFailure.failCreateTrainJob = false
+			clientWithFailure.failCreateTrainJobAfterPersist = false
+			if result, err := r.Reconcile(ctx, request); err != nil || result.RequeueAfter != trialCacheRequeueDelay {
+				t.Fatalf("Reconcile() after create error = (%v, %v), want safe cache recheck", result, err)
+			}
+			if suggestions.calls != tc.wantCalls {
+				t.Fatalf("suggestion calls after create error = %d, want %d", suggestions.calls, tc.wantCalls)
+			}
+			var trainJobs trainer.TrainJobList
+			if err := baseClient.List(ctx, &trainJobs, client.InNamespace(optJob.Namespace)); err != nil {
+				t.Fatal(err)
+			}
+			if len(trainJobs.Items) != 1 {
+				t.Fatalf("created %d trials after retry, want 1", len(trainJobs.Items))
+			}
+		})
+	}
+}
+
+func TestReconcile_PartialTrialCreateFailure(t *testing.T) {
+	ctx := context.Background()
+	optJob := getBaseOptJob()
+	optJob.Spec.NumTrials = 3
+	optJob.Spec.ParallelTrials = 2
+	serviceName := optimizationjob.GetAlgorithmServiceName(optJob)
+	deploy := &appsv1.Deployment{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: optJob.Namespace},
+		Status:     appsv1.DeploymentStatus{AvailableReplicas: 1},
+	}
+	service := &corev1.Service{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
+		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: optJob.Namespace},
+	}
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := trainer.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	builder := utiltesting.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&trainer.OptimizationJob{}, &trainer.TrainJob{}, &appsv1.Deployment{}).
+		WithObjects(optJob, deploy, service)
+	if err := SetupIndexes(ctx, utiltesting.AsIndex(builder)); err != nil {
+		t.Fatal(err)
+	}
+	baseClient := builder.Build()
+	delayedClient := &delayedTrainJobListClient{Client: baseClient, visibleNames: make(map[string]bool)}
+	clientWithFailure := &mockFailingClient{Client: delayedClient, failTrainJobCreateNumber: 2}
+	suggestions := &mockSearchAlgorithmClient{mockedAssignments: [][]trainer.ParameterAssignment{
+		{{Name: "lr", Value: "0.01"}},
+		{{Name: "lr", Value: "0.02"}},
+	}}
+	r := NewOptimizationJobReconciler(clientWithFailure, scheme, &events.FakeRecorder{}, suggestions)
+	r.APIReader = baseClient
+	request := reconcile.Request{NamespacedName: client.ObjectKeyFromObject(optJob)}
+	listCreated := func(want int) []trainer.TrainJob {
+		t.Helper()
+		var trainJobs trainer.TrainJobList
+		if err := baseClient.List(ctx, &trainJobs, client.InNamespace(optJob.Namespace)); err != nil {
+			t.Fatal(err)
+		}
+		if len(trainJobs.Items) != want {
+			t.Fatalf("created %d trials, want %d", len(trainJobs.Items), want)
+		}
+		return trainJobs.Items
+	}
+
+	if _, err := r.Reconcile(ctx, request); err == nil {
+		t.Fatal("expected the second trial Create to fail")
+	}
+	first := listCreated(1)[0]
+	if suggestions.calls != 1 {
+		t.Fatalf("suggestion calls after partial batch failure = %d, want 1", suggestions.calls)
+	}
+	if result, err := r.Reconcile(ctx, request); err != nil || result.RequeueAfter != trialCacheRequeueDelay {
+		t.Fatalf("Reconcile() with hidden successful Create = (%v, %v), want cache recheck", result, err)
+	}
+	listCreated(1)
+	if suggestions.calls != 1 {
+		t.Fatalf("suggestion calls while first trial is hidden = %d, want 1", suggestions.calls)
+	}
+
+	delayedClient.visibleNames[first.Name] = true
+	if _, err := r.Reconcile(ctx, request); err != nil {
+		t.Fatalf("Reconcile() after cache catch-up failed: %v", err)
+	}
+	listCreated(2)
+	if suggestions.calls != 2 || suggestions.lastReq.CurrentRequestNumber != 1 {
+		t.Fatalf("suggestion calls = %d, last request count = %d; want 2 calls and one replacement", suggestions.calls, suggestions.lastReq.CurrentRequestNumber)
+	}
+	if result, err := r.Reconcile(ctx, request); err != nil || result.RequeueAfter != trialCacheRequeueDelay {
+		t.Fatalf("Reconcile() with replacement hidden = (%v, %v), want cache recheck", result, err)
+	}
+	listCreated(2)
+}
+
+func TestObserveTrialCreations_DifferentOptimizationJobUID(t *testing.T) {
+	r := &OptimizationJobReconciler{}
+	key := types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: "reused-name"}
+	r.expectTrialCreation(key, types.UID("old-uid"), "old-trial")
+	if overdue := r.observeTrialCreations(key, types.UID("new-uid"), nil); len(overdue) != 0 {
+		t.Fatalf("overdue trials for replacement OptimizationJob = %v, want none", overdue)
+	}
+	r.expectTrialCreation(key, types.UID("new-uid"), "new-trial")
+	if pending, err := r.verifyPendingTrialCreations(context.Background(), &trainer.OptimizationJob{
+		ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name, UID: types.UID("new-uid")},
+	}, nil); err != nil || pending != 1 {
+		t.Fatalf("pending trials for replacement OptimizationJob = %d, %v; want 1, nil", pending, err)
 	}
 }
 
