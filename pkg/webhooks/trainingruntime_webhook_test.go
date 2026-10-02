@@ -134,3 +134,70 @@ func TestValidateReplicatedJobs(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatePriorityClassName(t *testing.T) {
+	rJobsPath := field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs")
+	priorityClassNamePath := func(idx int) *field.Path {
+		return rJobsPath.Index(idx).Child("template").Child("spec").Child("template").Child("spec").Child("priorityClassName")
+	}
+
+	cases := map[string]struct {
+		rJobs     []jobsetv1alpha2.ReplicatedJob
+		wantError field.ErrorList
+	}{
+		"no priorityClassName anywhere": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				Obj().Spec.ReplicatedJobs,
+		},
+		"priorityClassName on the trainer node only": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				PodPriorityClassNameForJobs("high-priority", constants.Node).
+				Obj().Spec.ReplicatedJobs,
+		},
+		"priorityClassName on a non-trainer job": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				PodPriorityClassNameForJobs("high-priority", constants.DatasetInitializer).
+				Obj().Spec.ReplicatedJobs,
+			wantError: field.ErrorList{
+				field.Invalid(priorityClassNamePath(0), "high-priority", ""),
+			},
+		},
+		// The deepspeed and mlx shape: the launcher carries the trainer ancestor label, so a value on
+		// the job named node is rejected even though that is where the training Pods run.
+		"priorityClassName on node when the launcher is the trainer ancestor": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				LauncherReplica().
+				ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+				ReplicatedJobLabel(constants.LabelTrainJobAncestor, "", constants.Node).
+				PodPriorityClassNameForJobs("high-priority", constants.Node).
+				Obj().Spec.ReplicatedJobs,
+			wantError: field.ErrorList{
+				field.Invalid(priorityClassNamePath(3), "high-priority", ""),
+			},
+		},
+		"priorityClassName on the launcher when it is the trainer ancestor": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				LauncherReplica().
+				ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+				PodPriorityClassNameForJobs("high-priority", constants.Launcher).
+				Obj().Spec.ReplicatedJobs,
+		},
+		"priorityClassName on every job": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				PodPriorityClassName("high-priority").
+				Obj().Spec.ReplicatedJobs,
+			wantError: field.ErrorList{
+				field.Invalid(priorityClassNamePath(0), "high-priority", ""),
+				field.Invalid(priorityClassNamePath(1), "high-priority", ""),
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			gotErr := validatePriorityClassName(tc.rJobs)
+			if diff := cmp.Diff(tc.wantError, gotErr, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); len(diff) != 0 {
+				t.Errorf("validatePriorityClassName() mismatch (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}

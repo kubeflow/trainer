@@ -65,3 +65,35 @@ spec:
       annotations:
         scheduling.volcano.sh/queue-name: "high-priority-queue"
 ```
+
+### Setting a Priority Class
+
+A `PodGroup` is scheduled as a single gang and carries one `priorityClassName` for all of its Pods,
+so a runtime declares the priority class once, on the ReplicatedJob labelled as the trainer
+ancestor:
+
+```yaml
+spec:
+  podGroupPolicy:
+    volcano: {}
+  template:
+    spec:
+      replicatedJobs:
+        - name: node
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  priorityClassName: "high-priority"
+```
+
+The [`PriorityClass`](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass)
+must exist before the `TrainJob` is created, otherwise the `TrainJob` is rejected at admission.
+
+Kubeflow Trainer propagates this value to the Pod template of every other ReplicatedJob in the
+runtime, so the whole gang runs at the same priority rather than leaving the remaining Pods at the
+cluster default. Setting `priorityClassName` on any other ReplicatedJob is rejected when the
+runtime is created, since a gang has no meaningful way to run at two priorities at once.

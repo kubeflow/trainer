@@ -549,6 +549,15 @@ func (j *JobSetWrapper) PodPriorityClassName(value string) *JobSetWrapper {
 	return j
 }
 
+func (j *JobSetWrapper) PodPriorityClassNameForJobs(value string, rJobNames ...string) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if slices.Contains(rJobNames, rJob.Name) {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.PriorityClassName = value
+		}
+	}
+	return j
+}
+
 func (j *JobSetWrapper) Label(key, value string) *JobSetWrapper {
 	if j.Labels == nil {
 		j.Labels = make(map[string]string, 1)
