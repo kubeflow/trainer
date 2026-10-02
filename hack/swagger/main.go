@@ -19,12 +19,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/kube-openapi/pkg/builder3"
 	"k8s.io/kube-openapi/pkg/common"
-	builderutil "k8s.io/kube-openapi/pkg/openapiconv"
+	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -33,10 +36,11 @@ import (
 // Generate Kubeflow Training OpenAPI specification.
 func main() {
 	var oAPIDefs = map[string]common.OpenAPIDefinition{}
-	defs := spec.Definitions{}
+	defs := map[string]common.OpenAPIDefinition{}
 
+	// builder3 doesn't rewrite the refs of pre-built definitions, so they must target the v3 components.
 	refCallback := func(name string) spec.Ref {
-		return spec.MustCreateRef("#/definitions/" + swaggify(name))
+		return spec.MustCreateRef("#/components/schemas/" + common.EscapeJsonPointer(swaggify(name)))
 	}
 
 	for k, v := range trainer.GetOpenAPIDefinitions(refCallback) {
@@ -63,23 +67,33 @@ func main() {
 					val.Schema.SetProperty(property, schema)
 				}
 			}
-			defs[swaggify(defName)] = val.Schema
+			defs[defName] = val
 		}
 	}
-	swagger := spec.Swagger{
-		SwaggerProps: spec.SwaggerProps{
-			Swagger:     "2.0",
-			Definitions: defs,
-			Paths:       &spec.Paths{Paths: map[string]spec.PathItem{}},
-			Info: &spec.Info{
-				InfoProps: spec.InfoProps{
-					Title:   "Kubeflow Trainer OpenAPI Spec",
-					Version: "unversioned",
-				},
+	config := &common.OpenAPIV3Config{
+		Info: &spec.Info{
+			InfoProps: spec.InfoProps{
+				Title:   "Kubeflow Trainer OpenAPI Spec",
+				Version: "unversioned",
 			},
 		},
+		Definitions: defs,
+		GetDefinitionName: func(name string) (string, spec.Extensions) {
+			return swaggify(name), nil
+		},
 	}
-	swaggerOpenAPIV3 := builderutil.ConvertV2ToV3(&swagger)
+	schemas, err := builder3.BuildOpenAPIDefinitionsForResources(config, slices.Sorted(maps.Keys(defs))...)
+	if err != nil {
+		klog.Fatal(err.Error())
+	}
+	swaggerOpenAPIV3 := &spec3.OpenAPI{
+		Version: "3.0.0",
+		Info:    config.Info,
+		Paths:   &spec3.Paths{Paths: map[string]*spec3.Path{}},
+		Components: &spec3.Components{
+			Schemas: schemas,
+		},
+	}
 
 	jsonBytes, err := json.MarshalIndent(swaggerOpenAPIV3, "", "  ")
 	if err != nil {
