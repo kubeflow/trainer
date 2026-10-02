@@ -25,6 +25,7 @@ import (
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -687,6 +688,59 @@ func TestGetNumNodes(t *testing.T) {
 			info := &runtime.Info{TemplateSpec: runtime.TemplateSpec{PodSets: tc.podSets}}
 			if got := getNumNodes(info); got != tc.want {
 				t.Errorf("getNumNodes() = %d; want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestGenerateFluxEntrypoint(t *testing.T) {
+	cases := map[string]struct {
+		nodeResources corev1.ResourceList
+		wantContains  []string
+		wantOmits     []string
+	}{
+		"GPUs declared by the Runtime are passed as gpus-per-task": {
+			nodeResources: corev1.ResourceList{
+				"example.com/gpu": resource.MustParse("4"),
+			},
+			wantContains: []string{"-g 4", "--gpu=0-3"},
+		},
+		"no GPU in the node resources": {
+			nodeResources: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("4"),
+			},
+			wantOmits: []string{"-g ", "--gpu="},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			info := runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().FluxPolicy(ptr.To[int32](1)).Obj()).
+					Obj(),
+				),
+				runtime.WithTemplateSpecObjApply(utiltesting.MakeJobSetSpecApplyWithNodeResources(tc.nodeResources)),
+			)
+			// The TrainJob overrides memory only, so the GPUs can come from the Runtime alone.
+			trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "flux-job").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					Container("image", nil, nil, corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("32Gi"),
+					}).
+					Obj()).
+				Obj()
+
+			got := (&Flux{}).generateFluxEntrypoint(trainJob, info, 1)
+			for _, want := range tc.wantContains {
+				if !strings.Contains(got, want) {
+					t.Errorf("generateFluxEntrypoint() does not contain %q:\n%s", want, got)
+				}
+			}
+			for _, omit := range tc.wantOmits {
+				if strings.Contains(got, omit) {
+					t.Errorf("generateFluxEntrypoint() contains %q for a node without GPUs:\n%s", omit, got)
+				}
 			}
 		})
 	}

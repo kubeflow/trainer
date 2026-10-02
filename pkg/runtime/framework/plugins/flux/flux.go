@@ -422,9 +422,6 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 
 	// Derive number of GPUs from resources. In Flux, -g is --gpus-per-task
 	resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
-	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
-		resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
-	}
 	gpus := runtime.GetNumGPUPerNode(&resourcesPerNode)
 
 	// Resource file for cluster includes GPUs or not
