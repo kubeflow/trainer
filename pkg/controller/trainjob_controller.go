@@ -126,7 +126,10 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = errors.Join(err, statusErr)
 	}
 
-	deadlineResult := r.reconcileDeadline(ctx, &trainJob)
+	deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob)
+	if deadlineErr != nil {
+		err = errors.Join(err, deadlineErr)
+	}
 
 	if !equality.Semantic.DeepEqual(trainJob.Status, prevTrainJob.Status) {
 		// TODO(astefanutti): Consider using SSA once controller-runtime client has SSA support
@@ -153,9 +156,9 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 	return nil
 }
 
-func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) ctrl.Result {
+func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
 	if trainJob.Spec.ActiveDeadlineSeconds == 0 || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
-		return ctrl.Result{}
+		return ctrl.Result{}, nil
 	}
 	startTime := trainJob.CreationTimestamp.Time
 	suspendedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobSuspended)
@@ -163,23 +166,25 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 		startTime = suspendedCond.LastTransitionTime.Time
 	}
 	if startTime.IsZero() {
-		return ctrl.Result{}
+		return ctrl.Result{}, nil
 	}
 	deadline := startTime.Add(time.Duration(trainJob.Spec.ActiveDeadlineSeconds) * time.Second)
 	now := r.clock.Now()
 	if now.After(deadline) {
-		ctrl.LoggerFrom(ctx).V(2).Info("TrainJob deadline exceeded, marking as failed",
+		ctrl.LoggerFrom(ctx).V(2).Info("TrainJob deadline exceeded, cleaning up JobSet",
 			"activeDeadlineSeconds", trainJob.Spec.ActiveDeadlineSeconds,
 			"startTime", startTime,
 			"deadline", deadline)
-		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
 		jobSet := &jobsetv1alpha2.JobSet{
 			ObjectMeta: metav1.ObjectMeta{Name: trainJob.Name, Namespace: trainJob.Namespace},
 		}
 		if err := client.IgnoreNotFound(r.client.Delete(ctx, jobSet)); err != nil {
 			ctrl.LoggerFrom(ctx).V(2).Info("Failed to delete JobSet after deadline exceeded", "error", err)
+			return ctrl.Result{}, err 
 		}
-		return ctrl.Result{}
+		ctrl.LoggerFrom(ctx).V(2).Info("TrainJob deadline exceeded, marking as failed")
+		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
+		return ctrl.Result{}, nil
 	}
 	requeueAfter := deadline.Sub(now)
 	if requeueAfter <= 0 {
@@ -188,7 +193,7 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 	ctrl.LoggerFrom(ctx).V(2).Info("Scheduling deadline check",
 		"activeDeadlineSeconds", trainJob.Spec.ActiveDeadlineSeconds,
 		"requeueAfter", requeueAfter)
-	return ctrl.Result{RequeueAfter: requeueAfter}
+	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
 func (r *TrainJobReconciler) Create(e event.TypedCreateEvent[*trainer.TrainJob]) bool {

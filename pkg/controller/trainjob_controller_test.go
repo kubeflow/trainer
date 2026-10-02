@@ -186,8 +186,10 @@ func TestReconcileDeadline(t *testing.T) {
 				client: cli,
 				clock:  clocktesting.NewFakePassiveClock(tc.now),
 			}
-
-			gotResult := r.reconcileDeadline(ctx, tc.trainJob)
+			gotResult, err := r.reconcileDeadline(ctx, tc.trainJob)
+			if err != nil {
+				t.Fatalf("Unexpected error from reconcileDeadline: %v", err)
+			}
 
 			if diff := cmp.Diff(tc.wantResult, gotResult); len(diff) != 0 {
 				t.Errorf("Unexpected ctrl.Result (-want, +got): \n%s", diff)
