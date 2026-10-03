@@ -121,6 +121,24 @@ manager:
 | manager.volumeMounts | list | `[]` | Volume mounts for manager containers. |
 | manager.resources | object | `{}` | Pod resource requests and limits for manager containers. |
 | manager.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for manager containers. |
+| manager.networkPolicy | object | `{"enabled":false,"health":{"enabled":true,"from":[],"ports":[{"port":8081,"protocol":"TCP"}]},"metrics":{"enabled":true,"from":[],"ports":[{"port":8443,"protocol":"TCP"}]},"statusServer":{"enabled":true,"from":[{"namespaceSelector":{},"podSelector":{"matchLabels":{"trainer.kubeflow.org/trainjob-ancestor-step":"trainer"}}}],"ports":[{"port":10443,"protocol":"TCP"}]},"webhook":{"enabled":true,"from":[],"ports":[{"port":9443,"protocol":"TCP"}]}}` | NetworkPolicy configuration for manager pods. |
+| manager.networkPolicy.enabled | bool | `false` | Enable NetworkPolicy for manager pods. |
+| manager.networkPolicy.statusServer | object | `{"enabled":true,"from":[{"namespaceSelector":{},"podSelector":{"matchLabels":{"trainer.kubeflow.org/trainjob-ancestor-step":"trainer"}}}],"ports":[{"port":10443,"protocol":"TCP"}]}` | Ingress configuration for the status server port. |
+| manager.networkPolicy.statusServer.enabled | bool | `true` | Whether the status server ingress rule is enabled. |
+| manager.networkPolicy.statusServer.from | list | `[{"namespaceSelector":{},"podSelector":{"matchLabels":{"trainer.kubeflow.org/trainjob-ancestor-step":"trainer"}}}]` | Sources allowed to access the status server. Defaults to trainer pods across all namespaces. |
+| manager.networkPolicy.statusServer.ports | list | `[{"port":10443,"protocol":"TCP"}]` | Ports for the status server rule. |
+| manager.networkPolicy.webhook | object | `{"enabled":true,"from":[],"ports":[{"port":9443,"protocol":"TCP"}]}` | Ingress configuration for the webhook port. |
+| manager.networkPolicy.webhook.enabled | bool | `true` | Whether the webhook ingress rule is enabled. |
+| manager.networkPolicy.webhook.from | list | `[]` | Sources allowed to access the webhook. An empty list allows all ingress. |
+| manager.networkPolicy.webhook.ports | list | `[{"port":9443,"protocol":"TCP"}]` | Ports for the webhook rule. |
+| manager.networkPolicy.metrics | object | `{"enabled":true,"from":[],"ports":[{"port":8443,"protocol":"TCP"}]}` | Ingress configuration for the metrics port. |
+| manager.networkPolicy.metrics.enabled | bool | `true` | Whether the metrics ingress rule is enabled. |
+| manager.networkPolicy.metrics.from | list | `[]` | Sources allowed to access metrics. An empty list allows all ingress. |
+| manager.networkPolicy.metrics.ports | list | `[{"port":8443,"protocol":"TCP"}]` | Ports for the metrics rule. |
+| manager.networkPolicy.health | object | `{"enabled":true,"from":[],"ports":[{"port":8081,"protocol":"TCP"}]}` | Ingress configuration for the health probe port. |
+| manager.networkPolicy.health.enabled | bool | `true` | Whether the health probe ingress rule is enabled. |
+| manager.networkPolicy.health.from | list | `[]` | Sources allowed to access health probes. An empty list allows all ingress (e.g. kubelet). |
+| manager.networkPolicy.health.ports | list | `[{"port":8081,"protocol":"TCP"}]` | Ports for the health probe rule. |
 | manager.config | object | `{"certManagement":{"enable":true,"webhookSecretName":"","webhookServiceName":""},"clientConnection":{"burst":100,"qps":50},"controller":{"groupKindConcurrency":{"clusterTrainingRuntime":1,"trainJob":5,"trainingRuntime":1}},"featureGates":{},"health":{"healthProbeBindAddress":":8081","livenessEndpointName":"healthz","readinessEndpointName":"readyz"},"leaderElection":{"leaderElect":true,"leaseDuration":"15s","renewDeadline":"10s","resourceName":"trainer.kubeflow.org","resourceNamespace":"","retryPeriod":"2s"},"metrics":{"bindAddress":":8443","secureServing":true},"statusServer":{"burst":10,"port":10443,"qps":5},"webhook":{"host":"","port":9443}}` | Controller manager configuration. This configuration is used to generate the ConfigMap for the controller manager. |
 | manager.config.clientConnection.qps | int | `50` | QPS rate limit for the manager's Kubernetes API client. Accepts fractional values (e.g. 0.5). |
 | manager.config.clientConnection.burst | int | `100` | Burst rate limit for the manager's Kubernetes API client |

@@ -157,7 +157,25 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 	return b
 }
 
-// TODO: Supporting merge labels would be great.
+// PodAncestorLabels propagates the trainer ancestor label from Job metadata to the Pod template.
+// If the Pod template already specifies an ancestor label, the ReplicatedJob's ancestor label takes
+// precedence to guarantee consistency with the NetworkPolicy selector matching.
+func (b *Builder) PodAncestorLabels() *Builder {
+	for i := range b.Spec.ReplicatedJobs {
+		rJob := &b.Spec.ReplicatedJobs[i]
+		if rJob.Template != nil && rJob.Template.ObjectMetaApplyConfiguration != nil && rJob.Template.ObjectMetaApplyConfiguration.Labels != nil {
+			if ancestor, ok := rJob.Template.ObjectMetaApplyConfiguration.Labels[constants.LabelTrainJobAncestor]; ok {
+				if rJob.Template.Spec == nil || rJob.Template.Spec.Template == nil {
+					continue
+				}
+				rJob.Template.Spec.Template.WithLabels(map[string]string{
+					constants.LabelTrainJobAncestor: ancestor,
+				})
+			}
+		}
+	}
+	return b
+}
 
 func (b *Builder) PodLabels(labels map[string]string) *Builder {
 	for i := range b.Spec.ReplicatedJobs {

@@ -2554,6 +2554,85 @@ func TestBuild(t *testing.T) {
 				},
 			},
 		},
+		"ancestor label from Job metadata is propagated to Pod template": {
+			info: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{Name: constants.Node},
+							},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Obj(),
+			wantObjs: []apiruntime.Object{
+				&jobsetv1alpha2.JobSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{
+							{APIVersion: trainer.GroupVersion.String(), Kind: trainer.TrainJobKind, Name: "test-job", Controller: ptr.To(true)},
+						},
+					},
+					Spec: jobsetv1alpha2.JobSetSpec{
+						ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+							{
+								Name:     constants.Node,
+								Replicas: 1,
+								Template: batchv1.JobTemplateSpec{
+									ObjectMeta: metav1.ObjectMeta{
+										Labels: map[string]string{
+											constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+										},
+									},
+									Spec: batchv1.JobSpec{
+										Template: corev1.PodTemplateSpec{
+											ObjectMeta: metav1.ObjectMeta{
+												Labels: map[string]string{
+													constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+												},
+											},
+											Spec: corev1.PodSpec{
+												Containers: []corev1.Container{
+													{Name: constants.Node},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
