@@ -1032,9 +1032,9 @@ TrainJob and trigger reconciliation on status changes.
 The TrainJob controller requires additional RBAC permissions:
 
 ```go
-// +kubebuilder:rbac:groups=scheduling.k8s.io,resources=workloads,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups=scheduling.k8s.io,resources=workloads,verbs=get;list;watch;create;patch
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=workloads/status,verbs=get
-// +kubebuilder:rbac:groups=scheduling.k8s.io,resources=podgroups,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups=scheduling.k8s.io,resources=podgroups,verbs=get;list;watch;create;patch
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=podgroups/status,verbs=get
 ```
 
