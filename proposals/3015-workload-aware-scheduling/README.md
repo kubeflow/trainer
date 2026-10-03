@@ -256,19 +256,6 @@ spec:
         targetReplicatedJobs:
           - launcher
       replicatedJobs:
-        - name: launcher
-          template:
-            metadata:
-              labels:
-                trainer.kubeflow.org/trainjob-ancestor-step: trainer
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: node
-                      image: ghcr.io/kubeflow/trainer/deepspeed-runtime
-                      securityContext:
-                        runAsUser: 1000
         - name: node
           template:
             spec:
@@ -289,6 +276,22 @@ spec:
                         tcpSocket:
                           port: 2222
                         initialDelaySeconds: 5
+        - name: launcher
+          dependsOn:
+            - name: node
+              status: Ready
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: ghcr.io/kubeflow/trainer/deepspeed-runtime
+                      securityContext:
+                        runAsUser: 1000
 ---
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: TrainJob
@@ -717,6 +720,7 @@ graduate upstream:
 // +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.template) && has(self.template.spec) && has(self.template.spec.scheduling))",message="JobSet scheduling must not be set, it is owned by the TrainJob controller"
 // +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.template) && has(self.template.spec) && self.template.spec.replicatedJobs.exists(r, has(r.template.spec.scheduling)))",message="Job scheduling must not be set, it is owned by the TrainJob controller"
 // +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.template) && has(self.template.spec) && self.template.spec.replicatedJobs.exists(r, has(r.template.spec.template.spec.schedulingGroup)))",message="Pod schedulingGroup must not be set, it is owned by the TrainJob controller"
+// +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.scheduling.schedulingPolicy) && has(self.scheduling.schedulingPolicy.gang)) || !has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs) || self.template.spec.replicatedJobs.all(rj, !has(rj.dependsOn) || size(rj.dependsOn) == 0)",message="TrainJob-level gang schedulingPolicy cannot be set with dependsOn; use per-ReplicatedJob gang scheduling instead"
 type TrainingRuntimeSpec struct {
 
     // scheduling defines the Workload-Aware Scheduling configuration for TrainJobs which
@@ -894,6 +898,8 @@ The TrainingRuntime and ClusterTrainingRuntime validation enforces that:
   multiple `Workloads`.
 - The JobSet `spec.scheduling`, the Job `spec.scheduling`, and the Pod `spec.schedulingGroup` are
   all owned by the TrainJob controller, since TrainJob owns the `Workload`.
+- The Level 1 `.spec.scheduling.schedulingPolicy.gang` is rejected when DependsOn is configured
+  on replicatedJobs.
 
 The TrainJob validating webhook enforces that:
 
