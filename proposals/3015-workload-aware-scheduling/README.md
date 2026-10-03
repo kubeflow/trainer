@@ -139,11 +139,11 @@ spec:
       replicatedJobs:
         - name: node
           template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
             spec:
               template:
-                metadata:
-                  labels:
-                    trainer.kubeflow.org/trainjob-ancestor-step: trainer
                 spec:
                   containers:
                     - name: node
@@ -611,11 +611,11 @@ spec:
         - name: node
           replicas: 3
           template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
             spec:
               template:
-                metadata:
-                  labels:
-                    trainer.kubeflow.org/trainjob-ancestor-step: trainer
                 spec:
                   containers:
                     - name: node
