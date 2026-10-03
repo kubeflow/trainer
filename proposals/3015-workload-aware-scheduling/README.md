@@ -1080,7 +1080,7 @@ avoiding orphaned Pods with a stale `PodGroup` reference.
 | Scheduling configured and gate enabled   | Create one Workload and its PodGroups.                                               |
 | No scheduling configuration              | Create no WAS resources.                                                             |
 | Suspend                                  | Delete the Workload and PodGroups                                                    |
-| Resume                                   | Reuse the same Workload and PodGroups.                                               |
+| Resume                                   | Recreated the Workload and PodGroups                                                 |
 | Runtime mutated                          | Retain scheduling resources; the new configuration applies to new TrainJobs.         |
 | `numNodes` updated with gang scheduling  | Reject at admission, since `minCount` is immutable.                                  |
 | Restart                                  | Discover scheduling resources by reference; recreated Pods receive the same mapping. |
