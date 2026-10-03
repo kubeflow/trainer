@@ -60,3 +60,15 @@ tests:
           content: disabled
       - notExists:
           path: webhooks[2].objectSelector
+
+  - it: Should register the OptimizationJob validating webhook
+    asserts:
+      - equal:
+          path: webhooks[3].name
+          value: validator.optimizationjob.trainer.kubeflow.org
+      - equal:
+          path: webhooks[3].clientConfig.service.path
+          value: /validate-trainer-kubeflow-org-v1alpha1-optimizationjob
+      - contains:
+          path: webhooks[3].rules[0].resources
+          content: optimizationjobs
