@@ -585,3 +585,92 @@ func TestCoScheduling(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildDoesNotMutatePodSetRequests(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	t.Cleanup(cancel)
+
+	wantRequests := []corev1.ResourceList{
+		{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
+		},
+		{
+			corev1.ResourceCPU:    resource.MustParse("250m"),
+			corev1.ResourceMemory: resource.MustParse("512Mi"),
+		},
+	}
+	info := &runtime.Info{
+		Scheduler: &runtime.Scheduler{},
+		RuntimePolicy: runtime.RuntimePolicy{
+			PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{
+				PodGroupPolicySource: trainerv1alpha1.PodGroupPolicySource{
+					Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{
+						ScheduleTimeoutSeconds: ptr.To[int32](30),
+					},
+				},
+			},
+		},
+		TemplateSpec: runtime.TemplateSpec{
+			PodSets: []runtime.PodSet{
+				{
+					Name:  "node",
+					Count: ptr.To[int32](2),
+					SinglePodRequests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("500m"),
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+				},
+				{
+					Name:  "dataset-initializer",
+					Count: ptr.To[int32](1),
+					SinglePodRequests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("250m"),
+						corev1.ResourceMemory: resource.MustParse("512Mi"),
+					},
+				},
+			},
+		},
+	}
+	trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+		UID("trainJob").
+		Obj()
+	wantObjs := []apiruntime.Object{
+		utiltesting.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "trainJob").
+			MinMember(3).
+			MinResources(corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1.25"),
+				corev1.ResourceMemory: resource.MustParse("2.5Gi"),
+			}).
+			SchedulingTimeout(30).
+			ControllerReference(trainerv1alpha1.GroupVersion.WithKind(trainerv1alpha1.TrainJobKind), "trainJob", "trainJob").
+			Obj(),
+	}
+
+	clientBuilder := utiltesting.NewClientBuilder()
+	cli := clientBuilder.Build()
+	plugin, err := New(ctx, cli, utiltesting.AsIndex(clientBuilder), nil)
+	if err != nil {
+		t.Fatalf("Failed to create plugin: %v", err)
+	}
+
+	for range 2 {
+		objs, err := plugin.(framework.ComponentBuilderPlugin).Build(ctx, info, trainJob)
+		if err != nil {
+			t.Fatalf("Unexpected error from Build: %v", err)
+		}
+		typedObjs, err := utiltesting.ToObject(cli.Scheme(), objs...)
+		if err != nil {
+			t.Fatalf("Failed to convert object: %v", err)
+		}
+		if diff := gocmp.Diff(wantObjs, typedObjs); len(diff) != 0 {
+			t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
+		}
+		for i, ps := range info.TemplateSpec.PodSets {
+			if diff := gocmp.Diff(wantRequests[i], ps.SinglePodRequests); len(diff) != 0 {
+				t.Errorf("Build mutated PodSet %q requests (-want, +got): %s", ps.Name, diff)
+			}
+		}
+	}
+}
