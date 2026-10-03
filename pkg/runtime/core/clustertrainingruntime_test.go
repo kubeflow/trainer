@@ -26,11 +26,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/ptr"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -178,6 +181,78 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 
 			if diff := cmp.Diff(tc.wantObjs, resultObjs, cmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestClusterTrainingRuntimeTrainJobStatus(t *testing.T) {
+	cases := map[string]struct {
+		statusPlugin *fakeTrainJobStatusPlugin
+		wantStatus   *trainer.TrainJobStatus
+		wantError    error
+	}{
+		"no TrainJobStatus plugin is registered": {},
+		"status is returned from the underlying TrainingRuntime": {
+			statusPlugin: &fakeTrainJobStatusPlugin{
+				status: &trainer.TrainJobStatus{
+					JobsStatus: []trainer.JobStatus{{Name: "node", Succeeded: ptr.To[int32](1)}},
+				},
+			},
+			wantStatus: &trainer.TrainJobStatus{
+				JobsStatus: []trainer.JobStatus{{Name: "node", Succeeded: ptr.To[int32](1)}},
+			},
+		},
+		"error is propagated from the underlying TrainingRuntime": {
+			statusPlugin: &fakeTrainJobStatusPlugin{err: errFakeTrainJobStatus},
+			wantError:    errFakeTrainJobStatus,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var statusPlugin framework.Plugin
+			if tc.statusPlugin != nil {
+				statusPlugin = tc.statusPlugin
+			}
+			clTrainingRuntime := &ClusterTrainingRuntime{
+				TrainingRuntime: newTrainingRuntimeWithRegistry(ctx, t, fakePluginRegistry(nil, nil, statusPlugin)),
+			}
+			trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj()
+
+			gotStatus, err := clTrainingRuntime.TrainJobStatus(ctx, trainJob)
+			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantStatus, gotStatus); len(diff) != 0 {
+				t.Errorf("Unexpected TrainJobStatus (-want,+got):\n%s", diff)
+			}
+			if tc.statusPlugin != nil && tc.statusPlugin.gotTrainJob != trainJob {
+				t.Errorf("Expected TrainJobStatus plugin to receive TrainJob %v, got %v", trainJob, tc.statusPlugin.gotTrainJob)
+			}
+		})
+	}
+}
+
+func TestClusterTrainingRuntimeEventHandlerRegistrars(t *testing.T) {
+	cases := map[string]struct {
+		watchBuilderIDs map[string][]string
+	}{
+		"no plugins are registered": {},
+		"WatchExtension plugins on the underlying TrainingRuntime are not registered again": {
+			watchBuilderIDs: map[string][]string{"watch-a": {"a-1"}},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var invokedBuilderIDs []string
+			clTrainingRuntime := &ClusterTrainingRuntime{
+				TrainingRuntime: newTrainingRuntimeWithRegistry(ctx, t, fakePluginRegistry(tc.watchBuilderIDs, &invokedBuilderIDs, nil)),
+			}
+
+			if builders := clTrainingRuntime.EventHandlerRegistrars(); builders != nil {
+				t.Errorf("Expected nil ReconcilerBuilders, got %d", len(builders))
 			}
 		})
 	}
