@@ -755,7 +755,7 @@ type Scheduling struct {
     // created by the TrainJob. Defaults to Gang when spec.scheduling is set but
     // schedulingPolicy is nil and replicatedJobs is not set.
     // +optional
-    // +kubebuilder:validation:XValidation:rule="!has(self.gang) || !has(self.gang.minCount)",message="gang.minCount is computed from numNodes and must not be set"
+    // +kubebuilder:validation:XValidation:rule="!has(self.gang) || !has(self.gang.minGroupCount)",message="gang.minGroupCount is computed from numNodes and must not be set"
     SchedulingPolicy *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
     // schedulingConstraints defines TrainJob-level (level 1) topology constraints for every
@@ -794,7 +794,7 @@ type ReplicatedJobScheduling struct {
     // schedulingPolicy defines the level 2 scheduling policy for the Pods created by the
     // targeted ReplicatedJobs. Defaults to Gang when not specified.
     // +optional
-    // +kubebuilder:validation:XValidation:rule="!has(self.gang) || !has(self.gang.minCount)",message="gang.minCount is computed from numNodes and must not be set"
+    // +kubebuilder:validation:XValidation:rule="!has(self.gang) || !has(self.gang.minGroupCount)",message="gang.minGroupCount is computed from numNodes and must not be set"
     SchedulingPolicy *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
     // schedulingConstraints defines level 2 topology constraints for the Pods created by the
