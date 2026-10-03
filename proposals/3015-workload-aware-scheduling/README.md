@@ -621,6 +621,35 @@ spec:
 
 The TrainJob controller will create one `Workload` and multiple `PodGroups` per Replica in `node` ReplicatedJob.
 
+## Risk and Mitigations
+
+### Upstream API Dependency
+
+`spec.scheduling` embeds upstream `scheduling.k8s.io/v1alpha3` types directly in the Trainer API.
+Upstream alpha APIs have no compatibility guarantees. The same risk applies to `CompositePodGroup`,
+which is alpha in Kubernetes v1.37.
+
+This becomes a problem once the Trainer APIs graduate while `spec.scheduling` still depends on
+alpha upstream types. Bumping the dependency from `schedulingv1alpha3` to `schedulingv1beta1`
+could then break the stable Trainer API and generated OpenAPI client which is used in Kubeflow SDK.
+
+Kubeflow Trainer does not have to follow API stability rules as strict as Kubernetes. Other
+controllers like [LeaderWorkerSet](https://github.com/kubernetes-sigs/lws/blob/main/api/leaderworkerset/v1/leaderworkerset_types.go#L229-L245)
+and JobSet APIs have similar problems. Users need workload aware scheduling now, so we
+accept this risk and mitigate it as follows.
+
+- **Feature gates**: `spec.scheduling` is guarded by the `TrainJobWorkloadAwareScheduling` and
+  `TrainJobCompositePodGroup` feature gates, which are disabled by default. Users who don't enable
+  them aren't affected by upstream changes.
+- **Field-level stability**: `spec.scheduling` is documented as an unstable, alpha-level field,
+  even after the TrainingRuntime and ClusterTrainingRuntime APIs graduate. It is excluded from
+  Trainer API stability guarantees until the upstream scheduling APIs reach beta.
+- **Generated clients**: Unlike the CRD schema, the OpenAPI spec and generated clients (e.g. the
+  Kubeflow SDK Python models) include the upstream API version in their type names (e.g.
+  `io.k8s.api.scheduling.v1alpha3.*`). Upgrading the upstream dependency is therefore a breaking
+  change for these clients. We don't guarantee the stability of these generated types until the
+  upstream APIs are GA, and each such change will be called out in the release notes.
+
 ## Design Details
 
 ### Kubernetes Workload API Overview
