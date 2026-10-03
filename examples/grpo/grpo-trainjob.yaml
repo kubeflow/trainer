@@ -1,0 +1,66 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Example: GRPO Post-Training with TRL
+#
+# This TrainJob runs GRPO (Group Relative Policy Optimization) post-training
+# using the TRL library on the grpo-distributed ClusterTrainingRuntime.
+# It fine-tunes Qwen2.5-0.5B-Instruct with the TLDR summarization dataset
+# using a length-based reward function.
+#
+# The GRPO trainer runs with torchrun for distributed training. PET_* env vars
+# (PET_NNODES, PET_NPROC_PER_NODE, PET_NODE_RANK, PET_MASTER_ADDR,
+# PET_MASTER_PORT) are injected by the Trainer torch plugin.
+#
+# Apply: kubectl apply -f grpo-trainjob.yaml
+# Check: kubectl get trainjob grpo-example
+# Logs:  kubectl logs -l jobset.sigs.k8s.io/jobset-name=grpo-example
+# Clean: kubectl delete trainjob grpo-example
+
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: grpo-example
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+    name: grpo-distributed
+
+  initializer:
+    dataset:
+      storageUri: hf://trl-lib/tldr
+    model:
+      storageUri: hf://Qwen/Qwen2.5-0.5B-Instruct
+
+  trainer:
+    numNodes: 1
+    resourcesPerNode:
+      requests:
+        nvidia.com/gpu: 2
+    env:
+      - name: NUM_GENERATIONS
+        value: "4"
+      - name: MAX_PROMPT_LENGTH
+        value: "512"
+      - name: MAX_COMPLETION_LENGTH
+        value: "256"
+      - name: PER_DEVICE_TRAIN_BATCH_SIZE
+        value: "2"
+      - name: GRADIENT_ACCUMULATION_STEPS
+        value: "4"
+      - name: NUM_TRAIN_EPOCHS
+        value: "1"
+      - name: LEARNING_RATE
+        value: "5e-7"
