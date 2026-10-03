@@ -44,6 +44,10 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
 > If you manage the CRDs out-of-band (previously via Helm's `--skip-crds` flag), set `--set crds.enabled=false` to skip
 > installing them with the chart.
 
+> [!NOTE]
+> Setting `dataCache.enabled=true` also installs LeaderWorkerSet as a chart dependency.
+> If LeaderWorkerSet is already installed in the cluster, add `--set dataCache.lws.install=false`.
+
 ### Install with ClusterTrainingRuntimes
 
 You can enable the default ClusterTrainingRuntimes together with the control plane in a single
@@ -129,7 +133,6 @@ manager:
 | manager.config.statusServer.burst | int | `10` | Burst rate limit for the TrainJob Status Server api client |
 | webhook.failurePolicy | string | `"Fail"` | Specifies how unrecognized errors are handled. Available options are `Ignore` or `Fail`. |
 | dataCache.enabled | bool | `false` | Enable/disable data cache support (LWS dependency, ClusterRole). Set to `true` to install data cache components. |
-| dataCache.lws.install | bool | `true` | Whether to install LeaderWorkerSet as a dependency. Set to `false` if LeaderWorkerSet is already installed in the cluster. |
 | dataCache.lws.fullnameOverride | string | `"lws"` | String to fully override LeaderWorkerSet release name. |
 | dataCache.cacheImage.registry | string | `"ghcr.io"` | Data cache image registry |
 | dataCache.cacheImage.repository | string | `"kubeflow/trainer/data-cache"` | Data cache image repository |

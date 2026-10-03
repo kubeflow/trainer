@@ -166,9 +166,12 @@ dataCache:
   # Set to `true` to install data cache components.
   enabled: false
   lws:
-    # -- Whether to install LeaderWorkerSet as a dependency.
-    # Set to `false` if LeaderWorkerSet is already installed in the cluster.
-    install: true
+    # Whether to install LeaderWorkerSet as a dependency. Leave it unset to install
+    # LeaderWorkerSet whenever `dataCache.enabled` is `true`; set it to `false` if
+    # LeaderWorkerSet is already installed in the cluster. It must stay unset here:
+    # Helm evaluates only the first condition path that is set, so a default value
+    # would take precedence over `dataCache.enabled`.
+    # install: false
     # -- String to fully override LeaderWorkerSet release name.
     fullnameOverride: lws
   cacheImage:
