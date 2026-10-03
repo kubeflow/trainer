@@ -79,6 +79,22 @@ case delete any remaining runtimes manually or with `helm uninstall`.
 For the available Helm values to configure runtimes, see the
 [kubeflow-trainer Helm chart documentation](https://github.com/kubeflow/trainer/tree/master/charts/kubeflow-trainer).
 
+### Controller TLS overrides
+
+The controller manager accepts optional TLS overrides for all of its TLS
+servers: metrics, webhooks, and the runtime status server.
+
+```text
+--tlsMinVersion=VersionTLS12|VersionTLS13
+--tlsCipherSuites=<comma-separated Go cipher names>
+--tlsCurvePreferences=<comma-separated numeric Go CurveID values>
+```
+
+Command-line values override the controller configuration file. TLS 1.3
+cipher suites cannot be configured by Go, so `tlsCipherSuites` must not be
+used with `VersionTLS13`. Curve preferences use the numeric values from the
+Go `crypto/tls` package.
+
 ## Install with Kustomize
 
 Run the following command to deploy Kubeflow Trainer control plane with kustomize:

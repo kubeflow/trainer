@@ -62,12 +62,6 @@ func healthEndpointPath(name string) string {
 
 // addTo applies the configuration to controller runtime Options.
 func addTo(o *ctrl.Options, cfg *configapi.Configuration) {
-	tlsOpts := []func(*tls.Config){
-		func(c *tls.Config) {
-			tlsconfig.Apply(c, cfg.TLS)
-		},
-	}
-
 	o.Metrics = metricsserver.Options{
 		// The metrics server is always started manually in setupManagerComponents
 		// after certificates are guaranteed to be present. Disable the manager's
@@ -75,16 +69,7 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration) {
 		BindAddress: "0",
 	}
 
-	if cfg.Webhook.Port != nil {
-		webhookOpts := webhook.Options{
-			Port:    int(*cfg.Webhook.Port),
-			TLSOpts: tlsOpts,
-		}
-		if cfg.Webhook.Host != nil {
-			webhookOpts.Host = *cfg.Webhook.Host
-		}
-		o.WebhookServer = webhook.NewServer(webhookOpts)
-	}
+	ApplyTLSOptions(o, cfg)
 
 	o.HealthProbeBindAddress = cfg.Health.HealthProbeBindAddress
 	o.ReadinessEndpointName = healthEndpointPath(cfg.Health.ReadinessEndpointName)
@@ -110,6 +95,31 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration) {
 			o.Controller.GroupKindConcurrency[gk] = int(concurrency)
 		}
 	}
+}
+
+// ApplyTLSOptions applies configuration-file TLS options and optional command-
+// line overrides to the webhook and metrics controller-runtime options.
+func ApplyTLSOptions(o *ctrl.Options, cfg *configapi.Configuration, optional ...func(*tls.Config)) {
+	tlsOpts := []func(*tls.Config){
+		func(c *tls.Config) {
+			tlsconfig.Apply(c, cfg.TLS)
+		},
+	}
+	tlsOpts = append(tlsOpts, optional...)
+
+	o.Metrics.TLSOpts = tlsOpts
+	if cfg.Webhook.Port == nil {
+		return
+	}
+
+	webhookOpts := webhook.Options{
+		Port:    int(*cfg.Webhook.Port),
+		TLSOpts: tlsOpts,
+	}
+	if cfg.Webhook.Host != nil {
+		webhookOpts.Host = *cfg.Webhook.Host
+	}
+	o.WebhookServer = webhook.NewServer(webhookOpts)
 }
 
 // Load loads configuration from file and returns controller Options and Configuration.
