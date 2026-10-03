@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -555,6 +556,51 @@ var _ = ginkgo.Describe("OptimizationJob Controller", ginkgo.Ordered, func() {
 				g.Expect(err).Should(gomega.Succeed())
 				g.Expect(jobs).Should(gomega.HaveLen(1))
 			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+		})
+	})
+
+	ginkgo.Context("Name Validation", func() {
+		ginkgo.DescribeTable("RFC1035-compliant OptimizationJob name validation", func(name string, errorMatcher gomega.OmegaMatcher) {
+			gomega.Expect(k8sClient.Create(ctx, newTestOptimizationJob(ns.Name, name, 2, 1))).Should(errorMatcher)
+		},
+			ginkgo.Entry("Should succeed to create OptimizationJob with valid RFC1035-compliant name",
+				"valid-job-name", gomega.Succeed()),
+			ginkgo.Entry("Should succeed to create OptimizationJob with name exactly 63 characters",
+				strings.Repeat("a", 63), gomega.Succeed()),
+			ginkgo.Entry("Should fail to create OptimizationJob with uppercase letters in name",
+				"Invalid-job-name", utiltesting.BeInvalidError()),
+			ginkgo.Entry("Should fail to create OptimizationJob starting with a digit",
+				"1jobname", utiltesting.BeInvalidError()),
+			ginkgo.Entry("Should fail to create OptimizationJob with a dot in name",
+				"job.name", utiltesting.BeInvalidError()),
+			ginkgo.Entry("Should fail to create OptimizationJob with name exceeding 63 characters",
+				strings.Repeat("a", 64), utiltesting.BeInvalidError()),
+		)
+
+		ginkgo.It("Should give OptimizationJobs whose names share a long prefix separate algorithm services", func() {
+			prefix := strings.Repeat("a", 46)
+			optJobA := newTestOptimizationJob(ns.Name, prefix+"-run-a", 2, 1)
+			optJobB := newTestOptimizationJob(ns.Name, prefix+"-run-b", 2, 1)
+
+			ginkgo.By("Creating both OptimizationJobs")
+			gomega.Expect(k8sClient.Create(ctx, optJobA)).Should(gomega.Succeed())
+			gomega.Expect(k8sClient.Create(ctx, optJobB)).Should(gomega.Succeed())
+			gomega.Expect(optutil.GetAlgorithmServiceName(optJobA)).ShouldNot(gomega.Equal(optutil.GetAlgorithmServiceName(optJobB)))
+
+			ginkgo.By("Waiting for each OptimizationJob to own its own Deployment and Service")
+			for _, optJob := range []*trainer.OptimizationJob{optJobA, optJobB} {
+				key := client.ObjectKey{Name: optutil.GetAlgorithmServiceName(optJob), Namespace: ns.Name}
+				gomega.Eventually(func(g gomega.Gomega) {
+					deploy := &appsv1.Deployment{}
+					g.Expect(k8sClient.Get(ctx, key, deploy)).Should(gomega.Succeed())
+					g.Expect(deploy.OwnerReferences).Should(gomega.HaveLen(1))
+					g.Expect(deploy.OwnerReferences[0].UID).Should(gomega.Equal(optJob.UID))
+					svc := &corev1.Service{}
+					g.Expect(k8sClient.Get(ctx, key, svc)).Should(gomega.Succeed())
+					g.Expect(svc.OwnerReferences).Should(gomega.HaveLen(1))
+					g.Expect(svc.OwnerReferences[0].UID).Should(gomega.Equal(optJob.UID))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			}
 		})
 	})
 })
