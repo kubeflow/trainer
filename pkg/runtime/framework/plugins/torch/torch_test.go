@@ -142,6 +142,74 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
+		"PET envs are injected from the runtime template when trainJob.Spec.Trainer is omitted": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 2, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().WithName(constants.Node),
+					),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").Obj(),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy().
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](2),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name: constants.Node,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("2"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("1"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("trainJob-node-0-0.trainJob"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+								},
+							},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
 		"nproc_per_node=auto with CPU limit": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(

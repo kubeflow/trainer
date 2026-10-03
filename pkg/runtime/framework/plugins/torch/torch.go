@@ -134,12 +134,12 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		numProcPerNode = intstr.FromInt(max(1, getNumCPUPerNode(&resourcesPerNode)))
 	}
 
-	// Update envs for Info object.
-	var trainerContainer *runtime.Container
-	if trainJob.Spec.Trainer != nil {
-		if trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
-			apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
-		}
+	// Update envs for Info object. The trainer container is resolved regardless of
+	// whether the TrainJob sets spec.trainer, so a TrainJob that relies on the runtime
+	// template still gets the distributed envs and the trainer port.
+	trainerContainer := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node)
+	if trainerContainer != nil && trainJob.Spec.Trainer != nil {
+		apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
 	}
 
 	petEnvs := []corev1ac.EnvVarApplyConfiguration{
@@ -172,7 +172,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
 		apply.UpsertEnvVars(&trainerContainer.Env, petEnvs...)
 
-		if !slices.Equal(trainJob.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
+		if trainJob.Spec.Trainer == nil || !slices.Equal(trainJob.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
 			apply.UpsertEnvVars(&trainerContainer.Env, masterEnvVars...)
 		} else {
 			// Mutate trainer command for torchtune.
