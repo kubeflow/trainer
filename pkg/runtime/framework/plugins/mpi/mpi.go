@@ -195,7 +195,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 				[]corev1ac.VolumeMountApplyConfiguration{
 					*corev1ac.VolumeMount().
 						WithName(constants.MPISSHAuthVolumeName).
-						WithMountPath(*info.RuntimePolicy.MLPolicySource.MPI.SSHAuthMountPath),
+						WithMountPath(ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.SSHAuthMountPath, "/root/.ssh")),
 				}...,
 			)
 			if ps.Name == constants.Launcher && (container.Name == constants.Node || container.Name == constants.Launcher) {
@@ -205,7 +205,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 						WithName(constants.MPIHostfileVolumeName).
 						WithMountPath(constants.MPIHostfileDir),
 				)
-				switch *info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
+				switch ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation, trainer.MPIImplementationOpenMPI) {
 				case trainer.MPIImplementationOpenMPI:
 					apply.UpsertEnvVars(
 						&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].Env,
@@ -319,7 +319,7 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 		if !isNode(runLauncherAsNode, ps) {
 			continue
 		}
-		switch *info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
+		switch ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation, trainer.MPIImplementationOpenMPI) {
 		case trainer.MPIImplementationOpenMPI:
 			for e := range ps.Endpoints {
 				fmt.Fprintf(&hostFile, "%s slots=%d\n", e, slots)
