@@ -326,7 +326,7 @@ spec:
     kind: TrainJob
     name: my-job
   podGroupTemplates:
-    - name: launcher-node
+    - name: 0-launcher-node
       schedulingPolicy:
         gang:
           minCount: 51 # 1 launcher Pod + 50 trainer nodes
@@ -338,7 +338,7 @@ The corresponding PodGroup will be created:
 apiVersion: scheduling.k8s.io/v1alpha1
 kind: PodGroup
 metadata:
-  name: <workload-name>-launcher-node-<hash>
+  name: <workload-name>-0-launcher-node-<hash>
   ownerReferences:
     - apiVersion: scheduling.k8s.io/v1beta1
       kind: Workload
@@ -351,7 +351,7 @@ spec:
   podGroupTemplateRef:
     workload:
       workloadName: <workload-name>
-      podGroupTemplateName: launcher-node
+      podGroupTemplateName: 0-launcher-node
   schedulingPolicy:
     gang:
       minCount: 51
@@ -362,7 +362,7 @@ And the Pod specs of both ReplicatedJobs will be updated with the scheduling gro
 ```yaml
 spec:
   schedulingGroup:
-    podGroupName: <workload-name>-launcher-node-<hash>
+    podGroupName: <workload-name>-0-launcher-node-<hash>
 ```
 
 #### Story 3: LLM Fine-Tuning with Initializers and Gang Scheduling
@@ -504,10 +504,10 @@ spec:
     kind: TrainJob
     name: my-job
   podGroupTemplates:
-    - name: dataset-initializer-model-initializer
+    - name: 0-dataset-initializer-model-initializer
       schedulingPolicy:
         basic: {}
-    - name: node
+    - name: 1-node
       schedulingPolicy:
         gang:
           minCount: 8 # Computed from trainJob.spec.trainer.numNodes
@@ -519,7 +519,7 @@ The corresponding PodGroups will be created:
 apiVersion: scheduling.k8s.io/v1alpha1
 kind: PodGroup
 metadata:
-  name: <workload-name>-dataset-initializer-model-initializer-<hash>
+  name: <workload-name>-0-dataset-initializer-model-initializer-<hash>
   ownerReferences:
     - apiVersion: scheduling.k8s.io/v1beta1
       kind: Workload
@@ -532,14 +532,14 @@ spec:
   podGroupTemplateRef:
     workload:
       workloadName: <workload-name>
-      podGroupTemplateName: dataset-initializer-model-initializer
+      podGroupTemplateName: 0-dataset-initializer-model-initializer
   schedulingPolicy:
     basic: {}
 ---
 apiVersion: scheduling.k8s.io/v1alpha1
 kind: PodGroup
 metadata:
-  name: <workload-name>-node-<hash>
+  name: <workload-name>-1-node-<hash>
   ownerReferences:
     - apiVersion: scheduling.k8s.io/v1beta1
       kind: Workload
@@ -552,7 +552,7 @@ spec:
   podGroupTemplateRef:
     workload:
       workloadName: <workload-name>
-      podGroupTemplateName: node
+      podGroupTemplateName: 1-node
   schedulingPolicy:
     gang:
       minCount: 8
@@ -564,12 +564,12 @@ Each Pod is associated with its respective PodGroup:
 # Initializer Pods (dataset-initializer, model-initializer)
 spec:
   schedulingGroup:
-    podGroupName: <workload-name>-dataset-initializer-model-initializer-<hash>
+    podGroupName: <workload-name>-0-dataset-initializer-model-initializer-<hash>
 ---
 # Trainer Pod
 spec:
   schedulingGroup:
-    podGroupName: <workload-name>-node-<hash>
+    podGroupName: <workload-name>-1-node-<hash>
 ```
 
 Note that a level 1 Gang policy cannot be used for this runtime: the `node` ReplicatedJob
@@ -921,10 +921,12 @@ When the `TrainJobWorkloadAwareScheduling` feature gate is enabled and the resol
 1. **ReplicatedJob mode (level 2)** is selected for each `replicatedJobs` entry that does not set
    `job`. One `PodGroupTemplate` is built per entry, shared by all ReplicatedJobs the entry targets
    and all of their replicas.
-1. **Job mode (level 3)** is selected for each `replicatedJobs` entry that sets `job`. One
-   `PodGroupTemplate` is built per replica of the targeted ReplicatedJob, sized to that Job's own
-   `parallelism`, so replicas are gang-scheduled and preempted independently and can carry
-   per-replica resource claims.
+1. **Job mode (level 3)** is selected per `replicatedJobs` entry when that entry sets job. Each
+   replica (Job) of the targeted ReplicatedJob gets its own WorkloadItem and PodGroup instead of
+   sharing one PodGroup across the whole ReplicatedJob, so replicas can be gang-scheduled and
+   preempted independently and can carry per-replica resource claims. job requires targetReplicatedJobs
+   to name exactly one ReplicatedJob, and is mutually exclusive with the composite-level
+   schedulingPolicy, schedulingConstraints, and disruptionMode fields on the same entry.
 
 ### Controller Workflow
 
@@ -992,8 +994,12 @@ Following prior art in the Kubernetes Job controller:
 - **Workload**: `<(truncated-if-needed)trainjob-name>-<hash>`
 - **PodGroupTemplate**, depending on the mode that produced it:
   - **TrainJob mode (level 1)**: the TrainJob name.
-  - **ReplicatedJob mode (level 2)**: the entry's target names joined with `-`, for example
-    `launcher-node`. A single target yields the ReplicatedJob's own name.
+  - **ReplicatedJob mode (level 2)**: `<entry-index>-<joined-target-names>`, where `entry-index`
+    is the entry's position in `spec.scheduling.replicatedJobs` and the target names are joined
+    with `-`, for example `0-launcher-node`. A single target yields `<entry-index>-<replicatedjob-name>`.
+    ReplicatedJob names cannot start with a digit, so the index prefix keeps level 2 names unique
+    against level 3 and against each other, even when ReplicatedJob names contain `-`
+    (`[a, b]` yields `0-a-b`, while `[a-b]` yields `1-a-b`).
   - **Job mode (level 3)**: `<replicatedjob-name>-<job-index>`, one per replica.
   - **Sequenced-startup fallback**: the ReplicatedJob's own name.
 - **PodGroup**: `<(truncated-if-needed)workload-name>-<(truncated-if-needed)podgroup-template-name>-<hash>`.
