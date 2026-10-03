@@ -2111,6 +2111,31 @@ test-job-node-0-1.test-job slots=8
 					Obj(),
 			},
 		},
+		"merged resourcesPerNode applies when the runtime has no mlPolicy": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Obj(),
+			).Obj(),
+			trainJob: func() *trainer.TrainJob {
+				trainerSpec := testingutil.MakeTrainJobTrainerWrapper().
+					NumNodes(1).
+					Obj()
+				trainerSpec.ResourcesPerNode = &corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						"nvidia.com/gpu": resource.MustParse("4"),
+					},
+				}
+				return testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+					UID("uid").
+					RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+					Trainer(trainerSpec).
+					Obj()
+			}(),
+			wantObjs: []runtime.Object{
+				wantJobSetWithMergedGPU(metav1.NamespaceDefault, "test-job", "uid", resRequests, "4"),
+			},
+		},
 		"merged resourcesPerNode keeps runtime resources when trainjob sets gpu only": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
