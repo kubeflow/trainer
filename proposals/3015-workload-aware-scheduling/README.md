@@ -224,10 +224,13 @@ spec:
 #### Story 2: MPI Distributed Training with Gang Scheduling
 
 As a platform engineer, I want to configure MPI-based distributed training with gang scheduling
-to ensure all MPI nodes (launcher + workers) are scheduled together.
+to ensure all MPI nodes (launcher + workers) are scheduled together within the same topology domain.
 
-The launcher and the workers must be admitted as a single gang, which is expressed with one
-`replicatedJobs` entry targeting both ReplicatedJobs:
+The runtime sets `runLauncherAsNode: true`, so the launcher is the first training node (rank 0)
+and the `node` ReplicatedJob runs `numNodes - 1` workers. The `launcher` ReplicatedJob `dependsOn`
+the `node` ReplicatedJob being Ready, so JobSet creates the launcher only after every worker runs
+its SSH server. The launcher and the workers are expressed with one `replicatedJobs` entry targeting
+both ReplicatedJobs:
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
@@ -242,11 +245,15 @@ spec:
     mpi:
       numProcPerNode: 4
       mpiImplementation: OpenMPI
+      runLauncherAsNode: true
   scheduling:
     replicatedJobs:
       - targetReplicatedJobs: ["launcher", "node"]
         schedulingPolicy:
           gang: {}
+        schedulingConstraints:
+          topology:
+            - key: topology.kubernetes.io/rack
   template:
     spec:
       network:
@@ -308,7 +315,8 @@ spec:
 ```
 
 The TrainJob controller will create a single `Workload` with one `PodGroupTemplate` covering both
-the `launcher` and `node` ReplicatedJobs:
+the `launcher` and `node` ReplicatedJobs. Since `launcher` `dependsOn` `node`, the launcher Pod is
+excluded from the Gang `minCount`:
 
 ```yaml
 apiVersion: scheduling.k8s.io/v1beta1
@@ -329,7 +337,10 @@ spec:
     - name: 0-launcher-node
       schedulingPolicy:
         gang:
-          minCount: 51 # 1 launcher Pod + 50 trainer nodes
+          minCount: 49 # 49 node Pods; the dependent launcher Pod is excluded
+      schedulingConstraints:
+        topology:
+          - key: topology.kubernetes.io/rack
 ```
 
 The corresponding PodGroup will be created:
@@ -354,7 +365,10 @@ spec:
       podGroupTemplateName: 0-launcher-node
   schedulingPolicy:
     gang:
-      minCount: 51
+      minCount: 49
+  schedulingConstraints:
+    topology:
+      - key: topology.kubernetes.io/rack
 ```
 
 And the Pod specs of both ReplicatedJobs will be updated with the scheduling group:
@@ -364,6 +378,19 @@ spec:
   schedulingGroup:
     podGroupName: <workload-name>-0-launcher-node-<hash>
 ```
+
+The scheduling flow is as follows:
+
+1. JobSet creates the `node` Job with 49 Pods. The kube-scheduler admits a gang only once `minCount`
+   of its Pods exist, so all 49 workers are placed together in a single rack, or none of them are.
+1. Once the workers are Ready, JobSet creates the `launcher` Job. The launcher Pod joins the same
+   `PodGroup`, whose `minCount` is already met, and the kube-scheduler places it in the rack already
+   used by the `PodGroup`.
+
+Including the launcher Pod in `minCount` would deadlock the TrainJob: the workers could not be
+scheduled until the launcher Pod exists, while the launcher is created only after the workers are
+Ready. Note that the kube-scheduler does not reserve capacity for the launcher Pod, so the launcher
+remains Pending if the rack has no capacity left once the workers are placed.
 
 #### Story 3: LLM Fine-Tuning with Initializers and Gang Scheduling
 
@@ -676,11 +703,11 @@ examples in this document will be pinned when the implementation lands.
 TrainJob has three layers that can be scheduled: the TrainJob itself, the ReplicatedJobs of its
 JobSet, and the individual Jobs (replicas) of each ReplicatedJob.
 
-| Level                    | API field                         | Use case                                        |
-| ------------------------ | --------------------------------- | ----------------------------------------------- |
-| Level 1 – TrainJob       | `scheduling.schedulingPolicy`     | Gang-schedule an entire TrainJob                |
-| Level 2 – ReplicatedJobs | `scheduling.replicatedJobs[]`     | Gang-schedule MPI launcher and workers together |
-| Level 3 – Jobs           | `scheduling.replicatedJobs[].job` | Each replica is its own gang,                   |
+| Level                    | API field                         | Use case                                           |
+| ------------------------ | --------------------------------- | -------------------------------------------------- |
+| Level 1 – TrainJob       | `scheduling.schedulingPolicy`     | Gang-schedule an entire TrainJob                   |
+| Level 2 – ReplicatedJobs | `scheduling.replicatedJobs[]`     | Gang-schedule trainer separately from initializers |
+| Level 3 – Jobs           | `scheduling.replicatedJobs[].job` | Each replica is its own gang                       |
 
 Level 3 is most useful for runtimes whose ReplicatedJobs set `replicas > 1`. The builtin Trainer
 runtimes map `trainJob.spec.trainer.numNodes` to Job `parallelism` with `replicas: 1`, so for them
@@ -708,6 +735,13 @@ TrainJob (root CPG, basic, zone-level topology)
                                         Job3 (PG3, gang, rack, DRA)
 ```
 
+Within a single `PodGroup`, Pods of a ReplicatedJob that `dependsOn` another ReplicatedJob of the
+same group are excluded from `minCount`, as described in [Defaulting](#defaulting). The hierarchy
+does not lift this restriction across groups: the kube-scheduler evaluates gang readiness from the
+root of the hierarchy, and a `PodGroup` is ready only once `minCount` of its Pods exist. A Gang
+`CompositePodGroup` whose `minGroupCount` requires both a group and a group it `dependsOn` would
+therefore deadlock.
+
 ### API
 
 `spec.scheduling` is added to `TrainingRuntimeSpec`, which is shared by TrainingRuntime and
@@ -720,7 +754,7 @@ graduate upstream:
 // +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.template) && has(self.template.spec) && has(self.template.spec.scheduling))",message="JobSet scheduling must not be set, it is owned by the TrainJob controller"
 // +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.template) && has(self.template.spec) && self.template.spec.replicatedJobs.exists(r, has(r.template.spec.scheduling)))",message="Job scheduling must not be set, it is owned by the TrainJob controller"
 // +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.template) && has(self.template.spec) && self.template.spec.replicatedJobs.exists(r, has(r.template.spec.template.spec.schedulingGroup)))",message="Pod schedulingGroup must not be set, it is owned by the TrainJob controller"
-// +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.scheduling.schedulingPolicy) && has(self.scheduling.schedulingPolicy.gang)) || !has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs) || self.template.spec.replicatedJobs.all(rj, !has(rj.dependsOn) || size(rj.dependsOn) == 0)",message="TrainJob-level gang schedulingPolicy cannot be set with dependsOn; use per-ReplicatedJob gang scheduling instead"
+// +kubebuilder:validation:XValidation:rule="!has(self.scheduling) || !(has(self.scheduling.schedulingPolicy) ? has(self.scheduling.schedulingPolicy.gang) : !has(self.scheduling.replicatedJobs)) || !has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs) || self.template.spec.replicatedJobs.all(rj, !has(rj.dependsOn) || size(rj.dependsOn) == 0)",message="TrainJob-level gang scheduling cannot be used with dependsOn; target the dependent ReplicatedJobs with separate replicatedJobs entries instead"
 type TrainingRuntimeSpec struct {
 
     // scheduling defines the Workload-Aware Scheduling configuration for TrainJobs which
@@ -860,7 +894,11 @@ Defaulting applies only when `spec.scheduling` is set:
   - **Level 1**: the total Pod count of the TrainJob, that is the sum of
     `parallelism × replicas` across all ReplicatedJobs.
   - **Level 2**: the sum of `parallelism × replicas` across the ReplicatedJobs targeted by the
-    entry.
+    entry, excluding ReplicatedJobs that `dependsOn` another ReplicatedJob targeted by the same
+    entry. JobSet creates such dependent ReplicatedJobs only after their dependencies reach the
+    requested status, so counting their Pods would prevent the gang from ever reaching `minCount`.
+    Their Pods join the `PodGroup` once created and are placed in the topology domain the
+    `PodGroup` already uses, as shown in [Story 2](#story-2-mpi-distributed-training-with-gang-scheduling).
   - **Level 3**: the `parallelism` of a single Job of the targeted ReplicatedJob.
 
 `minCount` cannot be defaulted by a webhook on the runtime because the trainer's Pod count comes
@@ -898,11 +936,11 @@ The TrainingRuntime and ClusterTrainingRuntime validation enforces that:
   multiple `Workloads`.
 - The JobSet `spec.scheduling`, the Job `spec.scheduling`, and the Pod `spec.schedulingGroup` are
   all owned by the TrainJob controller, since TrainJob owns the `Workload`.
-- The Level 1 `.spec.scheduling.schedulingPolicy.gang` is rejected when DependsOn is configured
-  on replicatedJobs.
-
-The TrainJob validating webhook enforces that:
-
+- A level 1 Gang policy, including the default when `schedulingPolicy` is unset, is rejected when
+  any ReplicatedJob sets `dependsOn`. The kube-scheduler admits a gang only once `minCount` of its
+  Pods exist, while JobSet creates a dependent ReplicatedJob only after its dependencies reach the
+  requested status, so a single TrainJob-wide gang would deadlock. Use `replicatedJobs` entries
+  instead, where dependent ReplicatedJobs are excluded from `minCount`.
 - Updates to `trainJob.spec.trainer.numNodes` are rejected when the resolved runtime configures
   gang scheduling, because the Workload API does not support changing `minCount` after creation.
   The validation logic mirrors the controller's `minCount` computation; if that computation
@@ -1124,7 +1162,7 @@ In `pkg/runtime/framework/plugins/workload`:
   per entry, including an entry targeting multiple ReplicatedJobs), and level 3 (one template per
   replica).
 - Gang `minCount` computation for each level from the resolved `runtime.Info` PodSets, including
-  the MPI launcher plus workers case and `numNodes: 1`.
+  the MPI case where the dependent `launcher` is excluded from `minCount`, and `numNodes: 1`.
 - Sequenced-startup fallback: a runtime using `dependsOn` or `InOrder` with only level 1 fields
   produces one template per ReplicatedJob.
 - Defaulting of a missing `schedulingPolicy` to Gang at each level.
@@ -1157,6 +1195,8 @@ In `pkg/webhooks`:
 - `job` combined with the same entry's level 2 fields, or with more than one target, is rejected
   without `TrainJobCompositePodGroup` and accepted with it.
 - An explicit `gang.minCount` is rejected.
+- A level 1 Gang policy, explicit or defaulted, is rejected when a ReplicatedJob sets `dependsOn`,
+  and a Basic level 1 policy is accepted.
 - A configuration resolving to more than 8 `PodGroupTemplates` is rejected.
 - A runtime Pod template setting `spec.schedulingGroup` is rejected.
 - Updates to `trainJob.spec.trainer.numNodes` are rejected when the resolved runtime configures
@@ -1168,7 +1208,9 @@ In `pkg/webhooks`:
   expected policies, `minCount`, and ownerReferences → Pods carry
   `schedulingGroup.podGroupName` → TrainJob deletion cascades to `Workload` and `PodGroup`
   deletion.
-- Level 1: MPI runtime: `launcher` and `node` share one `PodGroup` whose `minCount` covers both.
+- Level 2: MPI runtime: `launcher` and `node` share one `PodGroup` whose `minCount` covers only the
+  `node` Pods; the launcher Pod, created after the workers are Ready, joins the `PodGroup` and is
+  placed in the same topology domain.
 - Level 2: Initializer plus trainer runtime: the initializer `PodGroup` uses a Basic policy and the trainer
   `PodGroup` uses Gang.
 - Level 3: one `PodGroup` per replica, each with its own `resourceClaims`, and distinct generated
