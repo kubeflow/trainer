@@ -834,6 +834,181 @@ func TestValidate(t *testing.T) {
 					Model:   &trainer.ModelInitializer{},
 				}).Obj(),
 		},
+		"must not set STORAGE_URI in dataset env when storageUri is configured": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						VolumeClaimPolicies: []jobsetv1alpha2ac.VolumeClaimPolicyApplyConfiguration{
+							{
+								Templates: []corev1.PersistentVolumeClaim{
+									{
+										ObjectMeta: metav1.ObjectMeta{
+											Name: jobsetplgconsts.VolumeNameInitializer,
+										},
+									},
+								},
+							},
+						},
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.DatasetInitializer),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													*corev1ac.Container().
+														WithName(constants.DatasetInitializer).
+														WithVolumeMounts(corev1ac.VolumeMount().
+															WithName(jobsetplgconsts.VolumeNameInitializer)),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Dataset: utiltesting.MakeTrainJobDatasetInitializerWrapper().
+						StorageUri("hf://tatsu-lab/alpaca").
+						Env(corev1.EnvVar{
+							Name:  jobsetplgconsts.InitializerEnvStorageUri,
+							Value: "hf://other/repo",
+						}).
+						Obj(),
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("initializer").Child("dataset").Child("env"),
+					utiltesting.MakeTrainJobDatasetInitializerWrapper().
+						StorageUri("hf://tatsu-lab/alpaca").
+						Env(corev1.EnvVar{
+							Name:  jobsetplgconsts.InitializerEnvStorageUri,
+							Value: "hf://other/repo",
+						}).
+						Obj().Env,
+					fmt.Sprintf(
+						"must not set %q in env when storageUri is configured",
+						jobsetplgconsts.InitializerEnvStorageUri,
+					),
+				),
+			},
+		},
+		"must not set STORAGE_URI in model env when storageUri is configured": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						VolumeClaimPolicies: []jobsetv1alpha2ac.VolumeClaimPolicyApplyConfiguration{
+							{
+								Templates: []corev1.PersistentVolumeClaim{
+									{
+										ObjectMeta: metav1.ObjectMeta{
+											Name: jobsetplgconsts.VolumeNameInitializer,
+										},
+									},
+								},
+							},
+						},
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.ModelInitializer),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													*corev1ac.Container().
+														WithName(constants.ModelInitializer).
+														WithVolumeMounts(corev1ac.VolumeMount().
+															WithName(jobsetplgconsts.VolumeNameInitializer)),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Model: utiltesting.MakeTrainJobModelInitializerWrapper().
+						StorageUri("hf://meta-llama/Llama-3").
+						Env(corev1.EnvVar{
+							Name:  jobsetplgconsts.InitializerEnvStorageUri,
+							Value: "hf://other/model",
+						}).
+						Obj(),
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("initializer").Child("model").Child("env"),
+					utiltesting.MakeTrainJobModelInitializerWrapper().
+						StorageUri("hf://meta-llama/Llama-3").
+						Env(corev1.EnvVar{
+							Name:  jobsetplgconsts.InitializerEnvStorageUri,
+							Value: "hf://other/model",
+						}).
+						Obj().Env,
+					fmt.Sprintf(
+						"must not set %q in env when storageUri is configured",
+						jobsetplgconsts.InitializerEnvStorageUri,
+					),
+				),
+			},
+		},
+		"dataset initializer with STORAGE_URI env only passes when storageUri is unset": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						VolumeClaimPolicies: []jobsetv1alpha2ac.VolumeClaimPolicyApplyConfiguration{
+							{
+								Templates: []corev1.PersistentVolumeClaim{
+									{
+										ObjectMeta: metav1.ObjectMeta{
+											Name: jobsetplgconsts.VolumeNameInitializer,
+										},
+									},
+								},
+							},
+						},
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.DatasetInitializer),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													*corev1ac.Container().
+														WithName(constants.DatasetInitializer).
+														WithVolumeMounts(corev1ac.VolumeMount().
+															WithName(jobsetplgconsts.VolumeNameInitializer)),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Dataset: utiltesting.MakeTrainJobDatasetInitializerWrapper().
+						Env(corev1.EnvVar{
+							Name:  jobsetplgconsts.InitializerEnvStorageUri,
+							Value: "hf://only/env",
+						}).
+						Obj(),
+				}).Obj(),
+		},
 		"must have volumeMount with name - initializer in the dataset initializer container": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
