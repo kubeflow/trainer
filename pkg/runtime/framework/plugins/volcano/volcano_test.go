@@ -175,6 +175,119 @@ func TestVolcano(t *testing.T) {
 			expectEnforcePodGroupError: nil,
 			expectBuildError:           nil,
 		},
+		"networkTopology with nil HighestTierAllowed defaults to 1": {
+			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "job-nta-default", Namespace: "test-ns", UID: "4"}},
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobSetSpecApply,
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "launcher",
+							Count: ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("300m"),
+								corev1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+						{
+							Name:  "worker",
+							Count: ptr.To[int32](4),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("500m"),
+								corev1.ResourceMemory: resource.MustParse("0.5Gi"),
+							},
+						},
+					},
+				},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{
+								NetworkTopology: &volcanov1beta1.NetworkTopologySpec{
+									Mode: volcanov1beta1.HardNetworkTopologyMode,
+								},
+							},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{},
+			},
+			expectInfo: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobSetSpecApply,
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "launcher",
+							Count: ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("300m"),
+								corev1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+						{
+							Name:  "worker",
+							Count: ptr.To[int32](4),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("500m"),
+								corev1.ResourceMemory: resource.MustParse("0.5Gi"),
+							},
+						},
+					},
+				},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{
+								NetworkTopology: &volcanov1beta1.NetworkTopologySpec{
+									Mode: volcanov1beta1.HardNetworkTopologyMode,
+								},
+							},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{
+					PodAnnotations: map[string]string{
+						volcanov1beta1.KubeGroupNameAnnotationKey: "job-nta-default",
+					},
+				},
+			},
+			expectObjs: []apiruntime.Object{
+				&volcanov1beta1.PodGroup{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: volcanov1beta1.SchemeGroupVersion.String(),
+						Kind:       "PodGroup",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "job-nta-default",
+						Namespace: "test-ns",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion:         trainer.GroupVersion.String(),
+								Kind:               trainer.TrainJobKind,
+								Name:               "job-nta-default",
+								UID:                types.UID(strconv.Itoa(4)),
+								Controller:         ptr.To(true),
+								BlockOwnerDeletion: ptr.To(true),
+							},
+						},
+					},
+					Spec: volcanov1beta1.PodGroupSpec{
+						MinMember: 5,
+						MinResources: &corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("2300m"),
+							corev1.ResourceMemory: resource.MustParse("3Gi"),
+						},
+						PriorityClassName: "high-priority",
+						NetworkTopology: &volcanov1beta1.NetworkTopologySpec{
+							Mode:               volcanov1beta1.HardNetworkTopologyMode,
+							HighestTierAllowed: ptr.To(1),
+						},
+					},
+				},
+			},
+			expectEnforcePodGroupError: nil,
+			expectBuildError:           nil,
+		},
 		"PodGroup exists and trainjob not suspended": {
 			trainJob: &trainer.TrainJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "job-exist-running", Namespace: "test-ns", UID: "1"},
