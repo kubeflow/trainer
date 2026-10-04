@@ -26,12 +26,12 @@ rules:
       - leaderworkerset.x-k8s.io
     resources:
       - leaderworkersets
-    verbs: ["create", "get", "list", "watch"]
+    verbs: ["create", "delete", "get", "list", "watch"]
   - apiGroups:
       - ""
     resources:
       - services
-    verbs: ["create", "get", "list", "watch"]
+    verbs: ["create", "delete", "get", "list", "watch"]
   - apiGroups:
       - ""
     resources:
