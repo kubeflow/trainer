@@ -94,7 +94,7 @@ func TestJAXEnforceMLPolicy(t *testing.T) {
 				),
 			),
 		},
-		"JAX envs are injected from the runtime template when trainJob.Spec.Trainer is omitted": {
+		"trainer is nil - JAX envs come from the runtime": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
