@@ -243,7 +243,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 				),
 			),
 		},
-		"DMLC envs are injected from the runtime template when trainJob.Spec.Trainer is omitted": {
+		"trainer is nil - DMLC envs come from the runtime": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
