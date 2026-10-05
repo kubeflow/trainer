@@ -2451,7 +2451,8 @@ alpha-node-0-1.alpha slots=8
 					}
 					g.Expect(nodeContainer).ShouldNot(gomega.BeNil())
 					g.Expect(nodeContainer.Image).Should(gomega.Equal("test:trainjob"))
-					g.Expect(nodeContainer.Command).Should(gomega.Equal([]string{"/bin/bash", "/etc/flux-config/entrypoint.sh", "trainjob trainjob"}))
+					g.Expect(nodeContainer.Command).Should(gomega.Equal([]string{"/bin/bash", "/etc/flux-config/entrypoint.sh", "trainjob"}))
+					g.Expect(nodeContainer.Args).Should(gomega.Equal([]string{"trainjob"}))
 					g.Expect(nodeContainer.VolumeMounts).Should(gomega.ContainElements(
 						corev1.VolumeMount{Name: constants.FluxInstallVolumeName, MountPath: constants.FluxVolumePath},
 						corev1.VolumeMount{Name: constants.FluxSpackViewVolumeName, MountPath: constants.FluxSpackViewVolumePath},

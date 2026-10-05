@@ -483,39 +483,58 @@ func TestBuildCurveSecret(t *testing.T) {
 }
 
 func TestGetOriginalCommand(t *testing.T) {
-	cases := []struct {
-		name     string
+	runtimeInfo := &runtime.Info{
+		TemplateSpec: runtime.TemplateSpec{
+			PodSets: []runtime.PodSet{{
+				Name:       constants.Node,
+				Ancestor:   ptr.To(constants.AncestorTrainer),
+				Containers: []runtime.Container{{Name: constants.Node, Command: []string{"python", "runtime.py"}}},
+			}},
+		},
+	}
+	cases := map[string]struct {
 		trainJob *trainer.TrainJob
 		info     *runtime.Info
-		want     string
+		want     []string
 	}{
-		{
-			name: "full command and args",
+		"trainJob command is returned without args": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					Container("image", []string{"python"}, []string{"train.py", "--epochs", "10"}, nil).
+					Container("image", []string{"python", "train.py"}, []string{"--epochs", "10"}, nil).
 					Obj()).
 				Obj(),
-			info: &runtime.Info{},
-			want: "python train.py --epochs 10",
+			info: runtimeInfo,
+			want: []string{"python", "train.py"},
 		},
-		{
-			name: "command and args with extra spaces",
+		"runtime command is used when trainJob command is not set": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					Container("image", []string{"  python  "}, []string{" script.py "}, nil).
+					Container("image", nil, []string{"--epochs", "10"}, nil).
+					Obj()).
+				Obj(),
+			info: runtimeInfo,
+			want: []string{"python", "runtime.py"},
+		},
+		"no command is set": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+			info:     &runtime.Info{},
+		},
+		"argv elements with spaces are preserved": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					Container("image", []string{"  python  ", "-c", "print('hello world')"}, nil, nil).
 					Obj()).
 				Obj(),
 			info: &runtime.Info{},
-			want: "python    script.py",
+			want: []string{"  python  ", "-c", "print('hello world')"},
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
 			got := getOriginalCommand(tc.trainJob, tc.info)
-			if got != tc.want {
-				t.Errorf("getOriginalCommand() = %q; want %q", got, tc.want)
+			if diff := gocmp.Diff(tc.want, got); len(diff) != 0 {
+				t.Errorf("Unexpected getOriginalCommand() (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -527,6 +546,7 @@ func TestOptionalTrainerFields(t *testing.T) {
 		jobTrainer  *trainer.Trainer
 		// wantCommand is only asserted when set.
 		wantCommand []string
+		wantArgs    []string
 		wantFlags   string
 		// wantViewImage defaults to constants.FluxInstallerImage when empty.
 		wantViewImage string
@@ -534,9 +554,19 @@ func TestOptionalTrainerFields(t *testing.T) {
 	}{
 		"trainer is not set": {
 			podSetCount:  3,
-			wantCommand:  []string{"/bin/bash", "/etc/flux-config/entrypoint.sh", "python train.py"},
+			wantCommand:  []string{"/bin/bash", "/etc/flux-config/entrypoint.sh", "python", "train.py"},
 			wantFlags:    "-N 3 -n 3",
 			wantHostlist: "test-job-node-0-[0-2]",
+		},
+		"argument containing spaces is kept as a single argv element": {
+			podSetCount: 1,
+			jobTrainer: utiltesting.MakeTrainJobTrainerWrapper().
+				Container("image", []string{"python", "-c"}, []string{"print('hello world')"}, nil).
+				Obj(),
+			wantCommand:  []string{"/bin/bash", "/etc/flux-config/entrypoint.sh", "python", "-c"},
+			wantArgs:     []string{"print('hello world')"},
+			wantFlags:    "-N 1 -n 1",
+			wantHostlist: "test-job-node-0-[0]",
 		},
 		"num nodes is not set": {
 			podSetCount:  2,
@@ -616,6 +646,9 @@ func TestOptionalTrainerFields(t *testing.T) {
 					t.Errorf("Unexpected trainer command (-want, +got): %s", diff)
 				}
 			}
+			if diff := gocmp.Diff(tc.wantArgs, trainJob.Spec.Trainer.Args); len(diff) != 0 {
+				t.Errorf("Unexpected trainer args (-want, +got): %s", diff)
+			}
 
 			var viewImage string
 			for _, ic := range info.FindPodSetByAncestor(constants.AncestorTrainer).InitContainers {
@@ -647,6 +680,12 @@ func TestOptionalTrainerFields(t *testing.T) {
 			}
 			if !strings.Contains(configMap.Data["entrypoint.sh"], tc.wantFlags) {
 				t.Errorf("entrypoint.sh does not contain the Flux flags %q", tc.wantFlags)
+			}
+			// The original argv has to be forwarded to Flux without word splitting.
+			for _, want := range []string{`if [ "$#" -eq 0 ]; then`, `flux run ${flags} "$@"`} {
+				if !strings.Contains(configMap.Data["entrypoint.sh"], want) {
+					t.Errorf("entrypoint.sh does not contain %q", want)
+				}
 			}
 			if !strings.Contains(configMap.Data["init.sh"], tc.wantHostlist) {
 				t.Errorf("init.sh does not contain the hostlist %q", tc.wantHostlist)
