@@ -89,9 +89,7 @@ func (x *XGBoost) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 		*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
 	}
 
-	// Find the trainer container and inject environment variables. The container is
-	// resolved regardless of whether the TrainJob sets spec.trainer, so a TrainJob that
-	// relies on the runtime template still gets the distributed envs and the tracker port.
+	// Find the trainer container and inject environment variables, even when spec.trainer is omitted.
 	if trainerContainer := info.FindContainerByPodSetAncestorContainerName(
 		constants.AncestorTrainer, constants.Node,
 	); trainerContainer != nil {
