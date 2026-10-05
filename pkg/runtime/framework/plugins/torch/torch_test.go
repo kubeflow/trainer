@@ -142,7 +142,7 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
-		"PET envs are injected from the runtime template when trainJob.Spec.Trainer is omitted": {
+		"trainer is nil - PET envs come from the runtime": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
