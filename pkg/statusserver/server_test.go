@@ -36,6 +36,7 @@ import (
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	trainerv1alpha1ac "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -271,6 +272,103 @@ func TestServerErrorResponses(t *testing.T) {
 
 			if diff := cmp.Diff(tc.wantResponse, &got); diff != "" {
 				t.Errorf("response mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+
+func TestHandleDefault(t *testing.T) {
+	ts := newTestServer(
+		t,
+		&configapi.StatusServer{Port: ptr.To[int32](8080)},
+		fakeAuthorizer{authorized: true},
+	)
+	defer ts.Close()
+
+	req, err := http.NewRequest(http.MethodGet, ts.URL+"/unsupported-route", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("HTTP request failed: %v", err)
+	}
+	t.Cleanup(func() { _ = resp.Body.Close() })
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("status = %v, want %v", resp.StatusCode, http.StatusNotFound)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
+
+	var got metav1.Status
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+
+	want := metav1.Status{
+		Status:  metav1.StatusFailure,
+		Message: "Not found",
+		Reason:  metav1.StatusReasonNotFound,
+		Code:    http.StatusNotFound,
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("response mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestNeedLeaderElection(t *testing.T) {
+	s := &Server{}
+	if s.NeedLeaderElection() {
+		t.Error("NeedLeaderElection() = true, want false")
+	}
+}
+
+func TestToApplyConfig(t *testing.T) {
+	now := metav1.Now()
+	cases := map[string]struct {
+		req  trainer.UpdateTrainJobStatusRequest
+		want *trainerv1alpha1ac.TrainJobStatusApplyConfiguration
+	}{
+		"nil TrainerStatus returns empty status apply configuration": {
+			req:  trainer.UpdateTrainJobStatusRequest{},
+			want: trainerv1alpha1ac.TrainJobStatus(),
+		},
+		"populated TrainerStatus maps all fields": {
+			req: trainer.UpdateTrainJobStatusRequest{
+				TrainerStatus: &trainer.TrainerStatus{
+					ProgressPercentage:        ptr.To[int32](75),
+					EstimatedRemainingSeconds: ptr.To[int32](120),
+					LastUpdatedTime:           now,
+					Metrics: []trainer.Metric{
+						{Name: "loss", Value: "0.25"},
+						{Name: "accuracy", Value: "0.95"},
+					},
+				},
+			},
+			want: trainerv1alpha1ac.TrainJobStatus().
+				WithTrainerStatus(
+					trainerv1alpha1ac.TrainerStatus().
+						WithProgressPercentage(75).
+						WithEstimatedRemainingSeconds(120).
+						WithLastUpdatedTime(now).
+						WithMetrics(
+							trainerv1alpha1ac.Metric().WithName("loss").WithValue("0.25"),
+							trainerv1alpha1ac.Metric().WithName("accuracy").WithValue("0.95"),
+						),
+				),
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := toApplyConfig(tc.req)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("toApplyConfig() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
