@@ -66,9 +66,7 @@ func (j *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 		*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
 	}
 
-	// The trainer container is resolved regardless of whether the TrainJob sets
-	// spec.trainer, so a TrainJob that relies on the runtime template still gets
-	// the distributed envs and the trainer port.
+	// JAX envs and the trainer port are injected even when spec.trainer is omitted.
 	if trainerContainer := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
 		// Get the number of nodes for distributed setup
 		numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
