@@ -143,7 +143,8 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), deepSpeedRuntime).
 				Trainer(&trainer.Trainer{
 					NumNodes: ptr.To(int32(2)),
-					Command:  []string{"mpirun", "sleep", "10"},
+					// Verify MPI ranks run across both expected nodes.
+					Command: []string{"sh", "-c", `test "$(mpirun hostname | sort -u | wc -l)" -eq 2`},
 				}).
 				Obj()
 
