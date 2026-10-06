@@ -77,6 +77,9 @@ status:
         value: "0.0021"
       - name: "batch_size"
         value: "32"
+    metrics:
+      - name: "val_loss"
+        value: "0.182"
   trials:
     - trainJobName: "random-tuning-mvp-trial-ab12c"
       state: "Succeeded"
@@ -115,7 +118,20 @@ status:
 
 ### API
 
-Only the new field and types are shown; `conditions` and `result` on `OptimizationJobStatus` are unchanged from KEP-3562. `status.result` is retained as a convenience projection of `trials` (the best terminal trial), so there is no breaking change to the existing status API.
+Only the new fields and types are shown; `conditions` on `OptimizationJobStatus` is unchanged from the merged API ([#3552](https://github.com/kubeflow/trainer/pull/3552)). `status.result` is retained as a convenience projection of `trials` (the best terminal trial), with one additive change: `Result` gains an optional `metrics` field, copied from the winning trial's record, so the best objective value is readable directly from `status.result` without dereferencing a `TrainJob` that may have been deleted.
+
+```go
+type Result struct {
+	// ... existing fields (trainJobName, parameters) ...
+
+	// metrics are the objective metric values of the winning trial, copied
+	// from its TrialResult when result is updated.
+	// +listType=atomic
+	// +kubebuilder:validation:MaxItems=8
+	// +optional
+	Metrics []Metric `json:"metrics,omitempty"`
+}
+```
 
 ```go
 type OptimizationJobStatus struct {
@@ -171,6 +187,8 @@ const (
 // TrialResult records a single trial launched by the OptimizationJob.
 // +kubebuilder:validation:XValidation:rule="self.state != 'Succeeded' || (has(self.metrics) && self.metrics.size() > 0)",message="a Succeeded trial must record at least one metric"
 // +kubebuilder:validation:XValidation:rule="self.state == 'Running' || has(self.completionTime)",message="completionTime is required for terminal trials"
+// +kubebuilder:validation:XValidation:rule="self.state != 'Failed' || has(self.reason)",message="a Failed trial must record a reason"
+// +kubebuilder:validation:XValidation:rule="!has(self.reason) || self.state == 'Failed'",message="reason is only set for Failed trials"
 type TrialResult struct {
 	// trainJobName is the name of the trial TrainJob this record belongs to.
 	// Bounded at 63 to match TrainJob name validation (RFC 1035) and the
@@ -204,9 +222,9 @@ type TrialResult struct {
 	// +required
 	State TrialState `json:"state"`
 
-	// reason is a machine-readable explanation for a Failed state,
-	// e.g. TrainJobFailed, TrainJobDeleted, MetricsUnavailable.
-	// +kubebuilder:validation:MaxLength=128
+	// reason is the machine-readable explanation for a Failed state,
+	// schema-enforced to the known taxonomy.
+	// +kubebuilder:validation:Enum=TrainJobFailed;TrainJobDeleted;MetricsUnavailable
 	// +optional
 	Reason *string `json:"reason,omitempty"`
 
@@ -231,7 +249,7 @@ Notes:
 ### Controller semantics
 
 1. **On generating a suggestion:** the controller takes the next trial index from `status.nextTrialIndex` (persisted, so a stale-cache reconcile cannot reuse an index and silently overwrite an existing record), appends a `TrialResult` with `State: Running`, the assigned `Parameters`, and `CreationTime`, keyed by the generated trial `TrainJob` name, increments `nextTrialIndex` in the same write, and then creates the trial `TrainJob`. The append happens first, so the parameters are durable before the child exists; a crash between the two converges on the next reconcile by marking the childless record `Failed`/`TrainJobDeleted` (see the reconcile flow for why the controller never re-creates instead).
-2. **On observing a terminal child:** the controller patches the record once, setting `State`, `Metrics` (from `status.trainerStatus.metrics`), `Reason` if failed, and `CompletionTime` (from the terminal condition's `lastTransitionTime`), and updates `status.result` if this trial improves the objective. A record that is already terminal is never modified again.
+2. **On observing a terminal child:** the controller patches the record once, setting `State`, `Metrics` (from `status.trainerStatus.metrics`), `Reason` if failed, and `CompletionTime` (from the terminal condition's `lastTransitionTime`), and updates `status.result` (name, parameters, and metrics, copied from the record) if this trial improves the objective. A record that is already terminal is never modified again.
 3. **On observing a deleted or deleting child whose record is still `Running`:** the record is patched to `Failed` with `Reason: TrainJobDeleted`. No history is lost, because the parameters were recorded at creation.
 4. **Suggestion snapshots:** the history passed to `GetSuggestions` is assembled from `status.trials` (terminal records as completed trials, `Running` records as in-flight trials), replacing the reconstruction from child `TrainJob` objects. Two caveats. First, the Phase 1 pinned Katib Optuna image drops `RUNNING` and `FAILED` trials before the sampler sees them and tracks in-flight suggestions only in process memory, so the in-flight and restart-safety benefits on the *provider* side materialize only with the refactored gRPC contract ([#3796](https://github.com/kubeflow/trainer/issues/3796) / [#3950](https://github.com/kubeflow/trainer/pull/3950)); what this KEP guarantees on its own is that the *controller's* snapshot is complete and deletion-proof. Second, per-trial intermediate metric series for pruning decisions ([#3802](https://github.com/kubeflow/trainer/issues/3802)) stay out of status (see Non-Goals), so pruning reads live child `trainerStatus` in addition to `status.trials`.
 5. **History and size bound:** before launching a trial, the controller checks the trial budget (see point 7) and additionally estimates the serialized size of `status.trials` before every append; the schema cap counts records, not bytes, so the byte check is what actually protects the etcd object limit when parameter counts are large. If either bound is hit, the controller stops launching trials and sets a `Failed` condition with reason `TrialHistoryExhausted`: an explicit, observable outcome rather than a rejected status write wedging the reconcile loop.
@@ -329,7 +347,7 @@ The field is optional and additive on `v1alpha1`: no version bump, no migration.
 - Deleting a *running* trial `TrainJob` yields a `Failed`/`TrainJobDeleted` record and does not stall the optimization.
 - Deleting a *completed* trial `TrainJob` changes neither `status.trials` nor subsequent suggestions.
 - Deleting the `OptimizationJob` cascades cleanly: no children left in `Terminating`.
-- Schema validation: `MaxItems`, state enum, CEL rules (`Succeeded` requires metrics; terminal requires `completionTime`), and `listMapKey` uniqueness.
+- Schema validation: `MaxItems`, state and reason enums, CEL rules (`Succeeded` requires metrics; terminal requires `completionTime`; `Failed` requires `reason`; `reason` only on `Failed`), and `listMapKey` uniqueness.
 - Status-update conflict: concurrent terminal observations converge across reconciles.
 - SSA full-intent semantics: every apply carries the complete `trials` list, and an apply built from a stale read fails on the `resourceVersion` precondition (conflict) instead of silently dropping records.
 
