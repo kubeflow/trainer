@@ -45,3 +45,22 @@ tests:
               - patch
               - update
               - watch
+
+  - it: Should allow metrics authentication reviews
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - authentication.k8s.io
+            resources:
+              - tokenreviews
+            verbs: ["create"]
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - authorization.k8s.io
+            resources:
+              - subjectaccessreviews
+            verbs: ["create"]
