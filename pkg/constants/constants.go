@@ -144,6 +144,10 @@ const (
 	// MPISSHAuthVolumeName is the volume name for Secret with MPI SSH keys.
 	MPISSHAuthVolumeName string = "mpi-ssh-auth"
 
+	// MPISSHAuthDefaultMountPath is the default directory for the MPI SSH keys. It mirrors
+	// the sshAuthMountPath API default, which is only applied by the API server.
+	MPISSHAuthDefaultMountPath string = "/root/.ssh"
+
 	// MPISSHPrivateKeyFile is the file name for the private key.
 	MPISSHPrivateKeyFile string = "id_rsa"
 
