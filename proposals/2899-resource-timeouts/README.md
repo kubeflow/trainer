@@ -107,7 +107,22 @@ New fields use pointers, matching `batch/v1.JobSpec`. The shipped `ActiveDeadlin
 
 #### TrainJobStatus Changes
 
-Add `StartTime` and `CompletionTime` (`*metav1.Time`) to `TrainJobStatus`, with the same semantics as [Kubernetes Job](https://github.com/kubernetes/api/blob/master/batch/v1/types.go) and [JobSet](https://github.com/kubernetes-sigs/jobset/pull/1306): `startTime` resets on each resume from suspension, `completionTime` is set once the TrainJob is terminal. They become the reference points for deadline and TTL, which the controller infers from conditions today.
+Add `StartTime` and `CompletionTime` (`*metav1.Time`) to `TrainJobStatus`. `startTime` follows the suspend/resume behavior of [Kubernetes Job](https://github.com/kubernetes/api/blob/master/batch/v1/types.go) and [JobSet](https://github.com/kubernetes-sigs/jobset/pull/1306). `completionTime` is set once the TrainJob becomes Complete or Failed, unlike Kubernetes Job, which sets it only on success. These fields become the reference points for deadline and TTL calculation.
+
+```go
+type TrainJobStatus struct {
+    // ... existing fields ...
+
+    // startTime records when the TrainJob becomes active.
+    // It is cleared on suspension and reset on resume.
+    // +optional
+    StartTime *metav1.Time `json:"startTime,omitempty"`
+
+    // completionTime records when the TrainJob becomes Complete or Failed and is set once.
+    // +optional
+    CompletionTime *metav1.Time `json:"completionTime,omitempty"`
+}
+```
 
 #### TrainingRuntimeSpec Changes
 
