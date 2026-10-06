@@ -546,7 +546,7 @@ func TestOptionalTrainerFields(t *testing.T) {
 			wantFlags:    "-N 2 -n 2",
 			wantHostlist: "test-job-node-0-[0-1]",
 		},
-		"nil numProcPerNode in runtime and trainjob defaults to 1 without panic": {
+		"numProcPerNode is not set in the runtime and TrainJob": {
 			podSetCount:  2,
 			fluxPolicy:   &trainer.FluxMLPolicySource{},
 			wantFlags:    "-N 2 -n 2",

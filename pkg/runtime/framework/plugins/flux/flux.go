@@ -416,8 +416,6 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.NumProcPerNode != nil {
 		tasks = *jobTrainer.NumProcPerNode
 	} else {
-		// The numProcPerNode kubebuilder default is only applied by the API server,
-		// so the field can still be nil on objects constructed in-process.
 		tasks = ptr.Deref(info.RuntimePolicy.MLPolicySource.Flux.NumProcPerNode, 1)
 	}
 	flags = fmt.Sprintf("-N %d -n %d", numNodes, tasks*numNodes)
