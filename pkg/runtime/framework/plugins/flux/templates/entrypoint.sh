@@ -122,7 +122,7 @@ if [ "$(hostname)" = "${mainHost}" ]; then
     flags="%s  "
     echo "Flags for flux are ${flags}"
     echo "🌀 flux start  -o --config ${cfg} ${brokerOptions} flux submit ${flags} --quiet --watch ${command}"
-	flux start  -o --config ${cfg} ${brokerOptions} flux run ${flags} ${command}
+	flux start  -o --config ${cfg} ${brokerOptions} flux run ${flags} "$@"
   fi
 
 # Block run by workers

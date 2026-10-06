@@ -487,7 +487,7 @@ func TestGetOriginalCommand(t *testing.T) {
 		name     string
 		trainJob *trainer.TrainJob
 		info     *runtime.Info
-		want     string
+		want     []string
 	}{
 		{
 			name: "full command and args",
@@ -497,7 +497,7 @@ func TestGetOriginalCommand(t *testing.T) {
 					Obj()).
 				Obj(),
 			info: &runtime.Info{},
-			want: "python train.py --epochs 10",
+			want: []string{"python", "train.py", "--epochs", "10"},
 		},
 		{
 			name: "command and args with extra spaces",
@@ -507,15 +507,25 @@ func TestGetOriginalCommand(t *testing.T) {
 					Obj()).
 				Obj(),
 			info: &runtime.Info{},
-			want: "python    script.py",
+			want: []string{"python", "script.py"},
+		},
+		{
+			name: "args with spaces stay single arguments",
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					Container("image", []string{"python", "-c"}, []string{"print('hello world')"}, nil).
+					Obj()).
+				Obj(),
+			info: &runtime.Info{},
+			want: []string{"python", "-c", "print('hello world')"},
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := getOriginalCommand(tc.trainJob, tc.info)
-			if got != tc.want {
-				t.Errorf("getOriginalCommand() = %q; want %q", got, tc.want)
+			if diff := gocmp.Diff(tc.want, got); len(diff) != 0 {
+				t.Errorf("Unexpected getOriginalCommand() (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -536,7 +546,7 @@ func TestOptionalTrainerFields(t *testing.T) {
 	}{
 		"trainer is not set": {
 			podSetCount:  3,
-			wantCommand:  []string{"/bin/bash", "/etc/flux-config/entrypoint.sh", "python train.py"},
+			wantCommand:  []string{"/bin/bash", "/etc/flux-config/entrypoint.sh", "python", "train.py"},
 			wantFlags:    "-N 3 -n 3",
 			wantHostlist: "test-job-node-0-[0-2]",
 		},

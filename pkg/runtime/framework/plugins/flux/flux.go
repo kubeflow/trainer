@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -141,7 +142,7 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 	if trainJob.Spec.Trainer == nil {
 		trainJob.Spec.Trainer = &trainer.Trainer{}
 	}
-	trainJob.Spec.Trainer.Command = []string{"/bin/bash", "/etc/flux-config/entrypoint.sh", originalCmd}
+	trainJob.Spec.Trainer.Command = append([]string{"/bin/bash", "/etc/flux-config/entrypoint.sh"}, originalCmd...)
 	trainJob.Spec.Trainer.Args = nil
 
 	// Define the Init Container. This has a spack view with flux pre-built, and we add to an emptyDir
@@ -369,8 +370,9 @@ func generateBrokerConfig(
 	)
 }
 
-// getOriginalCommand derives the original Kubeflow command we need to wrap / handoff to Flux
-func getOriginalCommand(trainJob *trainer.TrainJob, info *runtime.Info) string {
+// getOriginalCommand derives the original Kubeflow command we need to wrap / handoff to Flux.
+// Each element stays a separate argument, so values that contain spaces reach flux run intact.
+func getOriginalCommand(trainJob *trainer.TrainJob, info *runtime.Info) []string {
 	var command []string
 	var args []string
 
@@ -390,9 +392,15 @@ func getOriginalCommand(trainJob *trainer.TrainJob, info *runtime.Info) string {
 		}
 	}
 
-	// Combine into a single string for the shell script
-	fullCommand := strings.Join(append(command, args...), " ")
-	return strings.TrimSpace(fullCommand)
+	// Trim each element and drop empty ones, as the shell's word splitting did when the
+	// command was passed as one string.
+	var fullCommand []string
+	for _, arg := range append(slices.Clone(command), args...) {
+		if arg = strings.TrimSpace(arg); arg != "" {
+			fullCommand = append(fullCommand, arg)
+		}
+	}
+	return fullCommand
 }
 
 // getNumNodes returns the node count for the Flux job. The trainer PodSet already carries
