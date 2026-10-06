@@ -2,21 +2,20 @@
 
 ## Summary
 
-This KEP adds a typed failure policy to Kubeflow Trainer. The policy controls what happens
-when a Pod of a TrainJob fails, and it is split between the two personas of the Trainer API:
+This KEP adds a typed failure policy to the Trainer runtimes and restart counters to the
+TrainJob status.
 
-- **Platform admins** define the policy on the runtime, under `TrainingRuntimeSpec.runPolicy`.
-  It holds `maxRestarts`, the number of restarts before the TrainJob is marked `Failed`, and
-  `rules`, which decide for each failure whether to restart the TrainJob, restart it without
-  consuming the restart budget, or fail it immediately. A rule matches on Pod conditions, for
-  example `DisruptionTarget`, which Kubernetes sets on preemption and node drain, or on
-  container exit codes.
-- **ML engineers** set one value on the TrainJob: `spec.failurePolicy.maxRestarts`, the retry
-  budget for their run. Everything else is inherited from the runtime.
-- **Everyone** can read `status.restarts` and `status.restartsCountTowardsMax` on the TrainJob.
+- **Platform admins** define the policy on a `ClusterTrainingRuntime` or `TrainingRuntime`,
+  under `spec.runPolicy.failurePolicy`. It holds `maxRestarts`, the number of restarts before
+  a TrainJob is marked `Failed`, and `rules`, which decide for each failure whether to restart
+  the TrainJob, restart it without consuming the restart budget, or fail it immediately. A
+  rule matches on Pod conditions, for example `DisruptionTarget`, which Kubernetes sets on
+  preemption and node drain, or on container exit codes.
+- **Every TrainJob** reports `status.restarts` and `status.restartsCountTowardsMax`.
+- **`TrainJobSpec` is unchanged.** A per-TrainJob retry budget is listed under
+  [Future Plan](#future-plan) and waits for user demand.
 
-The Trainer controller does not implement restarts itself. It translates the effective policy
-into the
+The Trainer controller does not implement restarts itself. It translates the policy into the
 [JobSet failure policy](https://github.com/kubernetes-sigs/jobset/blob/main/keps/262-ConfigurableFailurePolicy/README.md)
 and the
 [Job Pod failure policy](https://kubernetes.io/docs/concepts/workloads/controllers/job/#pod-failure-policy)
@@ -27,13 +26,13 @@ of the JobSet it already creates, and the JobSet and Job controllers do the work
 Long training jobs fail for reasons that have nothing to do with the training code. Nodes are
 preempted, drained for upgrades, or lost. On preemptible GPU capacity this is the normal case.
 A training platform has to answer two questions when a Pod fails: should the job be retried,
-and how many times. Today neither the platform admin nor the TrainJob user has a good way to
-answer them.
+and how many times. Today a platform admin can only answer them by hand-writing three layers
+of JobSet and Job fields, and the result is invisible on the TrainJob.
 
 [KEP-2170](../2170-kubeflow-trainer-v2/README.md) names `PodFailurePolicy` and the Pod
 disruption condition as features that moving to JobSet would let Trainer "introduce easily",
-and it assigns failure policy to the runtime, which platform engineers manage. The v2 API
-never surfaced the feature on either object.
+and it assigns failure policy to the runtime, which platform engineers manage. This KEP follows
+that split. It gives the runtime a typed policy and leaves the TrainJob API as it is.
 
 ### How failures are handled today
 
@@ -60,41 +59,34 @@ TrainJob runs with the values in the last column. That has three consequences:
 3. **A preemption is counted like a bug.** Nothing distinguishes a Pod that was evicted from a
    Pod whose training code crashed.
 
-A platform admin can change this by hand-writing the JobSet and Job fields in the runtime
-template, and some do
-([#3779](https://github.com/kubeflow/trainer/issues/3779)). Doing it correctly means knowing
-that `podFailurePolicy` requires `restartPolicy: Never`, that `backoffLimit` has to be 0 for a
-Pod failure to reach the JobSet layer, and how JobSet rules match Job failure reasons and
-messages. Even when it is done correctly, two gaps remain:
+### Why a typed policy instead of the JobSet template
 
-- The retry budget is the same for every TrainJob that uses the runtime, although the right
-  number depends on the job. See
-  [Why the TrainJob needs a retry budget](#why-the-trainjob-needs-a-retry-budget).
-- `TrainJobStatus` does not report how many times a TrainJob was restarted. Users have to read
-  the JobSet, which the TrainJob API is meant to hide from them.
+An admin can change the behavior above by writing the JobSet and Job fields in the runtime
+template, and some do ([#3779](https://github.com/kubeflow/trainer/issues/3779)). This KEP
+proposes a typed `runPolicy.failurePolicy` on the runtime instead, for four reasons.
 
-### Why the TrainJob needs a retry budget
+**The three layers have to agree, and the failure modes are silent.** A JobSet `failurePolicy`
+only sees a Pod failure after the Job has given up, so with the default `backoffLimit` of 6
+the JobSet rules run after six in-place retries. A `podFailurePolicy` is only accepted with
+`restartPolicy: Never`, and because JobSet defaults the template to `OnFailure`, the error
+appears when the JobSet tries to create the Job, after the TrainJob was admitted. Matching a
+JobSet rule to a `podFailurePolicy` rule requires a regular expression on the Job failure
+message. With a typed policy the controller owns all of this and the runtime webhook rejects an
+invalid policy when the runtime is created.
 
-Rules about Pod conditions, exit codes and restart strategies are infrastructure knowledge, and
-this KEP keeps them on the runtime. The number of restarts is different: it depends on facts
-that only the author of the job knows.
+**The runtime API already abstracts over JobSet.** `mlPolicy` and `podGroupPolicy` describe
+intent and let plugins produce the JobSet fields, and the API comments anticipate other
+backends such as LWS, Grove or Slurm. A JobSet `failurePolicy` in the template is tied to one
+backend. A Trainer policy can be translated for each of them.
 
-- **Whether a retry can help.** A script that checkpoints and resumes gains a lot from three
-  restarts. A script that starts from scratch loses the whole run on every restart, so each
-  retry burns the full GPU budget of the job again. The admin who writes the runtime cannot
-  know which kind of script a TrainJob runs.
-- **What the run costs.** A ten-minute experiment can be retried freely. A three-day run on
-  256 GPUs is a decision the owner of that budget wants to make.
+**The TrainJob has to understand restarts to report them.** `TrainJobStatus` does not show how
+many times a TrainJob was restarted, so users read the JobSet, which the TrainJob API is meant
+to hide. The counters proposed here are copied whenever the JobSet reports them, so they also
+help the runtimes that set the JobSet `failurePolicy` by hand today.
 
-Without a TrainJob-level value, the only way to offer two retry budgets is two runtimes, and
-every combination of runtime and budget becomes another runtime to maintain. The same
-argument led to `activeDeadlineSeconds` being exposed on the TrainJob in
-[KEP-2899](../2899-resource-timeouts/README.md), with the runtime holding the default.
-
-A retry count is also a concept ML engineers already use outside Kubernetes: `torchrun` takes
-`--max-restarts`, Ray Train has `FailureConfig(max_failures=...)`, and
-[kubeflow/sdk#285](https://github.com/kubeflow/sdk/issues/285) proposes a `max_restarts`
-argument for the Kubeflow SDK. None of them require knowledge of Pods or events.
+**A typed policy is the base for a per-TrainJob override.** If users ask for a retry budget on
+the TrainJob, it can be added as one field that adjusts the runtime policy. There is no clean
+way to let a TrainJob adjust a hand-written JobSet template.
 
 ### What users have asked for
 
@@ -103,8 +95,11 @@ argument for the Kubeflow SDK. None of them require knowledge of Pods or events.
 - [#2185](https://github.com/kubeflow/trainer/issues/2185) and
   [#2072](https://github.com/kubeflow/trainer/issues/2072) asked for a maximum retry count and
   for recovery from failed nodes in v1. Both were deferred to the v2 API.
-- [kubeflow/sdk#285](https://github.com/kubeflow/sdk/issues/285) proposes a `max_restarts`
-  argument in the SDK, which has no TrainJob API to map to.
+- [#3779](https://github.com/kubeflow/trainer/issues/3779) shows a user setting
+  `failurePolicy.maxRestarts` in the JobSet template to survive failures.
+
+None of these asked for a per-TrainJob setting, which is why this KEP leaves `TrainJobSpec`
+unchanged.
 
 [KEP-2899](../2899-resource-timeouts/README.md) is introducing `RunPolicy` on the runtime
 ([#3824](https://github.com/kubeflow/trainer/pull/3824)) and names `BackoffLimit` as an example
@@ -112,27 +107,25 @@ of a lifecycle knob that can be added to it later. This KEP is that addition.
 
 ### Goals
 
-- Add `failurePolicy` to `RunPolicy` on `TrainingRuntimeSpec` so platform admins can define
-  rules and a default retry budget for every TrainJob that uses a runtime, without hand-writing
+- Add `failurePolicy` to `RunPolicy` on `TrainingRuntimeSpec` so platform admins can define a
+  retry budget and failure rules for every TrainJob that uses a runtime, without hand-writing
   three layers of JobSet and Job fields.
-- Add `failurePolicy.maxRestarts` to `TrainJobSpec` so the owner of a run can set its retry
-  budget.
 - Let a policy treat infrastructure disruptions (preemption, eviction, node drain) differently
   from application failures, and fail immediately on exit codes that are known to be
   non-retriable.
-- Report restart counters in `TrainJobStatus`.
-- Expose the retry budget and the counters in the Kubeflow Python SDK.
+- Report restart counters in `TrainJobStatus` and in the Kubeflow Python SDK.
 - Build on the JobSet and Job failure policies. Add no Pod watches and no Pod permissions to
   the Trainer controller.
 
 ### Non-Goals
 
+- Adding failure-handling fields to `TrainJobSpec`. A per-TrainJob retry budget is deferred
+  until there is user demand. See [Future Plan](#future-plan) and
+  [Alternative 6](#alternative-6-a-retry-budget-on-the-trainjob).
 - Checkpointing or resuming training state. A restarted TrainJob starts its containers again.
   Resuming from a checkpoint is the responsibility of the training code. See
   [#2777](https://github.com/kubeflow/trainer/issues/2777) and
   [#2245](https://github.com/kubeflow/trainer/issues/2245).
-- Exposing failure rules on the TrainJob. Rules stay a runtime concern. See
-  [Alternative 6](#alternative-6-the-full-policy-on-the-trainjob).
 - Restarting only part of a TrainJob, such as a single Pod or a single step. See
   [Future Plan](#future-plan).
 - Detecting TrainJobs that hang without failing.
@@ -140,14 +133,12 @@ of a lifecycle knob that can be added to it later. This KEP is that addition.
   [#3304](https://github.com/kubeflow/trainer/issues/3304).
 - Retrying failed trials of an OptimizationJob
   ([#3743](https://github.com/kubeflow/trainer/issues/3743)).
-- Changing the behavior of TrainJobs whose runtime has no failure policy and that set no
-  retry budget.
+- Changing the behavior of TrainJobs whose runtime has no failure policy.
 
 ## Proposal
 
-The runtime defines the policy, the TrainJob can adjust the retry budget, and the controller
-turns the result into JobSet and Job fields. When a Pod fails, the policy picks one of three
-actions:
+The runtime defines the policy and the controller turns it into JobSet and Job fields. When a
+Pod of a TrainJob fails, the policy picks one of three actions:
 
 | Action | Effect |
 | --- | --- |
@@ -170,9 +161,9 @@ flowchart TD
     M -- "No" --> F
 ```
 
-In the common setup the admin ships one rule for `DisruptionTarget` and a conservative default
-budget, and an ML engineer who knows their script resumes from checkpoints raises
-`maxRestarts` on their TrainJob. Neither of them touches a JobSet or Job field.
+In the common setup the admin ships one rule for `DisruptionTarget` and a small `maxRestarts`.
+ML engineers submit TrainJobs as they do today and see the outcome in the TrainJob status.
+Nobody touches a JobSet or Job field.
 
 ### User Stories
 
@@ -185,20 +176,14 @@ knowing about Pod conditions or JobSet restarts.
 
 #### Story 2
 
-As an **ML Engineer** running an 8-node fine-tuning job that resumes from checkpoints, I want
-to allow three restarts for my run instead of the runtime default of one, because a retry is
-cheap for my job and losing the run to a transient failure is not.
-
-#### Story 3
-
 As an **ML Platform Engineer** maintaining a `TrainingRuntime` for my team's training image,
 which exits with code 42 when it detects an invalid configuration, I want TrainJobs that use
 the runtime to fail immediately on that exit code and skip the restarts.
 
-#### Story 4
+#### Story 3
 
-As an **ML Engineer**, I want to set the retry budget from the Kubeflow Python SDK and see how
-many times my TrainJob has restarted, without reading JobSet objects.
+As an **ML Engineer**, I want to see how many times my TrainJob has restarted, in
+`kubectl get trainjob` and in the Kubeflow Python SDK, without reading JobSet objects.
 
 ### Notes/Constraints/Caveats
 
@@ -210,9 +195,8 @@ many times my TrainJob has restarted, without reading JobSet objects.
   which rule applies. When a preempted worker takes its peers down with it, a peer's crash can
   be observed before the preempted Pod's `DisruptionTarget` condition. That incident is then
   handled as an ordinary failure.
-- **The policy is fixed when the TrainJob is created.** `spec.failurePolicy` is immutable, and
-  the runtime policy is read from the runtime snapshot, so editing a runtime only affects
-  TrainJobs created afterwards.
+- **The policy is fixed when the TrainJob is created.** The runtime policy is read from the
+  runtime snapshot, so editing a runtime only affects TrainJobs created afterwards.
 - **A restart is only as useful as the checkpoint behind it.** Without checkpoints on a
   persistent volume or in object storage, a restarted TrainJob repeats the whole run.
 
@@ -220,10 +204,9 @@ many times my TrainJob has restarted, without reading JobSet objects.
 
 | Risk | Mitigation |
 | --- | --- |
-| A disruption is classified as an ordinary failure and consumes a counted restart. | The error is in the safe direction, because it never causes extra restarts. The user guide recommends a default `maxRestarts` of at least 1 when the runtime relies on a disruption rule. |
-| A `FailTrainJob` exit-code rule matches a worker that crashed only because a peer was preempted, which turns a preemption into a terminal failure. | The user guide recommends `FailTrainJob` only for exit codes that the training image reserves for non-retriable errors, and warns against generic codes such as 1. |
+| A disruption is classified as an ordinary failure and consumes a counted restart. | The error is in the safe direction, because it never causes extra restarts. The admin guide recommends `maxRestarts` of at least 1 when the policy relies on a disruption rule. |
+| A `FailTrainJob` exit-code rule matches a worker that crashed only because a peer was preempted, which turns a preemption into a terminal failure. | The admin guide recommends `FailTrainJob` only for exit codes that the training image reserves for non-retriable errors, and warns against generic codes such as 1. |
 | `RestartTrainJobAndIgnoreMaxRestarts` restarts a TrainJob forever on a flapping node pool. | `activeDeadlineSeconds` is not reset by restarts, so it bounds the total run time. The runtime webhook returns an admission warning when this action is used and `runPolicy.activeDeadlineSeconds` is unset. |
-| An ML engineer sets a large `maxRestarts` on a script that does not checkpoint and wastes GPU time. | The budget is bounded by `activeDeadlineSeconds`, and the user guide explains when retries help. A future `runPolicy` field can cap the value a TrainJob may set if this turns out to be a problem. |
 | Rules are mapped to JobSet rules by matching the Job failure message (`... matching FailJob rule at index N`), which Kubernetes does not version as an API. | This is the usage documented by JobSet [KEP-262](https://github.com/kubernetes-sigs/jobset/blob/main/keps/262-ConfigurableFailurePolicy/README.md). Integration and E2E tests pin the format on every supported Kubernetes version. |
 | Re-running initializers on each restart is slow for large models and datasets. | Documented. Restarting only the failed step is planned once the JobSet `RestartJob` action graduates. |
 
@@ -241,15 +224,15 @@ type RunPolicy struct {
     // ... activeDeadlineSeconds and ttlSecondsAfterFinished from KEP-2899 ...
 
     // failurePolicy defines how TrainJobs that reference this runtime react when
-    // one of their Pods fails. A TrainJob can override maxRestarts with its own
-    // spec.failurePolicy.maxRestarts.
+    // one of their Pods fails.
+    // This is an alpha field and requires enabling the TrainJobFailurePolicy feature gate.
     // +optional
     FailurePolicy *FailurePolicy `json:"failurePolicy,omitempty"`
 }
 
 // FailurePolicy defines how a TrainJob reacts to Pod failures.
 type FailurePolicy struct {
-    // maxRestarts is the default number of times a TrainJob can be restarted by the
+    // maxRestarts is the number of times a TrainJob can be restarted by the
     // RestartTrainJob action before it is marked Failed.
     // Defaults to 0, which fails the TrainJob on the first counted failure.
     // +optional
@@ -314,65 +297,35 @@ Two choices in this API are worth calling out:
 If `RunPolicy` has not merged when this KEP is implemented, this KEP introduces the struct
 with `failurePolicy` as its first field.
 
-#### TrainJobSpec Changes
-
-Add `FailurePolicy` to `TrainJobSpec` in `pkg/apis/trainer/v1alpha1/trainjob_types.go`:
-
-```go
-type TrainJobSpec struct {
-    // ... existing fields ...
-
-    // failurePolicy adjusts the failure policy of the referenced runtime for this TrainJob.
-    // This is an alpha field and requires enabling the TrainJobFailurePolicy feature gate.
-    // +optional
-    // +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
-    FailurePolicy *TrainJobFailurePolicy `json:"failurePolicy,omitempty"`
-}
-
-// TrainJobFailurePolicy holds the parts of the failure policy that a TrainJob can set.
-type TrainJobFailurePolicy struct {
-    // maxRestarts is the number of times the TrainJob can be restarted by the
-    // RestartTrainJob action before it is marked Failed. It overrides the
-    // maxRestarts of the runtime's spec.runPolicy.failurePolicy. The rules of the
-    // runtime policy still apply.
-    // +required
-    // +kubebuilder:validation:Minimum=0
-    MaxRestarts *int32 `json:"maxRestarts,omitempty"`
-}
-```
-
-The TrainJob type is deliberately narrow. It carries the one value that the owner of a run
-has the information to decide, and nothing that requires knowledge of Pods, conditions or
-JobSet restarts. It is a struct rather than a flat `spec.maxRestarts` so that the relationship
-to the runtime's `failurePolicy` is visible in the YAML, and so that a later addition does not
-need a new top-level field. `spec.failurePolicy` is immutable in alpha, because the value is
-written into the JobSet when it is created.
-
 #### TrainJobStatus Changes
 
 ```go
 type TrainJobStatus struct {
     // ... existing fields ...
 
-    // restarts is the number of times the TrainJob has been restarted by its failure policy.
+    // restarts is the number of times the TrainJob has been restarted.
     // +optional
     Restarts int32 `json:"restarts,omitempty"`
 
     // restartsCountTowardsMax is the number of restarts that count towards
-    // the effective maxRestarts.
+    // the maxRestarts of the failure policy.
     // +optional
     RestartsCountTowardsMax int32 `json:"restartsCountTowardsMax,omitempty"`
 }
 ```
 
-Both fields mirror the fields of the same name in `JobSetStatus`. A TrainJob that survived one
-preemption and one crash, with an effective `maxRestarts` of 2, reports:
+Both fields mirror the fields of the same name in `JobSetStatus`, and they are copied whenever
+the JobSet reports them. A runtime that sets the JobSet `failurePolicy` by hand in its template
+gets the counters as well. A TrainJob that survived one preemption and one crash, with
+`maxRestarts: 2`, reports:
 
 ```yaml
 status:
   restarts: 2
   restartsCountTowardsMax: 1
 ```
+
+`restarts` is added as a printer column, so that `kubectl get trainjob` shows it.
 
 This KEP does not change how the `Failed` condition is derived. Its reason and message are
 copied from the JobSet `Failed` condition, as today. With a failure policy the reasons are:
@@ -381,6 +334,10 @@ copied from the JobSet `Failed` condition, as today. With a failure policy the r
 | --- | --- |
 | A `FailTrainJob` rule matched. | `FailJobSetFailurePolicyAction` |
 | A counted failure occurred after `maxRestarts` restarts. | `ReachedMaxRestarts` |
+
+#### TrainJobSpec
+
+Unchanged. See [Future Plan](#future-plan) for the per-TrainJob retry budget.
 
 ### Semantics
 
@@ -441,34 +398,12 @@ A restart is the JobSet `RestartJobSet` action with the default `Recreate` strat
 | JAX, XGBoost | All `node` Pods. |
 | Any runtime with initializers | The initializer Jobs first, then the trainer. |
 
-### Value Resolution
+### Policy Resolution
 
-The effective policy is the runtime policy with the TrainJob's retry budget applied on top:
-
-```
-rules       = runtime.spec.runPolicy.failurePolicy.rules        (if the runtime sets a policy)
-         else none
-
-maxRestarts = trainJob.spec.failurePolicy.maxRestarts           (if set)
-         else runtime.spec.runPolicy.failurePolicy.maxRestarts  (if set)
-         else 0
-```
-
-A policy is in effect when the runtime sets `runPolicy.failurePolicy`, the TrainJob sets
-`spec.failurePolicy`, or both. When neither is set, nothing changes and failures are handled
-by the runtime's JobSet template as today. The runtime policy is read from the runtime
-snapshot, following KEP-2899.
-
-| `runPolicy.failurePolicy` | `TrainJob.spec.failurePolicy` | Effective policy |
-| --- | --- | --- |
-| `maxRestarts: 1`, one `DisruptionTarget` rule | Unset | One restart, disruptions do not count. |
-| `maxRestarts: 1`, one `DisruptionTarget` rule | `maxRestarts: 3` | Three restarts, disruptions do not count. |
-| `maxRestarts: 1`, one `DisruptionTarget` rule | `maxRestarts: 0` | No restart for the training code, disruptions still restart. |
-| Unset | `maxRestarts: 3` | Three restarts, every failure counts. |
-| Unset | Unset | None. The behavior is unchanged. |
-
-Only `maxRestarts` is merged. Rules come from one place, so their evaluation order is always
-the order the admin wrote.
+The policy of a TrainJob is `runPolicy.failurePolicy` of the runtime snapshot taken when the
+TrainJob was created, following KEP-2899. When the runtime has no policy, nothing changes and
+failures are handled by the runtime's JobSet template as today. There is nothing to merge in
+this version of the KEP, because the TrainJob carries no failure-handling fields.
 
 ### User Examples
 
@@ -499,7 +434,7 @@ spec:
     # ... JobSet template ...
 ```
 
-**TrainJob that raises the retry budget (ML Engineer):**
+**TrainJob (ML Engineer), unchanged from today:**
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
@@ -511,36 +446,26 @@ spec:
     name: torch-distributed
   trainer:
     numNodes: 8
-  failurePolicy:
-    maxRestarts: 3    # this script resumes from checkpoints, so retries are cheap
 ```
 
-**TrainJob on a runtime without a policy (ML Engineer):**
+After one preemption the TrainJob shows:
 
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: TrainJob
-metadata:
-  name: bounded-restarts
-spec:
-  runtimeRef:
-    name: torch-distributed
-  trainer:
-    numNodes: 4
-  failurePolicy:
-    maxRestarts: 2    # every failure counts, at most two restarts
+```
+$ kubectl get trainjob preemptible-finetune
+NAME                   STATE     RESTARTS   AGE
+preemptible-finetune   Running   1          3h
 ```
 
 ### Implementation Overview
 
-All changes are in the JobSet plugin (`pkg/runtime/framework/plugins/jobset`), the webhooks,
-and the runtime `Info` object, which carries the effective policy. The controller gains no new
+All changes are in the JobSet plugin (`pkg/runtime/framework/plugins/jobset`), the runtime
+webhooks, and the runtime `Info` object, which carries the policy. The controller gains no new
 watches and no new RBAC.
 
 #### Translation to JobSet
 
-When an effective policy exists, the JobSet plugin sets the following fields when it builds
-the JobSet:
+When the runtime has a policy, the JobSet plugin sets the following fields when it builds the
+JobSet:
 
 1. On every replicated Job:
    - `backoffLimit: 0` and Pod `restartPolicy: Never`, so that the first Pod failure fails the
@@ -548,8 +473,7 @@ the JobSet:
      required by Kubernetes when `podFailurePolicy` is set.
    - `podFailurePolicy` with one `FailJob` rule per policy rule, in the same order, with the
      requirement copied unchanged.
-2. On the JobSet, `failurePolicy.maxRestarts` set to the effective value, and one rule per
-   policy rule:
+2. On the JobSet, `failurePolicy.maxRestarts` and one rule per policy rule:
 
    | Policy action | JobSet action |
    | --- | --- |
@@ -583,13 +507,12 @@ template. An exit-code rule with `containerName` is therefore added only to the 
 that container. Because this can shift rule indexes between Jobs, the generated JobSet rules
 are scoped with `targetReplicatedJobs`.
 
-For the `torch-distributed` runtime and the `preemptible-finetune` TrainJob above, the
-generated JobSet contains:
+For the `torch-distributed` runtime above, the generated JobSet contains:
 
 ```yaml
 spec:
   failurePolicy:
-    maxRestarts: 3
+    maxRestarts: 1
     rules:
       - name: TrainJobFailurePolicyRule0
         action: RestartJobSetAndIgnoreMaxRestarts
@@ -624,8 +547,7 @@ spec:
 #### Worked Scenarios
 
 The three scenarios below use the `torch-distributed` runtime and the `preemptible-finetune`
-TrainJob from the user examples. The effective policy has `maxRestarts: 3` and the two rules
-from the runtime.
+TrainJob from the user examples, with `maxRestarts: 1` and the two rules.
 
 **A node is preempted.**
 
@@ -646,10 +568,9 @@ from the runtime.
    `backoffLimit: 0` the Job fails with reason `BackoffLimitExceeded`.
 2. No JobSet rule matches, so the JobSet controller applies `RestartJobSet`. The TrainJob
    reports `restarts: 1` and `restartsCountTowardsMax: 1`.
-3. The code crashes again on the following attempts. After the fourth failure the budget of
-   three restarts is used up, and the TrainJob is `Failed` with reason `ReachedMaxRestarts`.
-   A TrainJob without its own `maxRestarts` would have stopped after the second failure, with
-   the runtime default of one restart.
+3. The code crashes again on the second attempt. The budget of one restart is used up, and the
+   TrainJob is `Failed` with reason `ReachedMaxRestarts`. Today the same script would have been
+   retried in place six times before the TrainJob failed.
 
 **The training code exits with the reserved code 42.**
 
@@ -661,34 +582,34 @@ from the runtime.
 #### Status
 
 The JobSet plugin copies `status.restarts` and `status.restartsCountTowardsMax` from the JobSet
-to the TrainJob. The controller emits a `Warning` event on the TrainJob each time
+to the TrainJob on every status sync, whether the JobSet `failurePolicy` came from the typed
+policy or from the template. The controller emits a `Warning` event on the TrainJob each time
 `status.restarts` increases, so that a restart is visible with `kubectl describe trainjob`.
 
 #### Validation
 
 | Check | Where | Result |
 | --- | --- | --- |
-| `maxRestarts` is negative, on the runtime or the TrainJob. | CRD schema | Rejected. |
+| `maxRestarts` is negative. | CRD schema | Rejected. |
 | A rule sets both or neither of `onExitCodes` and `onPodConditions`. | CRD schema (CEL) | Rejected. |
 | `onExitCodes` or `onPodConditions` values break the Job API constraints, for example unordered exit codes. | Runtime webhook | Rejected at admission, so that the error does not surface later when a JobSet is created. |
 | `onPodConditions[].status` is omitted. | Runtime defaulting | Set to `"True"`, matching the Job API. |
-| `spec.failurePolicy` is changed on an existing TrainJob. | CRD schema (CEL) | Rejected. |
-| A runtime sets `runPolicy.failurePolicy` together with `failurePolicy` on the JobSet template or `podFailurePolicy` on a Job template. | Runtime webhook | Rejected. A Trainer policy and a hand-written one cannot be combined. |
-| A TrainJob sets `spec.failurePolicy` and the referenced runtime's template sets either of those fields. | TrainJob webhook | Rejected, with a message that points at the runtime. |
+| A runtime sets `runPolicy.failurePolicy` together with `failurePolicy` on the JobSet template or `podFailurePolicy` on a Job template. | Runtime webhook | Rejected. A typed policy and a hand-written one cannot be combined. |
 | A rule uses `RestartTrainJobAndIgnoreMaxRestarts` and `runPolicy.activeDeadlineSeconds` is unset. | Runtime webhook | Accepted with an admission warning. |
 
-`backoffLimit` and `restartPolicy` in the runtime template are overridden when a policy is in
-effect, because the translation depends on them.
+`backoffLimit` and `restartPolicy` in the runtime template are overridden when a policy is set,
+because the translation depends on them.
 
 #### Feature Gate
 
 The feature is guarded by the `TrainJobFailurePolicy` feature gate, alpha and disabled by
 default.
 
-- With the gate disabled, the webhooks reject a TrainJob or a runtime that sets the new fields.
+- With the gate disabled, the runtime webhooks reject a runtime that sets
+  `runPolicy.failurePolicy`, and the status counters are not populated.
 - A policy that is already stored is still honored after the gate is disabled, so that turning
   the gate off does not change the JobSet of a running TrainJob.
-- TrainJobs without an effective policy are not affected by the gate in either state.
+- TrainJobs whose runtime has no policy are not affected by the gate in either state.
 
 ### Interaction with Other Features
 
@@ -698,9 +619,9 @@ default.
 - **Suspend and Kueue**: suspending a TrainJob is not a failure and evaluates no rule. Kueue
   preempts a TrainJob by suspending it, so Kueue preemption does not consume the restart
   budget. The restart counters are kept across suspend and resume.
-- **MultiKueue**: the MultiKueue adapter copies `TrainJobSpec` to the worker cluster, so
-  `spec.failurePolicy` travels with the TrainJob. The runtime policy is resolved from the
-  runtime in the worker cluster.
+- **MultiKueue**: the policy comes from the runtime in the worker cluster, like every other
+  runtime setting. Admins who want the same behavior in every cluster install the same runtime
+  everywhere, which MultiKueue already requires.
 - **`ttlSecondsAfterFinished`** (KEP-2899): applies only after the TrainJob is terminal, so it
   does not interact with restarts.
 - **TrainJob progress** ([KEP-2779](../2779-trainjob-progress/README.md)): `trainerStatus` is
@@ -709,31 +630,20 @@ default.
   features complement each other. A PodDisruptionBudget reduces voluntary disruptions, and the
   failure policy decides what happens when a disruption still occurs.
 - **OptimizationJob** ([KEP-3562](https://github.com/kubeflow/trainer/issues/3562)): trials are
-  TrainJobs and inherit the runtime policy, so a trial can survive a preemption without being
+  TrainJobs and use the runtime policy, so a trial can survive a preemption without being
   reported as failed.
 
 ### Kubeflow SDK Changes
 
-Add a `MaxRestarts` option to `kubeflow.trainer.options`, next to `ActiveDeadlineSeconds`, and
-expose the restart counters on the SDK `TrainJob` type:
+No new argument to `TrainerClient.train()`. The SDK `TrainJob` type gains the two counters, so
+that users can see restarts without reading Kubernetes objects:
 
 ```python
-from kubeflow.trainer import TrainerClient, CustomTrainer
-from kubeflow.trainer.options import MaxRestarts
+from kubeflow.trainer import TrainerClient
 
-client = TrainerClient()
-job_name = client.train(
-    trainer=CustomTrainer(func=train_func, num_nodes=8),
-    options=[MaxRestarts(3)],
-)
-
-job = client.get_job(job_name)
-print(job.restarts)
+job = TrainerClient().get_job("preemptible-finetune")
+print(job.restarts, job.restarts_count_towards_max)
 ```
-
-This is the `max_restarts` argument that
-[kubeflow/sdk#285](https://github.com/kubeflow/sdk/issues/285) asks for. The final shape of
-the option is decided in `kubeflow/sdk`.
 
 ### Test Plan
 
@@ -747,48 +657,44 @@ this enhancement.
   - Translation: each action maps to the expected JobSet rule and Pod failure policy rule.
   - An exit-code rule with `containerName` is added only to Jobs that have the container, and
     the JobSet rule indexes and `targetReplicatedJobs` match.
-  - No effective policy: the JobSet built from the runtime template is unchanged.
-  - Status: restart counters are copied from the JobSet.
-- `pkg/runtime/core`: value resolution for every row of the table in
-  [Value Resolution](#value-resolution).
-- `pkg/webhooks`: field validation, immutability, conflict with a template-level failure
-  policy, feature gate disabled, admission warning for unbounded restarts.
+  - No policy: the JobSet built from the runtime template is unchanged.
+  - Status: restart counters are copied from the JobSet, with and without a typed policy.
+- `pkg/webhooks`: field validation, conflict with a template-level failure policy, feature
+  gate disabled, admission warning for unbounded restarts.
 
 #### Integration Tests
 
 - A runtime policy produces a JobSet with the expected `failurePolicy`, `podFailurePolicy`,
   `backoffLimit`, and `restartPolicy`.
-- A TrainJob `maxRestarts` overrides the runtime value while the runtime rules are kept.
-- A TrainJob `maxRestarts` on a runtime without a policy produces a JobSet with
-  `failurePolicy.maxRestarts` and no rules.
 - A runtime edited after the TrainJob is created does not change the applied policy.
-- Restart counters on the JobSet status are reflected on the TrainJob status.
-- Conflicting runtime and TrainJob configurations are rejected.
+- Restart counters on the JobSet status are reflected on the TrainJob status, for a typed
+  policy and for a hand-written JobSet `failurePolicy`.
+- A runtime that combines a typed and a hand-written policy is rejected.
 
 #### E2E Tests
 
 - `test/e2e/trainjob_failure_policy_test.go`:
-  - A trainer that fails on every attempt with `maxRestarts: 1` ends `Failed` with reason
-    `ReachedMaxRestarts` and `status.restarts: 1`.
+  - A trainer that fails on every attempt, on a runtime with `maxRestarts: 1`, ends `Failed`
+    with reason `ReachedMaxRestarts` and `status.restarts: 1`.
   - A trainer that exits with a code matched by a `FailTrainJob` rule ends `Failed` with
     `status.restarts: 0`.
-  - A trainer Pod evicted through the Eviction API, with a `DisruptionTarget` rule, is
-    restarted with `status.restarts: 1` and `status.restartsCountTowardsMax: 0`.
+  - A trainer Pod evicted through the Eviction API, on a runtime with a `DisruptionTarget`
+    rule, is restarted with `status.restarts: 1` and `status.restartsCountTowardsMax: 0`.
 
 ### Graduation Criteria
 
 **Alpha**
 
 - `TrainJobFailurePolicy` feature gate, disabled by default.
-- Runtime policy, TrainJob retry budget, translation, status counters, and validation
-  implemented.
+- Runtime policy, translation, status counters, and validation implemented.
 - Unit, integration, and E2E tests in place.
 
 **Beta**
 
 - Feature gate enabled by default.
-- SDK support released.
-- User guide for fault-tolerant TrainJobs published, for admins and for ML engineers.
+- SDK exposes the restart counters.
+- Admin guide for fault-tolerant runtimes published.
+- Decision made on a per-TrainJob retry budget, based on user feedback collected during alpha.
 - Decision made on restarting only the failed step, based on the state of the JobSet
   `RestartJob` feature.
 - Decision made on shipping a default policy in the built-in runtimes.
@@ -799,6 +705,11 @@ this enhancement.
 
 ## Future Plan
 
+- **A per-TrainJob retry budget.** If users ask to adjust the number of restarts for one run,
+  for example because their script resumes from checkpoints and the runtime default is
+  conservative, a single `maxRestarts` value can be added to the TrainJob and merged with the
+  runtime rules. Whether that value belongs on `TrainJobSpec` or in `runtimePatches` is
+  decided then. The typed runtime policy makes either option a small change.
 - **Restart only the failed step.** JobSet v0.12 has the `RestartJob` and
   `RestartJobAndIgnoreMaxRestarts` actions behind an alpha feature gate. Once they are enabled
   by default, a restart can recreate only the trainer step and leave completed initializer
@@ -806,26 +717,24 @@ this enhancement.
 - **In-place restart.** The JobSet `InPlaceRestart` strategy, also alpha, restarts healthy
   Pods in place and avoids rescheduling them.
 - **Default policy in the built-in runtimes**, for example a disruption rule with one restart.
-- **A cap on the TrainJob retry budget**, for example `runPolicy.failurePolicy.maxRestartsLimit`,
-  if admins need to bound what a TrainJob may set.
 - **Stalled TrainJob detection**, building on the progress reported through KEP-2779.
 
 ## Open Questions
 
-1. When a TrainJob sets `spec.failurePolicy` and the runtime template already has a hand-written
-   JobSet `failurePolicy`, this KEP rejects the TrainJob. The alternative is to let the TrainJob
-   value override the template. Rejecting is the conservative choice for alpha and can be
-   relaxed later.
-2. The `Failed` condition reasons are the JobSet reasons (`ReachedMaxRestarts`,
+1. The `Failed` condition reasons are the JobSet reasons (`ReachedMaxRestarts`,
    `FailJobSetFailurePolicyAction`). Should the TrainJob map them to its own reason names?
-3. Should the built-in runtimes ship a default policy with a `DisruptionTarget` rule once the
+2. Should the built-in runtimes ship a default policy with a `DisruptionTarget` rule once the
    feature is beta?
+3. Should the status counters be populated for hand-written JobSet failure policies while the
+   feature gate is disabled? This KEP keeps them behind the gate for alpha.
 
 ## Implementation History
 
 - **2026-10-05**: Initial KEP draft.
 - **2026-10-06**: Narrowed the TrainJob API to `maxRestarts` after review feedback on
-  [#4163](https://github.com/kubeflow/trainer/pull/4163). Rules live on the runtime only.
+  [#4163](https://github.com/kubeflow/trainer/pull/4163).
+- **2026-10-07**: Removed the TrainJob API change. The policy lives on the runtime only, and a
+  per-TrainJob retry budget is deferred until there is user demand.
 
 ## Drawbacks
 
@@ -833,8 +742,7 @@ this enhancement.
   to the JobSet and Job templates. Validation rejects mixing them, but admins have to learn
   which one applies.
 - The translation depends on the Job failure message format, which is not a versioned API.
-- A TrainJob can raise its retry budget above what the admin intended. Alpha relies on
-  `activeDeadlineSeconds` to bound the cost; a cap is listed under Future Plan.
+- Every retry budget needs its own runtime until a per-TrainJob value is added.
 
 ## Alternatives
 
@@ -845,15 +753,16 @@ Extend `runtimePatches` with the JobSet `failurePolicy` and the Job `backoffLimi
 
 **Pros:**
 - No new API types.
+- Fits the existing mechanism for per-TrainJob infrastructure changes.
 
 **Cons:**
-- Exposes three interacting Kubernetes layers to ML engineers, which is the complexity the
-  TrainJob API exists to hide.
-- Users can build combinations that do not work, for example a Pod failure policy with
-  `restartPolicy: OnFailure`.
+- Exposes three interacting Kubernetes layers to the TrainJob author, who has to keep them
+  consistent, for example a Pod failure policy with `restartPolicy: OnFailure` is rejected.
+- Does not help the runtime side, where the same three layers still have to be written by hand.
 - Hard to expose as a simple SDK option.
 
-**Decision:** Rejected.
+**Decision:** Not adopted for the runtime policy. It remains a candidate for a per-TrainJob
+override later, see [Future Plan](#future-plan).
 
 ### Alternative 2: Configure the policy only in the runtime's JobSet template
 
@@ -864,15 +773,14 @@ Keep the status quo and document how admins write the JobSet `failurePolicy` and
 - No API change.
 
 **Cons:**
-- The retry budget is the same for every TrainJob of a runtime, so each budget needs its own
-  runtime.
-- The TrainJob status still does not report restarts, and the SDK has nothing to expose.
-- Admins have to get the three layers right by hand. The failure modes are silent, for example
-  a policy that never reaches the JobSet layer because `backoffLimit` kept its default.
+- The three layers have to be right by hand, and the failure modes are silent, as described in
+  [Why a typed policy instead of the JobSet template](#why-a-typed-policy-instead-of-the-jobset-template).
+- The policy is tied to the JobSet backend.
+- The TrainJob status still does not report restarts, and the SDK has nothing to expose. The
+  status counters of this KEP could ship on their own, but without a typed policy there is no
+  Trainer-level definition of what a restart is.
 
-**Decision:** Rejected. If reviewers prefer no change to `TrainJobSpec`, the runtime policy
-and the status counters from this KEP still stand on their own, at the cost of one runtime per
-retry budget.
+**Decision:** Rejected.
 
 ### Alternative 3: Handle failures in the TrainJob controller
 
@@ -903,7 +811,7 @@ and a list of non-retriable exit codes.
 
 ### Alternative 5: Retry individual Pods
 
-Keep the Job `backoffLimit` as the retry mechanism and expose it on the TrainJob.
+Keep the Job `backoffLimit` as the retry mechanism.
 
 **Cons:**
 - A replaced worker cannot rejoin a running PyTorch DDP or MPI job, so the unit of retry has to
@@ -913,13 +821,32 @@ Keep the Job `backoffLimit` as the retry mechanism and expose it on the TrainJob
 
 **Decision:** Rejected.
 
-### Alternative 6: The full policy on the TrainJob
+### Alternative 6: A retry budget on the TrainJob
+
+The second draft of this KEP added `spec.failurePolicy.maxRestarts` to `TrainJobSpec`, merged
+with the rules of the runtime policy. The argument was that the right number of restarts
+depends on whether the script resumes from checkpoints and on the cost of the run, which the
+owner of the run knows and the admin does not, and that without it every retry budget needs
+its own runtime.
+
+**Pros:**
+- One runtime serves jobs with different retry needs.
+- Maps to a one-line SDK option.
+
+**Cons:**
+- No user has asked for it. The requests listed under
+  [What users have asked for](#what-users-have-asked-for) are all satisfied by a runtime-level
+  policy.
+- A retry budget without the rules that give it meaning adds a field to the TrainJob API that
+  most users would leave unset.
+
+**Decision:** Deferred. Listed under [Future Plan](#future-plan) and revisited at beta with the
+feedback collected during alpha.
+
+### Alternative 7: The full policy on the TrainJob
 
 The first draft of this KEP put the whole `FailurePolicy` struct, rules included, on
 `TrainJobSpec`, with the runtime policy as a default that a TrainJob replaced as a whole.
-
-**Pros:**
-- A TrainJob can express any policy without a matching runtime.
 
 **Cons:**
 - Rules about Pod conditions, exit codes and restart strategies require Kubernetes knowledge
@@ -929,18 +856,4 @@ The first draft of this KEP put the whole `FailurePolicy` struct, rules included
 - Replacing the runtime policy as a whole lets a TrainJob drop the admin's disruption rule by
   accident.
 
-**Decision:** Rejected. The TrainJob keeps only `maxRestarts`.
-
-### Alternative 7: A flat `spec.maxRestarts` on the TrainJob
-
-Expose the retry budget as a top-level field, matching the flat `spec.activeDeadlineSeconds`.
-
-**Pros:**
-- Consistent with the fields that KEP-2899 added to `TrainJobSpec`.
-
-**Cons:**
-- The link to the runtime's `failurePolicy` is not visible in the YAML.
-- A later TrainJob-level addition to the policy would need another top-level field.
-
-**Decision:** Not adopted, but the author has no strong preference. Reviewers can pick either
-shape without affecting the rest of the design.
+**Decision:** Rejected.
