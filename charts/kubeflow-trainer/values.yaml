@@ -111,6 +111,54 @@ manager:
         - ALL
     seccompProfile:
       type: RuntimeDefault
+  # -- NetworkPolicy configuration for manager pods.
+  networkPolicy:
+    # -- Enable NetworkPolicy for manager pods.
+    enabled: false
+    # -- Ingress configuration for the status server port.
+    statusServer:
+      # -- Whether the status server ingress rule is enabled.
+      enabled: true
+      # -- Sources allowed to access the status server. Defaults to trainer pods across all namespaces.
+      from:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              trainer.kubeflow.org/trainjob-ancestor-step: trainer
+      # -- Ports for the status server rule.
+      ports:
+        - port: 10443
+          protocol: TCP
+    # -- Ingress configuration for the webhook port.
+    webhook:
+      # -- Whether the webhook ingress rule is enabled.
+      enabled: true
+      # -- Sources allowed to access the webhook. An empty list allows all ingress.
+      from: []
+      # -- Ports for the webhook rule.
+      ports:
+        - port: 9443
+          protocol: TCP
+    # -- Ingress configuration for the metrics port.
+    metrics:
+      # -- Whether the metrics ingress rule is enabled.
+      enabled: true
+      # -- Sources allowed to access metrics. An empty list allows all ingress.
+      from: []
+      # -- Ports for the metrics rule.
+      ports:
+        - port: 8443
+          protocol: TCP
+    # -- Ingress configuration for the health probe port.
+    health:
+      # -- Whether the health probe ingress rule is enabled.
+      enabled: true
+      # -- Sources allowed to access health probes. An empty list allows all ingress (e.g. kubelet).
+      from: []
+      # -- Ports for the health probe rule.
+      ports:
+        - port: 8081
+          protocol: TCP
 
   # -- Controller manager configuration.
   # This configuration is used to generate the ConfigMap for the controller manager.

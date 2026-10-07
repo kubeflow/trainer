@@ -62,6 +62,11 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 							},
 							Spec: batchv1.JobSpec{
 								Template: corev1.PodTemplateSpec{
+									ObjectMeta: metav1.ObjectMeta{
+										Labels: map[string]string{
+											constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+										},
+									},
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
 											{
@@ -96,6 +101,11 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 							},
 							Spec: batchv1.JobSpec{
 								Template: corev1.PodTemplateSpec{
+									ObjectMeta: metav1.ObjectMeta{
+										Labels: map[string]string{
+											constants.LabelTrainJobAncestor: constants.ModelInitializer,
+										},
+									},
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
 											{
@@ -130,6 +140,11 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 							},
 							Spec: batchv1.JobSpec{
 								Template: corev1.PodTemplateSpec{
+									ObjectMeta: metav1.ObjectMeta{
+										Labels: map[string]string{
+											constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+										},
+									},
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
 											{
