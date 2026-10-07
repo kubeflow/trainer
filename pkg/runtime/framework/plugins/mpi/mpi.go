@@ -195,7 +195,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 				[]corev1ac.VolumeMountApplyConfiguration{
 					*corev1ac.VolumeMount().
 						WithName(constants.MPISSHAuthVolumeName).
-						WithMountPath(ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.SSHAuthMountPath, "/root/.ssh")),
+						WithMountPath(ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.SSHAuthMountPath, constants.MPISSHAuthDefaultMountPath)),
 				}...,
 			)
 			if ps.Name == constants.Launcher && (container.Name == constants.Node || container.Name == constants.Launcher) {

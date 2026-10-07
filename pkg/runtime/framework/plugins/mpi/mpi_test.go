@@ -758,7 +758,7 @@ trainJob-node-1-0.trainJob slots=1
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 									*corev1ac.VolumeMount().
 										WithName(constants.MPISSHAuthVolumeName).
-										WithMountPath("/root/.ssh"),
+										WithMountPath(constants.MPISSHAuthDefaultMountPath),
 									*corev1ac.VolumeMount().
 										WithName(constants.MPIHostfileVolumeName).
 										WithMountPath("/etc/mpi"),

@@ -144,6 +144,11 @@ const (
 	// MPISSHAuthVolumeName is the volume name for Secret with MPI SSH keys.
 	MPISSHAuthVolumeName string = "mpi-ssh-auth"
 
+	// MPISSHAuthDefaultMountPath is the fallback directory where the MPI SSH keys are mounted
+	// when the MPI policy leaves sshAuthMountPath unset. It must match the kubebuilder default
+	// on MPIMLPolicySource.SSHAuthMountPath.
+	MPISSHAuthDefaultMountPath string = "/root/.ssh"
+
 	// MPISSHPrivateKeyFile is the file name for the private key.
 	MPISSHPrivateKeyFile string = "id_rsa"
 
