@@ -110,6 +110,17 @@ leaderElection:
 		t.Fatal(err)
 	}
 
+	leaderElectionNoDurationsConfig := filepath.Join(tmpDir, "leader-election-no-durations.yaml")
+	if err := os.WriteFile(leaderElectionNoDurationsConfig, []byte(`
+apiVersion: config.trainer.kubeflow.org/v1alpha1
+kind: Configuration
+leaderElection:
+  leaderElect: true
+  resourceName: trainer-leader
+`), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
 	controllerConcurrencyConfig := filepath.Join(tmpDir, "controller-concurrency.yaml")
 	if err := os.WriteFile(controllerConcurrencyConfig, []byte(`
 apiVersion: config.trainer.kubeflow.org/v1alpha1
@@ -457,6 +468,38 @@ this is not: valid: yaml: content
 				LeaseDuration:              ptr.To(15 * time.Second),
 				RenewDeadline:              ptr.To(10 * time.Second),
 				RetryPeriod:                ptr.To(2 * time.Second),
+			},
+		},
+		{
+			name:       "leader election config without durations",
+			configFile: leaderElectionNoDurationsConfig,
+			wantConfiguration: configapi.Configuration{
+				TypeMeta:         typeMeta,
+				Webhook:          defaultWebhook,
+				Metrics:          defaultMetrics,
+				Health:           defaultHealth,
+				CertManagement:   defaultCertManagement,
+				ClientConnection: defaultClientConnection,
+				StatusServer:     defaultStatusServer,
+				LeaderElection: &componentconfigv1alpha1.LeaderElectionConfiguration{
+					LeaderElect:  ptr.To(true),
+					ResourceName: "trainer-leader",
+				},
+			},
+			wantOptions: ctrl.Options{
+				HealthProbeBindAddress: ":8081",
+				ReadinessEndpointName:  "/readyz",
+				LivenessEndpointName:   "/healthz",
+				Metrics: metricsserver.Options{
+					BindAddress: "0",
+				},
+				WebhookServer: &webhook.DefaultServer{
+					Options: webhook.Options{
+						Port: 9443,
+					},
+				},
+				LeaderElection:   true,
+				LeaderElectionID: "trainer-leader",
 			},
 		},
 		{

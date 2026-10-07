@@ -97,9 +97,15 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration) {
 		o.LeaderElectionResourceLock = cfg.LeaderElection.ResourceLock
 		o.LeaderElectionNamespace = cfg.LeaderElection.ResourceNamespace
 		o.LeaderElectionID = cfg.LeaderElection.ResourceName
-		o.LeaseDuration = &cfg.LeaderElection.LeaseDuration.Duration
-		o.RenewDeadline = &cfg.LeaderElection.RenewDeadline.Duration
-		o.RetryPeriod = &cfg.LeaderElection.RetryPeriod.Duration
+		if cfg.LeaderElection.LeaseDuration.Duration != 0 {
+			o.LeaseDuration = &cfg.LeaderElection.LeaseDuration.Duration
+		}
+		if cfg.LeaderElection.RenewDeadline.Duration != 0 {
+			o.RenewDeadline = &cfg.LeaderElection.RenewDeadline.Duration
+		}
+		if cfg.LeaderElection.RetryPeriod.Duration != 0 {
+			o.RetryPeriod = &cfg.LeaderElection.RetryPeriod.Duration
+		}
 	}
 
 	if cfg.Controller != nil && len(cfg.Controller.GroupKindConcurrency) > 0 {
