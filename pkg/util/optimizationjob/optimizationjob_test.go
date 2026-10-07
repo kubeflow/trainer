@@ -25,6 +25,7 @@ import (
 	katibapi "github.com/kubeflow/katib/pkg/apis/manager/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -74,6 +75,9 @@ func TestGetAlgorithmServiceName(t *testing.T) {
 			}
 			if len(got) > 63 {
 				t.Errorf("GetAlgorithmServiceName() length %d exceeds 63 characters: %q", len(got), got)
+			}
+			if errs := validation.IsDNS1035Label(got); len(errs) > 0 {
+				t.Errorf("GetAlgorithmServiceName() = %q is not a valid DNS-1035 label: %v", got, errs)
 			}
 		})
 	}
