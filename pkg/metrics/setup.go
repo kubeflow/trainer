@@ -68,5 +68,9 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.ControllerMetrics, tlsOpts *co
 		return nil
 	}
 
+	if err := setupTrainerMetrics(mgr); err != nil {
+		return fmt.Errorf("failed to register Trainer metrics: %w", err)
+	}
+
 	return mgr.Add(server)
 }
