@@ -1,3 +1,4 @@
 **/zz_generated.*.go linguist-generated=true
 api/** linguist-generated=true
 pkg/client/** linguist-generated=true
+manifests/base/crds/*.yaml text eol=lf
