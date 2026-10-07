@@ -136,7 +136,7 @@ func wantDRATorchJobSet(requests corev1.ResourceList, numProcPerNode string) *te
 
 func TestTrainingRuntimeNewObjects(t *testing.T) {
 	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobDynamicResourceAllocation, true)
 	resRequests := corev1.ResourceList{
 		corev1.ResourceCPU: resource.MustParse("1"),
 	}
@@ -2272,7 +2272,7 @@ test-job-node-0-1.test-job slots=8
 					Obj(),
 			},
 		},
-		"resourceClaimsPerNode keeps the request of a runtime container claim with the same name": {
+		"resourceClaimsPerNode drops the request of a runtime container claim with the same name": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				draTorchRuntimeSpec(resRequests).
 					PodResourceClaims(constants.Node,
@@ -2294,9 +2294,8 @@ test-job-node-0-1.test-job slots=8
 						Obj(),
 				).
 				Obj(),
-			// resourceClaimsPerNode wins on the template name, but the runtime's container-level
-			// request, which restricts the container to a subset of the claim's devices, is kept
-			// because container claims merge by name.
+			// resourceClaimsPerNode replaces the Pod-level claim, so the runtime's container-level
+			// request, which named a device request in the previous template, is dropped with it.
 			wantObjs: []runtime.Object{
 				wantDRATorchJobSet(resRequests, "1").
 					PodResourceClaims(constants.Node,
@@ -2304,8 +2303,8 @@ test-job-node-0-1.test-job slots=8
 						corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To("tmpl")},
 					).
 					ContainerResourceClaims(constants.Node, constants.Node,
+						corev1.ResourceClaim{Name: "gpu"},
 						corev1.ResourceClaim{Name: "nic"},
-						corev1.ResourceClaim{Name: "gpu", Request: "gpu-0"},
 					).
 					Obj(),
 			},
@@ -2470,7 +2469,7 @@ func TestApplyTrainerPodResourceClaims(t *testing.T) {
 		podSpec *corev1ac.PodSpecApplyConfiguration
 		claims  []trainer.TrainerResourceClaim
 		want    []corev1ac.PodResourceClaimApplyConfiguration
-		// disableDRAGate turns the DynamicResourceAllocation feature gate off for the case.
+		// disableDRAGate turns the TrainJobDynamicResourceAllocation feature gate off for the case.
 		disableDRAGate bool
 	}{
 		"feature gate disabled leaves the pod resourceClaims untouched": {
@@ -2522,7 +2521,7 @@ func TestApplyTrainerPodResourceClaims(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, !tc.disableDRAGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobDynamicResourceAllocation, !tc.disableDRAGate)
 			applyTrainerPodResourceClaims(tc.podSpec, tc.claims)
 			if diff := cmp.Diff(tc.want, tc.podSpec.ResourceClaims); len(diff) != 0 {
 				t.Errorf("Unexpected pod resourceClaims (-want,+got):\n%s", diff)
@@ -2537,7 +2536,7 @@ func TestMergeTrainerNodeResources(t *testing.T) {
 		resourcesPerNode *corev1.ResourceRequirements
 		claims           []trainer.TrainerResourceClaim
 		want             corev1.ResourceRequirements
-		// disableDRAGate turns the DynamicResourceAllocation feature gate off for the case.
+		// disableDRAGate turns the TrainJobDynamicResourceAllocation feature gate off for the case.
 		disableDRAGate bool
 	}{
 		"feature gate disabled merges resourcesPerNode but ignores the claims": {
@@ -2585,7 +2584,7 @@ func TestMergeTrainerNodeResources(t *testing.T) {
 				Claims: []corev1.ResourceClaim{{Name: "gpu"}},
 			},
 		},
-		"claims merge by name: runtime claims stay, a same-name entry keeps its request, new claims follow": {
+		"claims merge by name: runtime claims stay, an overridden entry is dropped with its request, new claims follow": {
 			runtimeNode: corev1ac.Container().WithName(constants.Node).WithResources(
 				corev1ac.ResourceRequirements().WithClaims(
 					corev1ac.ResourceClaim().WithName("nic"),
@@ -2596,8 +2595,9 @@ func TestMergeTrainerNodeResources(t *testing.T) {
 				{Name: "gpu", ResourceClaimTemplateName: "gpu-tmpl"},
 				{Name: "fpga", ResourceClaimTemplateName: "fpga-tmpl"},
 			},
+			// "gpu" is overridden by resourceClaimsPerNode, so the runtime's request no longer applies.
 			want: corev1.ResourceRequirements{
-				Claims: []corev1.ResourceClaim{{Name: "nic"}, {Name: "gpu", Request: "half"}, {Name: "fpga"}},
+				Claims: []corev1.ResourceClaim{{Name: "gpu"}, {Name: "fpga"}, {Name: "nic"}},
 			},
 		},
 		"resourcesPerNode and claims are merged together": {
@@ -2620,7 +2620,7 @@ func TestMergeTrainerNodeResources(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, !tc.disableDRAGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobDynamicResourceAllocation, !tc.disableDRAGate)
 			got, err := mergeTrainerNodeResources(tc.runtimeNode, tc.resourcesPerNode, tc.claims)
 			if err != nil {
 				t.Fatal(err)

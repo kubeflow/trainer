@@ -325,7 +325,7 @@ func TestValidateCreate(t *testing.T) {
 		wantWarnings           admission.Warnings
 		enableFeatureGates     []featuregate.Feature
 	}{
-		"DRA fields are accepted with the DynamicResourceAllocation gate enabled": {
+		"DRA fields are accepted with the TrainJobDynamicResourceAllocation gate enabled": {
 			obj: testingutil.MakeTrainJobWrapper("default", "test").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
 				Trainer(
@@ -343,7 +343,7 @@ func TestValidateCreate(t *testing.T) {
 						Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
 					},
 				}).Obj(),
-			enableFeatureGates: []featuregate.Feature{features.DynamicResourceAllocation},
+			enableFeatureGates: []featuregate.Feature{features.TrainJobDynamicResourceAllocation},
 		},
 		"valid trainjob name compliant with RFC 1035": {
 			obj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
@@ -521,7 +521,7 @@ func TestValidateUpdate(t *testing.T) {
 	// Feature-gated fields are rejected on create while their gate is disabled. On update they are
 	// rejected only when the update introduces them, so a TrainJob created while the gate was
 	// enabled stays updatable (for example, suspend) after the gate is disabled. The cases below
-	// use DynamicResourceAllocation fields; the same shape works for any gated field.
+	// use TrainJobDynamicResourceAllocation fields; the same shape works for any gated field.
 	cases := map[string]struct {
 		oldObj             *trainer.TrainJob
 		newObj             *trainer.TrainJob

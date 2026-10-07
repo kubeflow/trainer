@@ -134,7 +134,7 @@ runtimePatches:
                             - name: workspace
                               mountPath: /workspace
                           resources:
-                            claims:              # DRA, requires the DynamicResourceAllocation gate
+                            claims:              # DRA, requires the TrainJobDynamicResourceAllocation gate
                               - name: gpu
                       volumes:
                         - name: workspace
@@ -274,7 +274,7 @@ merged on top of the patched claims. See the
 ### Pod-Level Resource Claims
 
 You can add DRA `resourceClaims` to the Pod spec and reference them from any container's
-`resources.claims`. This requires the `DynamicResourceAllocation` feature gate. Pod-level
+`resources.claims`. This requires the `TrainJobDynamicResourceAllocation` feature gate. Pod-level
 `resourceClaims` merge with the runtime's entries by `name`, while a patched container
 `resources.claims` list replaces the runtime's list for that container. Every referenced claim
 must exist in the Pod's `resourceClaims`, otherwise the TrainJob is rejected. Like `volumes`,

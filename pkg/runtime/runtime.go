@@ -276,6 +276,12 @@ func ExtractResourcePerNodeFromRuntime(info *Info) *corev1.ResourceRequirements 
 						if container.Resources.Requests != nil {
 							res.Requests = *container.Resources.Requests
 						}
+						for _, claim := range container.Resources.Claims {
+							res.Claims = append(res.Claims, corev1.ResourceClaim{
+								Name:    ptr.Deref(claim.Name, ""),
+								Request: ptr.Deref(claim.Request, ""),
+							})
+						}
 						return res
 					}
 				}

@@ -104,7 +104,7 @@ func (f *Framework) RunManager(cfg *rest.Config, startControllers bool) (context
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), "failed to create manager")
 
 	// Alpha feature gates exercised by the integration suites.
-	gomega.ExpectWithOffset(1, utilfeature.DefaultMutableFeatureGate.Set(string(features.DynamicResourceAllocation)+"=true")).To(gomega.Succeed())
+	gomega.ExpectWithOffset(1, utilfeature.DefaultMutableFeatureGate.Set(string(features.TrainJobDynamicResourceAllocation)+"=true")).To(gomega.Succeed())
 
 	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer(), nil)
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())

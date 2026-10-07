@@ -2558,7 +2558,7 @@ func schema_pkg_apis_trainer_v1alpha1_Trainer(ref common.ReferenceCallback) comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "resourceClaimsPerNode defines the DRA ResourceClaims for each training node. These claims are added to the trainer node Pod's resourceClaims and automatically referenced in the node container's resources.claims. To attach a claim to another container (sidecar or init), use the runtimePatches API. Claims are merged by name with strategic merge patch. For a claim of the same name, this field takes precedence over runtimePatches, which take precedence over the runtime template, matching how resourcesPerNode overrides patched requests and limits. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/",
+							Description: "resourceClaimsPerNode defines the DRA ResourceClaims for each training node. These claims are added to the trainer node Pod's resourceClaims and automatically referenced in the node container's resources.claims. To attach a claim to another container (sidecar or init), use the runtimePatches API. Claims are merged by name. For a claim of the same name, this field takes precedence over runtimePatches, which take precedence over the runtime template, matching how resourcesPerNode overrides patched requests and limits. This is an alpha feature and requires enabling the TrainJobDynamicResourceAllocation feature gate. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{

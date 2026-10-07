@@ -212,9 +212,10 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	// Every container resources.claims entry must reference a Pod-level resourceClaims entry,
 	// otherwise the API server rejects the Pod only after the JobSet is created.
 	// The runtime webhook rejects dangling claims in the runtime template and
-	// spec.trainer.resourceClaimsPerNode always adds both the Pod-level and the container-level
-	// entries, so a dangling reference in the merged spec comes from spec.runtimePatches (or from
-	// a runtime snapshot taken before that validation existed).
+	// spec.trainer.resourceClaimsPerNode adds both the Pod-level and the container-level entries
+	// (or neither while the feature gate is disabled), so a dangling reference in the merged spec
+	// comes from spec.runtimePatches, or from a runtime (or runtime snapshot) created before that
+	// validation existed.
 	for _, rJob := range jobSetSpec.ReplicatedJobs {
 		podSpec := rJob.Template.Spec.Template.Spec
 		podClaims := sets.New[string]()

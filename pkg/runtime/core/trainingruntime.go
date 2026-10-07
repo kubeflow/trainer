@@ -214,7 +214,7 @@ func (r *TrainingRuntime) newRuntimeInfo(
 				if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil {
 					applyTrainerPodResourceClaims(applyPodSpec, jobTrainer.ResourceClaimsPerNode)
 					hasNodeResources := jobTrainer.ResourcesPerNode != nil ||
-						(features.Enabled(features.DynamicResourceAllocation) && len(jobTrainer.ResourceClaimsPerNode) > 0)
+						(features.Enabled(features.TrainJobDynamicResourceAllocation) && len(jobTrainer.ResourceClaimsPerNode) > 0)
 					for k := range applyPodSpec.Containers {
 						if ptr.Deref(applyPodSpec.Containers[k].Name, "") != constants.Node || !hasNodeResources {
 							continue
@@ -339,9 +339,9 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 }
 
 // applyTrainerPodResourceClaims upserts the TrainJob's resourceClaimsPerNode into the Pod's
-// resourceClaims by name. It is a no-op while the DynamicResourceAllocation gate is disabled.
+// resourceClaims by name. It is a no-op while the TrainJobDynamicResourceAllocation gate is disabled.
 func applyTrainerPodResourceClaims(podSpec *corev1ac.PodSpecApplyConfiguration, claims []trainer.TrainerResourceClaim) {
-	if !features.Enabled(features.DynamicResourceAllocation) {
+	if !features.Enabled(features.TrainJobDynamicResourceAllocation) {
 		return
 	}
 	for _, claim := range claims {
@@ -360,8 +360,8 @@ func applyTrainerPodResourceClaims(podSpec *corev1ac.PodSpecApplyConfiguration, 
 
 // mergeTrainerNodeResources merges the TrainJob's resourcesPerNode and resourceClaimsPerNode over the
 // runtime node container's resources with strategic merge patch: requests and limits merge per key
-// and claims merge by name, so a claim already wired by the runtime, including its request, is kept.
-// Claims are ignored while the DynamicResourceAllocation gate is disabled.
+// and claims merge by name. A runtime claim overridden by resourceClaimsPerNode is dropped, including its request.
+// Claims are ignored while the TrainJobDynamicResourceAllocation gate is disabled.
 func mergeTrainerNodeResources(
 	runtimeNode *corev1ac.ContainerApplyConfiguration, resourcesPerNode *corev1.ResourceRequirements, resourceClaimsPerNode []trainer.TrainerResourceClaim,
 ) (corev1.ResourceRequirements, error) {
@@ -370,7 +370,7 @@ func mergeTrainerNodeResources(
 		nodeRes.Limits = resourcesPerNode.Limits
 		nodeRes.Requests = resourcesPerNode.Requests
 	}
-	if features.Enabled(features.DynamicResourceAllocation) {
+	if features.Enabled(features.TrainJobDynamicResourceAllocation) {
 		// The node container consumes every claim declared in resourceClaimsPerNode.
 		for _, claim := range resourceClaimsPerNode {
 			nodeRes.Claims = append(nodeRes.Claims, corev1.ResourceClaim{Name: claim.Name})
@@ -386,8 +386,14 @@ func mergeTrainerNodeResources(
 			runtimeRes.Requests = *runtimeNode.Resources.Requests
 		}
 		for _, claim := range runtimeNode.Resources.Claims {
+			name := ptr.Deref(claim.Name, "")
+			// resourceClaimsPerNode replaces the Pod-level claim, so a request scoped to the
+			// previous claim source no longer applies.
+			if slices.ContainsFunc(nodeRes.Claims, func(c corev1.ResourceClaim) bool { return c.Name == name }) {
+				continue
+			}
 			runtimeRes.Claims = append(runtimeRes.Claims, corev1.ResourceClaim{
-				Name:    ptr.Deref(claim.Name, ""),
+				Name:    name,
 				Request: ptr.Deref(claim.Request, ""),
 			})
 		}

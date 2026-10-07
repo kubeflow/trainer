@@ -38,7 +38,7 @@ const (
 	//
 	// Enables Dynamic Resource Allocation (DRA) support: trainer.resourceClaimsPerNode and
 	// resourceClaims / resources.claims in runtimePatches.
-	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
+	TrainJobDynamicResourceAllocation featuregate.Feature = "TrainJobDynamicResourceAllocation"
 )
 
 // defaultFeatureGates consists of all known Trainer-specific feature keys.
@@ -50,7 +50,7 @@ const (
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	TrainJobStatus: {Default: false, PreRelease: featuregate.Alpha},
 
-	DynamicResourceAllocation: {Default: false, PreRelease: featuregate.Alpha},
+	TrainJobDynamicResourceAllocation: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 // Enabled is helper for `utilfeature.DefaultFeatureGate.Enabled()`

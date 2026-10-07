@@ -113,7 +113,7 @@ func (w *TrainJobValidator) ValidateCreate(ctx context.Context, obj *trainer.Tra
 	log := ctrl.LoggerFrom(ctx).WithName("trainJob-webhook")
 	log.V(5).Info("Validating create", "TrainJob", klog.KObj(obj))
 
-	if !features.Enabled(features.DynamicResourceAllocation) && usesDRA(obj) {
+	if !features.Enabled(features.TrainJobDynamicResourceAllocation) && usesDRA(obj) {
 		return nil, draFieldPaths(obj).ToAggregate()
 	}
 
@@ -133,7 +133,7 @@ func (w *TrainJobValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *
 	// spec.trainer is immutable, but spec.runtimePatches entries can still be appended on update,
 	// so only reject an update that introduces DRA fields; a TrainJob created with them while the
 	// gate was enabled stays updatable (e.g. suspend) after the gate is disabled.
-	if !features.Enabled(features.DynamicResourceAllocation) && usesDRA(newObj) && !usesDRA(oldObj) {
+	if !features.Enabled(features.TrainJobDynamicResourceAllocation) && usesDRA(newObj) && !usesDRA(oldObj) {
 		return nil, draFieldPaths(newObj).ToAggregate()
 	}
 
@@ -188,7 +188,7 @@ func usesDRA(trainJob *trainer.TrainJob) bool {
 func draFieldPaths(trainJob *trainer.TrainJob) field.ErrorList {
 	var allErrs field.ErrorList
 	specPath := field.NewPath("spec")
-	msg := "DynamicResourceAllocation feature gate is disabled"
+	msg := "TrainJobDynamicResourceAllocation feature gate is disabled"
 
 	if trainJob.Spec.Trainer != nil && len(trainJob.Spec.Trainer.ResourceClaimsPerNode) > 0 {
 		allErrs = append(allErrs, field.Forbidden(

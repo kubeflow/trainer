@@ -5,7 +5,7 @@ This guide describes how to allocate GPUs and other devices for TrainJobs with K
 instead of extended resources such as `nvidia.com/gpu`.
 
 :::{important}
-DRA support was introduced in Kubeflow Trainer v2.4.0 behind the `DynamicResourceAllocation`
+DRA support was introduced in Kubeflow Trainer v2.4.0 behind the `TrainJobDynamicResourceAllocation`
 alpha feature gate. With the gate disabled, TrainJobs that set `resourceClaimsPerNode` or DRA
 fields in `runtimePatches` are rejected; claims defined directly in a runtime template are
 still applied.
@@ -19,17 +19,17 @@ to understand the basics of Kubeflow Trainer.
 ## Prerequisites
 
 - Kubeflow Trainer v2.4.0 or later installed on your cluster.
-- Kubernetes v1.34 or later, where DRA is GA and the `Exactly` device request API shape
-  (`resource.k8s.io/v1`) used by Trainer is available.
+- Kubernetes v1.34 or later, where DRA is GA (`resource.k8s.io/v1`). The examples in this guide
+  use the `exactly` device request shape from that API.
 - A DRA driver installed for your hardware (for example, the NVIDIA DRA driver for GPUs).
-- The `DynamicResourceAllocation` alpha feature gate enabled on the Trainer controller. To enable
+- The `TrainJobDynamicResourceAllocation` alpha feature gate enabled on the Trainer controller. To enable
   it, pass the flag to the controller at startup:
 
   ```bash
-  --feature-gates=DynamicResourceAllocation=true
+  --feature-gates=TrainJobDynamicResourceAllocation=true
   ```
 
-  Or, if deploying via Helm, set `manager.config.featureGates.DynamicResourceAllocation=true`.
+  Or, if deploying via Helm, set `manager.config.featureGates.TrainJobDynamicResourceAllocation=true`.
 
   The command-line flag takes precedence over any value set in the controller config file.
 
@@ -147,9 +147,9 @@ The Trainer admission webhook rejects TrainJobs with dangling references.
   list for that container. For the `node` container, `resourceClaimsPerNode` entries are added
   on top of the patched list.
 - `spec.trainer.resourcesPerNode` still controls the requests and limits of the `node`
-  container, and `spec.trainer.resourceClaimsPerNode` controls its claims.
-- An existing `runtimePatches[].resourceClaims` entry is immutable after creation (CEL-enforced);
-  new `runtimePatches` entries can still be appended while the TrainJob is suspended.
+  container, and `spec.trainer.resourceClaimsPerNode` adds to its claims.
+- Once set, `runtimePatches[].…resourceClaims` is immutable (CEL-enforced); other
+  `runtimePatches` changes are still allowed while the TrainJob is suspended.
 
 ## Next steps
 
