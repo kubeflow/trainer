@@ -37,8 +37,8 @@ import (
 // the webhook server probe.
 const probeDialTimeout = 10 * time.Second
 
-func SetupServer(mgr ctrl.Manager, cfg *configapi.StatusServer, tlsOpts *configapi.TLSOptions) error {
-	tlsConfig, err := cert.SetupTLSConfig(mgr, tlsOpts)
+func SetupServer(mgr ctrl.Manager, cfg *configapi.StatusServer, tlsOpts *configapi.TLSOptions, optionalTLSOpts ...func(*tls.Config)) error {
+	tlsConfig, err := cert.SetupTLSConfig(mgr, tlsOpts, optionalTLSOpts...)
 	if err != nil {
 		return err
 	}
