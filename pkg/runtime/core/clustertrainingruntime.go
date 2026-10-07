@@ -103,7 +103,7 @@ func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *
 	if err := getRuntimeSnapshot(ctx, r.client, new, clusterTrainingRuntime); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, field.ErrorList{
-				field.InternalError(field.NewPath("spec", "RuntimeRef"), fmt.Errorf("unable to get runtime snapshot: %w", err)),
+				field.InternalError(field.NewPath("spec", "runtimeRef"), fmt.Errorf("unable to get runtime snapshot: %w", err)),
 			}
 		}
 		clusterTrainingRuntime = &trainer.ClusterTrainingRuntime{}
@@ -112,11 +112,11 @@ func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *
 		}, clusterTrainingRuntime); err != nil {
 			if !apierrors.IsNotFound(err) {
 				return nil, field.ErrorList{
-					field.InternalError(field.NewPath("spec", "RuntimeRef"), fmt.Errorf("unable to get clusterTrainingRuntime: %w", err)),
+					field.InternalError(field.NewPath("spec", "runtimeRef"), fmt.Errorf("unable to get clusterTrainingRuntime: %w", err)),
 				}
 			}
 			return nil, field.ErrorList{
-				field.Invalid(field.NewPath("spec", "RuntimeRef"), new.Spec.RuntimeRef,
+				field.Invalid(field.NewPath("spec", "runtimeRef"), new.Spec.RuntimeRef,
 					fmt.Sprintf("%v: specified clusterTrainingRuntime must be created before the TrainJob is created", err)),
 			}
 		}
