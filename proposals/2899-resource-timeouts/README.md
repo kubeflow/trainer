@@ -23,7 +23,7 @@ Currently, `TrainJob` resources persist in the cluster indefinitely after comple
 - Add `ActiveDeadlineSeconds` to `TrainJobSpec` for data scientists to control individual job timeouts
 - Add `TTLSecondsAfterFinished` to `TrainJobSpec` for data scientists to control post-finish cleanup of individual jobs
 - Add a `RunPolicy` struct to `TrainingRuntimeSpec` so platform admins can set default `ActiveDeadlineSeconds` and `TTLSecondsAfterFinished` for all TrainJobs using a runtime, with per-TrainJob overrides
-- Add `StartTime` and `CompletionTime` to `TrainJobStatus` and use them as the reference points for deadline and TTL calculation
+- Add `StartTime` to `TrainJobStatus` as the reference point for deadline calculation
 - Expose `ActiveDeadlineSeconds` and `TTLSecondsAfterFinished` in the Kubeflow Python SDK for data scientists
 - Keep MultiKueue working when `TTLSecondsAfterFinished` is set: a worker-cluster TTL must never delete a TrainJob before its terminal status has been synchronized back to the manager cluster
 - Follow Kubernetes Job/JobSet patterns and existing Trainer API conventions
@@ -107,7 +107,7 @@ New fields use pointers, matching `batch/v1.JobSpec`. The shipped `ActiveDeadlin
 
 #### TrainJobStatus Changes
 
-Add `StartTime` and `CompletionTime` (`*metav1.Time`) to `TrainJobStatus`. `startTime` follows the suspend/resume behavior of [Kubernetes Job](https://github.com/kubernetes/api/blob/master/batch/v1/types.go) and [JobSet](https://github.com/kubernetes-sigs/jobset/pull/1306). `completionTime` is set once the TrainJob becomes Complete or Failed, unlike Kubernetes Job, which sets it only on success. These fields become the reference points for deadline and TTL calculation.
+Add `StartTime` (`*metav1.Time`) to `TrainJobStatus` as the reference point for deadline calculation. `startTime` follows the suspend/resume behavior of [Kubernetes Job](https://github.com/kubernetes/api/blob/master/batch/v1/types.go) and [JobSet](https://github.com/kubernetes-sigs/jobset/pull/1306).
 
 ```go
 type TrainJobStatus struct {
@@ -117,10 +117,6 @@ type TrainJobStatus struct {
     // It is cleared on suspension and reset on resume.
     // +optional
     StartTime *metav1.Time `json:"startTime,omitempty"`
-
-    // completionTime records when the TrainJob becomes Complete or Failed and is set once.
-    // +optional
-    CompletionTime *metav1.Time `json:"completionTime,omitempty"`
 }
 ```
 
@@ -268,7 +264,7 @@ spec:
 
 3. **TTL Enforcement:**
     - Only applies once the TrainJob is finished (`Complete` or `Failed` condition is true)
-    - Calculate `expiry = status.completionTime + effectiveTTLSecondsAfterFinished`
+    - Calculate `expiry = terminalCondition.LastTransitionTime + effectiveTTLSecondsAfterFinished`, using the `Complete` or `Failed` condition whose status is true
     - If `expiry` has passed, delete the TrainJob; owner references cascade the delete to the child JobSet, Jobs, Pods, and Services, matching Kubernetes Job `ttlSecondsAfterFinished` semantics. This requires adding `delete` to the controller's TrainJob RBAC marker in `pkg/controller/trainjob_controller.go` (today `get;list;watch;update;patch`) and re-running `make generate`
     - Otherwise, requeue at `expiry`
     - TTL deletes the TrainJob itself rather than only the child JobSet. This avoids the JobSet-recreation loop from [#3779](https://github.com/kubeflow/trainer/issues/3779): once the parent TrainJob is gone there is nothing left to reconcile, so no new JobSet is created with a reset restart count
@@ -299,7 +295,7 @@ return ctrl.Result{RequeueAfter: requeueAfter}, nil
 The controller is stateless and stores no timers in memory. On restart:
 
 1. Controller-runtime triggers initial sync, reconciling all TrainJobs
-2. For each TrainJob, deadlines and expiries are recalculated from `status.startTime` and `status.completionTime`
+2. For each TrainJob, deadlines are recalculated from `status.startTime` and TTL expiries from the terminal condition's `LastTransitionTime`
 3. If a deadline or a TTL already expired during downtime, action is taken immediately
 4. Otherwise, appropriate requeue times are set
 
