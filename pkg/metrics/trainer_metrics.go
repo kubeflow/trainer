@@ -244,22 +244,16 @@ func acceleratorResources(resources *corev1.ResourceRequirements) corev1.Resourc
 // at scrape time and therefore does not retain a second runtime inventory.
 type runtimeInfoCollector struct {
 	client client.Client
-	desc   *prometheus.Desc
 }
 
 func newRuntimeInfoCollector(cli client.Client) *runtimeInfoCollector {
 	return &runtimeInfoCollector{
 		client: cli,
-		desc: prometheus.NewDesc(
-			prometheus.BuildFQName(metricNamespace, "", "runtime_info"),
-			"Current TrainingRuntime and ClusterTrainingRuntime resources.",
-			[]string{"namespace", "name", "api_group", "kind", "ml_policy", "pod_group_policy"}, nil,
-		),
 	}
 }
 
 func (c *runtimeInfoCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- c.desc
+	ch <- runtimeInfoDesc
 }
 
 func (c *runtimeInfoCollector) Collect(ch chan<- prometheus.Metric) {
@@ -267,7 +261,7 @@ func (c *runtimeInfoCollector) Collect(ch chan<- prometheus.Metric) {
 	if err := c.client.List(context.Background(), &runtimes); err == nil {
 		for i := range runtimes.Items {
 			runtime := &runtimes.Items[i]
-			ch <- prometheus.MustNewConstMetric(c.desc, prometheus.GaugeValue, 1,
+			ch <- prometheus.MustNewConstMetric(runtimeInfoDesc, prometheus.GaugeValue, 1,
 				runtime.Namespace, runtime.Name, trainer.GroupVersion.Group,
 				trainingRuntimeKind, mlPolicyName(runtime.Spec.MLPolicy), podGroupPolicyName(runtime.Spec.PodGroupPolicy))
 		}
@@ -277,7 +271,7 @@ func (c *runtimeInfoCollector) Collect(ch chan<- prometheus.Metric) {
 	if err := c.client.List(context.Background(), &clusterRuntimes); err == nil {
 		for i := range clusterRuntimes.Items {
 			runtime := &clusterRuntimes.Items[i]
-			ch <- prometheus.MustNewConstMetric(c.desc, prometheus.GaugeValue, 1,
+			ch <- prometheus.MustNewConstMetric(runtimeInfoDesc, prometheus.GaugeValue, 1,
 				"", runtime.Name, trainer.GroupVersion.Group,
 				clusterTrainingRuntimeKind, mlPolicyName(runtime.Spec.MLPolicy), podGroupPolicyName(runtime.Spec.PodGroupPolicy))
 		}
@@ -286,6 +280,9 @@ func (c *runtimeInfoCollector) Collect(ch chan<- prometheus.Metric) {
 
 func setupTrainerMetrics(mgr ctrl.Manager) error {
 	m := newTrainerMetrics(mgr.GetClient())
+	if err := controllerMetrics.Registry.Register(m.runtimeInfo); err != nil {
+		return fmt.Errorf("register runtime metrics: %w", err)
+	}
 	return m.installObserver(mgr.GetCache())
 }
 

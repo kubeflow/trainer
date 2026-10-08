@@ -73,9 +73,10 @@ kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="ClusterTrai
 				objects = append(objects, object.(client.Object))
 			}
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+			m := newTrainerMetrics(cli)
 			reg := prometheus.NewRegistry()
-			if err := reg.Register(newRuntimeInfoCollector(cli)); err != nil {
-				t.Fatalf("register runtime collector: %v", err)
+			if err := registerTrainerCollectors(reg, m); err != nil {
+				t.Fatalf("register Trainer metrics: %v", err)
 			}
 			assertMetric(t, reg, test.want, "kubeflow_trainer_runtime_info")
 		})
