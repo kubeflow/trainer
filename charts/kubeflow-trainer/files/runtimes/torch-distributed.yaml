@@ -36,6 +36,29 @@ spec:
             spec:
               template:
                 spec:
+                  securityContext:
+                    runAsNonRoot: true
+                    runAsUser: 1000
+                    seccompProfile:
+                      type: RuntimeDefault
                   containers:
                     - name: node
                       image: pytorch/pytorch:2.13.0-cuda13.0-cudnn9-runtime
+                      securityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
+                      volumeMounts:
+                        - name: workspace
+                          mountPath: /workspace
+                  # The default image runs as root and owns /workspace, so the non-root
+                  # trainer cannot write there. The emptyDir keeps the working directory
+                  # writable without changing the image's configured WORKDIR.
+                  volumes:
+                    - name: workspace
+                      emptyDir: {}
