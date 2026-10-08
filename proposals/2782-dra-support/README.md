@@ -358,6 +358,11 @@ DRA usage rarely exceeds a handful of claims per pod.
 
 **Example: PodSpecPatch via runtimePatches**
 
+To configure DRA for a container other than the trainer `node`, the claim must be set in both
+places within `runtimePatches`: the Pod-level `.spec.resourceClaims` entry and the consuming
+container's `.spec.containers[*].resources.claims[*].name`. A container claim that references no
+Pod-level claim is rejected by the webhook.
+
 A user wants to add a DRA claim to a non-node replicatedJob (e.g., a `preprocessor`):
 
 ```yaml
