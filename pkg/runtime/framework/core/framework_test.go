@@ -933,6 +933,22 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithEnv(corev1ac.EnvVar().
 															WithName(constants.OpenMPIEnvKeyRSHArgs).
 															WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
+														).
+														WithEnv(corev1ac.EnvVar().
+															WithName(constants.PRTEEnvHostFileLocation).
+															WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+														).
+														WithEnv(corev1ac.EnvVar().
+															WithName(constants.PRTEEnvKeepFQDNHostNames).
+															WithValue("false"),
+														).
+														WithEnv(corev1ac.EnvVar().
+															WithName(constants.PRTEEnvDefaultSlots).
+															WithValue("1"),
+														).
+														WithEnv(corev1ac.EnvVar().
+															WithName(constants.PRTEEnvKeySSHArgs).
+															WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
 														),
 												).
 												WithVolumes(
@@ -1119,6 +1135,18 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										WithValue("1"),
 									*corev1ac.EnvVar().
 										WithName(constants.OpenMPIEnvKeyRSHArgs).
+										WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
+									*corev1ac.EnvVar().
+										WithName(constants.PRTEEnvHostFileLocation).
+										WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+									*corev1ac.EnvVar().
+										WithName(constants.PRTEEnvKeepFQDNHostNames).
+										WithValue("false"),
+									*corev1ac.EnvVar().
+										WithName(constants.PRTEEnvDefaultSlots).
+										WithValue("1"),
+									*corev1ac.EnvVar().
+										WithName(constants.PRTEEnvKeySSHArgs).
 										WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
 								},
 							}},
@@ -1344,6 +1372,22 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 						},
 						{
 							Name:  constants.OpenMPIEnvKeyRSHArgs,
+							Value: constants.OpenMPIEnvDefaultValueRSHArgs,
+						},
+						{
+							Name:  constants.PRTEEnvHostFileLocation,
+							Value: fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName),
+						},
+						{
+							Name:  constants.PRTEEnvKeepFQDNHostNames,
+							Value: "false",
+						},
+						{
+							Name:  constants.PRTEEnvDefaultSlots,
+							Value: "1",
+						},
+						{
+							Name:  constants.PRTEEnvKeySSHArgs,
 							Value: constants.OpenMPIEnvDefaultValueRSHArgs,
 						}}...,
 					).
