@@ -121,6 +121,13 @@ func EnvVar(e corev1.EnvVar) *corev1ac.EnvVarApplyConfiguration {
 			}
 			source.WithSecretKeyRef(key)
 		}
+		if ref := from.FileKeyRef; ref != nil {
+			key := corev1ac.FileKeySelector().WithVolumeName(ref.VolumeName).WithPath(ref.Path).WithKey(ref.Key)
+			if optional := ref.Optional; optional != nil {
+				key.WithOptional(*optional)
+			}
+			source.WithFileKeyRef(key)
+		}
 		envVar.WithValueFrom(source)
 	} else {
 		envVar.WithValue(e.Value)
