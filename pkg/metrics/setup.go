@@ -32,10 +32,10 @@ import (
 // +kubebuilder:rbac:groups=authentication.k8s.io,resources=tokenreviews,verbs=create
 // +kubebuilder:rbac:groups=authorization.k8s.io,resources=subjectaccessreviews,verbs=create
 
-// SetupServer creates and registers a metrics server with the manager.
+// Setup creates and registers the metrics server and Trainer collectors with the manager.
 // It must be called only after the serving certificates are available on disk —
 // typically inside setupManagerComponents after certsReady fires.
-func SetupServer(mgr ctrl.Manager, cfg *configapi.ControllerMetrics, tlsOpts *configapi.TLSOptions) error {
+func Setup(mgr ctrl.Manager, cfg *configapi.ControllerMetrics, tlsOpts *configapi.TLSOptions) error {
 	secureServing := cfg.SecureServing != nil && *cfg.SecureServing
 
 	opts := metricsserver.Options{

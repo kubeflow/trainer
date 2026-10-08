@@ -1,5 +1,5 @@
 /*
-Copyright The Kubeflow Authors.
+Copyright 2024 The Kubeflow Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,198 +17,226 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/cache/informertest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 )
 
 func TestRuntimeInfoCollector(t *testing.T) {
-	scheme := newMetricsScheme(t)
-	cli := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(
-			&trainer.TrainingRuntime{
-				ObjectMeta: metav1.ObjectMeta{Name: "torch", Namespace: "team-a"},
-				Spec:       trainer.TrainingRuntimeSpec{MLPolicy: &trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{Torch: &trainer.TorchMLPolicySource{}}}},
-			},
-			&trainer.ClusterTrainingRuntime{
-				ObjectMeta: metav1.ObjectMeta{Name: "mpi"},
-				Spec:       trainer.TrainingRuntimeSpec{PodGroupPolicy: &trainer.PodGroupPolicy{PodGroupPolicySource: trainer.PodGroupPolicySource{Volcano: &trainer.VolcanoPodGroupPolicySource{}}}},
-			},
-		).Build()
-
-	reg := prometheus.NewRegistry()
-	collector := newRuntimeInfoCollector(cli)
-	if err := reg.Register(collector); err != nil {
-		t.Fatalf("register runtime collector: %v", err)
-	}
-
-	want := `# HELP kubeflow_trainer_runtime_info Current TrainingRuntime and ClusterTrainingRuntime resources.
-# TYPE kubeflow_trainer_runtime_info gauge
-kubeflow_trainer_runtime_info{kind="ClusterTrainingRuntime",ml_policy="none",name="mpi",namespace="",pod_group_policy="volcano"} 1
-kubeflow_trainer_runtime_info{kind="TrainingRuntime",ml_policy="torch",name="torch",namespace="team-a",pod_group_policy="none"} 1
-`
-	if err := testutil.GatherAndCompare(reg, strings.NewReader(want), "kubeflow_trainer_runtime_info"); err != nil {
-		t.Fatalf("unexpected runtime metrics: %v", err)
-	}
-}
-
-func TestTrainJobObserverRecordsLifecycleAndReplicatedJobState(t *testing.T) {
-	scheme := newMetricsScheme(t)
-	cli := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(&trainer.ClusterTrainingRuntime{
-			ObjectMeta: metav1.ObjectMeta{Name: "torch"},
-			Spec:       trainer.TrainingRuntimeSpec{MLPolicy: &trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{Torch: &trainer.TorchMLPolicySource{}}}},
-		}).Build()
-	m := newTrainerMetrics(cli)
-	reg := prometheus.NewRegistry()
-	if err := registerTrainerCollectors(reg, m); err != nil {
-		t.Fatalf("register Trainer metrics: %v", err)
-	}
-
-	created := time.Now().Add(-2 * time.Minute)
-	finished := metav1.NewTime(created.Add(90 * time.Second))
-	job := &trainer.TrainJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "job-a",
-			Namespace:         "team-a",
-			UID:               types.UID("job-a-uid"),
-			CreationTimestamp: metav1.NewTime(created),
-			Labels:            map[string]string{kueueQueueLabel: "queue-a"},
-		},
-		Spec: trainer.TrainJobSpec{RuntimeRef: trainer.RuntimeRef{Name: "torch"}},
-		Status: trainer.TrainJobStatus{
-			Conditions: []metav1.Condition{{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue, Reason: "Completed", LastTransitionTime: finished}},
-			JobsStatus: []trainer.JobStatus{{Name: "trainer", Ready: int32Ptr(1), Failed: int32Ptr(0)}},
-		},
-	}
-	m.onAdd(job)
-
-	assertMetric(t, reg, `# HELP kubeflow_trainer_trainjob_info Current TrainJob metadata for local Prometheus joins.
-# TYPE kubeflow_trainer_trainjob_info gauge
-kubeflow_trainer_trainjob_info{kueue_queue_label_present="yes",ml_policy="torch",namespace="team-a",pod_group_policy="none",runtime_ref="trainer.kubeflow.org/ClusterTrainingRuntime//torch",trainjob="job-a"} 1
-`, "kubeflow_trainer_trainjob_info")
-	assertMetric(t, reg, `# HELP kubeflow_trainer_trainjob_status Current normalized TrainJob lifecycle state.
-# TYPE kubeflow_trainer_trainjob_status gauge
-kubeflow_trainer_trainjob_status{namespace="team-a",status="succeeded",trainjob="job-a"} 1
-`, "kubeflow_trainer_trainjob_status")
-	assertMetric(t, reg, `# HELP kubeflow_trainer_trainjob_replicated_jobs_ready Ready replicated jobs in the current TrainJob status.
-# TYPE kubeflow_trainer_trainjob_replicated_jobs_ready gauge
-kubeflow_trainer_trainjob_replicated_jobs_ready{namespace="team-a",role="trainer",trainjob="job-a"} 1
-`, "kubeflow_trainer_trainjob_replicated_jobs_ready")
-	assertMetric(t, reg, `# HELP kubeflow_trainer_trainjob_created_total TrainJobs observed by the controller metrics observer.
-# TYPE kubeflow_trainer_trainjob_created_total counter
-kubeflow_trainer_trainjob_created_total{kueue_queue_label_present="yes",ml_policy="torch",pod_group_policy="none"} 1
-`, "kubeflow_trainer_trainjob_created_total")
-	assertMetric(t, reg, `# HELP kubeflow_trainer_trainjob_finished_total TrainJobs observed reaching a terminal outcome.
-# TYPE kubeflow_trainer_trainjob_finished_total counter
-kubeflow_trainer_trainjob_finished_total{reason="none",result="succeeded"} 1
-`, "kubeflow_trainer_trainjob_finished_total")
-}
-
-func TestTrainJobObserverRecordsResumeAfterSuspension(t *testing.T) {
-	scheme := newMetricsScheme(t)
-	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
-	m := newTrainerMetrics(cli)
-	reg := prometheus.NewRegistry()
-	if err := registerTrainerCollectors(reg, m); err != nil {
-		t.Fatalf("register Trainer metrics: %v", err)
-	}
-	job := &trainer.TrainJob{
-		ObjectMeta: metav1.ObjectMeta{Name: "job-a", Namespace: "team-a", UID: types.UID("job-a-uid")},
-		Spec:       trainer.TrainJobSpec{RuntimeRef: trainer.RuntimeRef{Name: "torch"}, Suspend: boolPtr(true)},
-	}
-	m.onAdd(job)
-
-	resumed := job.DeepCopy()
-	resumed.Spec.Suspend = boolPtr(false)
-	m.onUpdate(job, resumed)
-
-	assertMetric(t, reg, `# HELP kubeflow_trainer_trainjob_suspend_events_total Observed TrainJob suspension and resumption transitions.
-# TYPE kubeflow_trainer_trainjob_suspend_events_total counter
-kubeflow_trainer_trainjob_suspend_events_total{event="resume"} 1
-	`, "kubeflow_trainer_trainjob_suspend_events_total")
-}
-
-func TestTrainJobObserverUpdatesAndDeletesCurrentState(t *testing.T) {
-	scheme := newMetricsScheme(t)
-	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
-	m := newTrainerMetrics(cli)
-	reg := prometheus.NewRegistry()
-	if err := registerTrainerCollectors(reg, m); err != nil {
-		t.Fatalf("register Trainer metrics: %v", err)
-	}
-	job := &trainer.TrainJob{
-		ObjectMeta: metav1.ObjectMeta{Name: "job-a", Namespace: "team-a", UID: types.UID("job-a-uid")},
-		Spec:       trainer.TrainJobSpec{RuntimeRef: trainer.RuntimeRef{Name: "torch"}},
-	}
-	m.onAdd(job)
-
-	completed := job.DeepCopy()
-	completed.Status.Conditions = []metav1.Condition{{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue}}
-	completed.Status.JobsStatus = []trainer.JobStatus{{Name: "worker", Ready: int32Ptr(2), Failed: int32Ptr(1)}}
-	m.onUpdate(job, completed)
-
-	assertMetric(t, reg, `# HELP kubeflow_trainer_trainjob_status Current normalized TrainJob lifecycle state.
-# TYPE kubeflow_trainer_trainjob_status gauge
-kubeflow_trainer_trainjob_status{namespace="team-a",status="succeeded",trainjob="job-a"} 1
-`, "kubeflow_trainer_trainjob_status")
-	assertMetric(t, reg, `# HELP kubeflow_trainer_trainjob_replicated_jobs_failed Failed replicated jobs in the current TrainJob status.
-# TYPE kubeflow_trainer_trainjob_replicated_jobs_failed gauge
-kubeflow_trainer_trainjob_replicated_jobs_failed{namespace="team-a",role="other",trainjob="job-a"} 1
-`, "kubeflow_trainer_trainjob_replicated_jobs_failed")
-
-	m.onUpdate(completed, completed.DeepCopy())
-	if got := testutil.ToFloat64(m.finished.WithLabelValues("succeeded", "none")); got != 1 {
-		t.Fatalf("terminal counter was incremented on a resync: got %v, want 1", got)
-	}
-	m.onDelete(completed)
-	if got := testutil.ToFloat64(m.trainJobStatus.WithLabelValues("team-a", "job-a", "succeeded")); got != 0 {
-		t.Fatalf("current status gauge was not removed: got %v, want 0", got)
-	}
-}
-
-func TestNormalizedStatusUsesTerminalStateBeforeSuspension(t *testing.T) {
 	tests := map[string]struct {
-		conditions []metav1.Condition
-		suspend    *bool
-		want       string
+		objects []runtime.Object
+		want    string
 	}{
-		"nonterminal": {want: "nonterminal"},
-		"suspended":   {suspend: boolPtr(true), want: "suspended"},
-		"succeeded": {
-			conditions: []metav1.Condition{{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue}},
-			suspend:    boolPtr(true),
-			want:       "succeeded",
+		"namespaced runtime": {
+			objects: []runtime.Object{&trainer.TrainingRuntime{
+				ObjectMeta: metav1.ObjectMeta{Name: "torch", Namespace: "team-a"},
+				Spec: trainer.TrainingRuntimeSpec{
+					MLPolicy: &trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{Torch: &trainer.TorchMLPolicySource{}}},
+				},
+			}},
+			want: `# HELP kubeflow_trainer_runtime_info Current TrainingRuntime and ClusterTrainingRuntime resources.
+# TYPE kubeflow_trainer_runtime_info gauge
+kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRuntime",ml_policy="torch",name="torch",namespace="team-a",pod_group_policy="none"} 1
+`,
 		},
-		"failed": {
-			conditions: []metav1.Condition{{Type: trainer.TrainJobFailed, Status: metav1.ConditionTrue}},
-			want:       "failed",
+		"cluster runtime": {
+			objects: []runtime.Object{&trainer.ClusterTrainingRuntime{
+				ObjectMeta: metav1.ObjectMeta{Name: "mpi"},
+				Spec: trainer.TrainingRuntimeSpec{
+					PodGroupPolicy: &trainer.PodGroupPolicy{PodGroupPolicySource: trainer.PodGroupPolicySource{Volcano: &trainer.VolcanoPodGroupPolicySource{}}},
+				},
+			}},
+			want: `# HELP kubeflow_trainer_runtime_info Current TrainingRuntime and ClusterTrainingRuntime resources.
+# TYPE kubeflow_trainer_runtime_info gauge
+kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="ClusterTrainingRuntime",ml_policy="none",name="mpi",namespace="",pod_group_policy="volcano"} 1
+`,
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			job := &trainer.TrainJob{Spec: trainer.TrainJobSpec{Suspend: test.suspend}, Status: trainer.TrainJobStatus{Conditions: test.conditions}}
-			if got := normalizedStatus(job); got != test.want {
-				t.Fatalf("normalizedStatus() = %q, want %q", got, test.want)
+			scheme := newMetricsScheme(t)
+			objects := make([]client.Object, 0, len(test.objects))
+			for _, object := range test.objects {
+				objects = append(objects, object.(client.Object))
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+			reg := prometheus.NewRegistry()
+			if err := reg.Register(newRuntimeInfoCollector(cli)); err != nil {
+				t.Fatalf("register runtime collector: %v", err)
+			}
+			assertMetric(t, reg, test.want, "kubeflow_trainer_runtime_info")
+		})
+	}
+}
+
+func TestTrainJobAdd(t *testing.T) {
+	tests := map[string]struct {
+		initialList bool
+		wantCreated float64
+	}{
+		"initial cache list": {initialList: true, wantCreated: 0},
+		"new TrainJob":       {initialList: false, wantCreated: 1},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			resetMetrics(t)
+			scheme := newMetricsScheme(t)
+			m := newTrainerMetrics(fake.NewClientBuilder().WithScheme(scheme).Build())
+			fakeCache := &informertest.FakeInformers{Scheme: scheme}
+			if err := m.installObserver(fakeCache); err != nil {
+				t.Fatalf("install observer: %v", err)
+			}
+			informer, err := fakeCache.FakeInformerFor(context.Background(), &trainer.TrainJob{})
+			if err != nil {
+				t.Fatalf("get fake informer: %v", err)
+			}
+			job := trainJob("job-a", false)
+			if test.initialList {
+				m.onAdd(job, true)
+			} else {
+				informer.Add(job)
+			}
+			if got := testutil.ToFloat64(trainJobCreated.WithLabelValues(job.Namespace, runtimeReference(job))); got != test.wantCreated {
+				t.Fatalf("created counter = %v, want %v", got, test.wantCreated)
+			}
+			if !test.initialList {
+				reg := prometheus.NewRegistry()
+				if err := registerTrainerCollectors(reg, m); err != nil {
+					t.Fatalf("register Trainer metrics: %v", err)
+				}
+				assertHistogramObservation(t, reg, "kubeflow_trainer_trainjob_requested_training_nodes_per_job", map[string]string{
+					"runtime_ref": runtimeReference(job),
+				}, 1, 2)
 			}
 		})
 	}
 }
 
+func TestTrainJobUpdate(t *testing.T) {
+	tests := map[string]struct {
+		terminalUpdate bool
+		repeatUpdate   bool
+		wantFinished   float64
+	}{
+		"nonterminal update":       {wantFinished: 0},
+		"terminal transition":      {terminalUpdate: true, wantFinished: 1},
+		"repeated terminal update": {terminalUpdate: true, repeatUpdate: true, wantFinished: 1},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			resetMetrics(t)
+			scheme := newMetricsScheme(t)
+			m := newTrainerMetrics(fake.NewClientBuilder().WithScheme(scheme).Build())
+			job := trainJob("job-a", false)
+			m.onAdd(job, false)
+			updated := job.DeepCopy()
+			if test.terminalUpdate {
+				updated.Status.Conditions = []metav1.Condition{{
+					Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue, Reason: "Completed",
+					LastTransitionTime: metav1.Now(),
+				}}
+			}
+			m.onUpdate(job, updated)
+			if test.repeatUpdate {
+				m.onUpdate(updated, updated.DeepCopy())
+			}
+			runtimeRef := runtimeReference(job)
+			if got := testutil.ToFloat64(trainJobFinished.WithLabelValues("succeeded", "Completed", runtimeRef)); got != test.wantFinished {
+				t.Fatalf("finished counter = %v, want %v", got, test.wantFinished)
+			}
+		})
+	}
+}
+
+func TestTrainJobAddRecordsAcceleratorClass(t *testing.T) {
+	resetMetrics(t)
+	scheme := newMetricsScheme(t)
+	m := newTrainerMetrics(fake.NewClientBuilder().WithScheme(scheme).Build())
+	job := trainJob("gpu-job", false)
+	job.Spec.Trainer.ResourcesPerNode = &corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")},
+	}
+	m.onAdd(job, false)
+
+	reg := prometheus.NewRegistry()
+	if err := registerTrainerCollectors(reg, m); err != nil {
+		t.Fatalf("register Trainer metrics: %v", err)
+	}
+	assertHistogramObservation(t, reg, "kubeflow_trainer_trainjob_requested_accelerators", map[string]string{
+		"accelerator_class": "nvidia.com/gpu",
+		"runtime_ref":       runtimeReference(job),
+	}, 1, 2)
+}
+
+func resetMetrics(t *testing.T) {
+	t.Helper()
+	trainJobCreated.Reset()
+	trainJobFinished.Reset()
+	trainJobLifetime.Reset()
+	trainJobRequestedAccelerators.Reset()
+	trainJobRequestedTrainingNodes.Reset()
+}
+
 func assertMetric(t *testing.T, reg *prometheus.Registry, want, name string) {
 	t.Helper()
+	if want == "" {
+		return
+	}
 	if err := testutil.GatherAndCompare(reg, strings.NewReader(want), name); err != nil {
 		t.Fatalf("unexpected %s metrics: %v", name, err)
 	}
+}
+
+func assertHistogramObservation(t *testing.T, reg *prometheus.Registry, name string, labels map[string]string, wantCount uint64, wantSum float64) {
+	t.Helper()
+	families, err := reg.Gather()
+	if err != nil {
+		t.Fatalf("gather %s metrics: %v", name, err)
+	}
+	for _, family := range families {
+		if family.GetName() != name {
+			continue
+		}
+		for _, metric := range family.GetMetric() {
+			gotLabels := make(map[string]string, len(metric.GetLabel()))
+			for _, label := range metric.GetLabel() {
+				gotLabels[label.GetName()] = label.GetValue()
+			}
+			if equalLabels(gotLabels, labels) {
+				histogram := metric.GetHistogram()
+				if histogram.GetSampleCount() != wantCount || histogram.GetSampleSum() != wantSum {
+					t.Fatalf("%s observation = count %d, sum %v; want count %d, sum %v", name, histogram.GetSampleCount(), histogram.GetSampleSum(), wantCount, wantSum)
+				}
+				return
+			}
+		}
+	}
+	t.Fatalf("%s labels %v were not found", name, labels)
+}
+
+func equalLabels(got, want map[string]string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for key, value := range want {
+		if got[key] != value {
+			return false
+		}
+	}
+	return true
 }
 
 func newMetricsScheme(t *testing.T) *runtime.Scheme {
@@ -220,6 +248,21 @@ func newMetricsScheme(t *testing.T) *runtime.Scheme {
 	return scheme
 }
 
-func int32Ptr(value int32) *int32 { return &value }
+func trainJob(name string, terminal bool) *trainer.TrainJob {
+	job := &trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name, Namespace: "team-a", UID: types.UID(name + "-uid"),
+			CreationTimestamp: metav1.Now(),
+		},
+		Spec: trainer.TrainJobSpec{
+			RuntimeRef: trainer.RuntimeRef{Name: "torch"},
+			Trainer:    &trainer.Trainer{NumNodes: ptrInt32(2)},
+		},
+	}
+	if terminal {
+		job.Status.Conditions = []metav1.Condition{{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue}}
+	}
+	return job
+}
 
-func boolPtr(value bool) *bool { return &value }
+func ptrInt32(value int32) *int32 { return &value }
