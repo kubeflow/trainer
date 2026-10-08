@@ -17,14 +17,27 @@ Volcano scheduling can be enabled through the `podGroupPolicy` field in your `Tr
 
 ### Gang Scheduling
 
-To enable gang scheduling, specify the `volcano` policy in your runtime:
+To enable gang scheduling, specify the `volcano` policy in your runtime and set `schedulerName`
+in the Pod template of each ReplicatedJob:
 
 ```yaml
-podGroupPolicy:
-  volcano: {}
+spec:
+  podGroupPolicy:
+    volcano: {}
+  template:
+    spec:
+      replicatedJobs:
+        - name: node
+          template:
+            spec:
+              template:
+                spec:
+                  schedulerName: volcano
 ```
 
 This configuration automatically creates Volcano `PodGroups` for your training job.
+Volcano only schedules Pods whose `schedulerName` matches its scheduler name, which is `volcano`
+by default. Other Pods are not gang scheduled.
 
 ### Topology Aware Scheduling
 
