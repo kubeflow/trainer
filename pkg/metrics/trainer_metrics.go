@@ -19,10 +19,10 @@ package metrics
 import (
 	"context"
 	"fmt"
-	"sync"
-	"time"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	toolscache "k8s.io/client-go/tools/cache"
@@ -37,119 +37,71 @@ import (
 
 const (
 	metricNamespace = "kubeflow_trainer"
-
-	unknownValue = "unknown"
+	unknownValue    = "unknown"
 
 	trainingRuntimeKind        = "TrainingRuntime"
 	clusterTrainingRuntimeKind = "ClusterTrainingRuntime"
-
-	kueueQueueLabel = "kueue.x-k8s.io/queue-name"
 )
 
-// trainerMetrics owns Trainer-specific metrics. Dependency-owned metrics, such as
-// JobSet and Kueue metrics, are intentionally not duplicated here.
-type trainerMetrics struct {
-	client client.Client
+var (
+	trainJobCreated = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: metricNamespace,
+		Name:      "trainjob_created_total",
+		Help:      "Number of TrainJobs observed after the initial cache listing.",
+	}, []string{"namespace", "runtime_ref"})
+	trainJobFinished = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: metricNamespace,
+		Name:      "trainjob_finished_total",
+		Help:      "Number of TrainJobs that reached a terminal outcome.",
+	}, []string{"result", "reason", "runtime_ref"})
+	trainJobLifetime = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: metricNamespace,
+		Name:      "trainjob_lifetime_seconds",
+		Help:      "Time from TrainJob creation to its terminal outcome.",
+	}, []string{"result", "runtime_ref"})
+	trainJobRequestedAccelerators = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: metricNamespace,
+		Name:      "trainjob_requested_accelerators",
+		Help:      "Accelerators requested per TrainJob training node.",
+	}, []string{"accelerator_class", "runtime_ref"})
+	trainJobRequestedTrainingNodes = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: metricNamespace,
+		Name:      "trainjob_requested_training_nodes_per_job",
+		Help:      "Training nodes requested by each TrainJob.",
+	}, []string{"runtime_ref"})
+)
 
-	runtimeInfo            *runtimeInfoCollector
-	trainJobInfo           *prometheus.GaugeVec
-	trainJobStatus         *prometheus.GaugeVec
-	requestedTrainingNodes *prometheus.GaugeVec
-	replicatedJobCount     *prometheus.GaugeVec
-	replicatedJobsReady    *prometheus.GaugeVec
-	replicatedJobsFailed   *prometheus.GaugeVec
-
-	created          *prometheus.CounterVec
-	finished         *prometheus.CounterVec
-	lifetime         *prometheus.HistogramVec
-	suspendEvents    *prometheus.CounterVec
-	suspendedSeconds *prometheus.HistogramVec
-
-	mu   sync.Mutex
-	seen map[string]observedTrainJob
+func init() {
+	controllerMetrics.Registry.MustRegister(
+		trainJobCreated,
+		trainJobFinished,
+		trainJobLifetime,
+		trainJobRequestedAccelerators,
+		trainJobRequestedTrainingNodes,
+	)
 }
 
-type observedTrainJob struct {
-	infoLabels           []string
-	statusLabels         []string
-	requestedNodesLabels []string
-	requestedNodes       float64
-	terminal             bool
-	suspended            bool
-	suspendedAt          time.Time
+// trainerMetrics observes TrainJob events and records event-based metrics. It
+// intentionally does not retain TrainJob state: counters and histograms are
+// derived from add/update events and current object data.
+type trainerMetrics struct {
+	client      client.Client
+	runtimeInfo *runtimeInfoCollector
 }
 
 func newTrainerMetrics(cli client.Client) *trainerMetrics {
 	return &trainerMetrics{
 		client:      cli,
 		runtimeInfo: newRuntimeInfoCollector(cli),
-		trainJobInfo: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: metricNamespace,
-			Name:      "trainjob_info",
-			Help:      "Current TrainJob metadata for local Prometheus joins.",
-		}, []string{"namespace", "trainjob", "runtime_ref", "ml_policy", "pod_group_policy", "kueue_queue_label_present"}),
-		trainJobStatus: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: metricNamespace,
-			Name:      "trainjob_status",
-			Help:      "Current normalized TrainJob lifecycle state.",
-		}, []string{"namespace", "trainjob", "status"}),
-		requestedTrainingNodes: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: metricNamespace,
-			Name:      "trainjob_requested_training_nodes",
-			Help:      "Logical training nodes requested by the current TrainJob.",
-		}, []string{"namespace", "trainjob"}),
-		replicatedJobCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: metricNamespace,
-			Name:      "trainjob_replicated_job_count",
-			Help:      "Number of replicated jobs in the current TrainJob status.",
-		}, []string{"namespace", "trainjob", "role"}),
-		replicatedJobsReady: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: metricNamespace,
-			Name:      "trainjob_replicated_jobs_ready",
-			Help:      "Ready replicated jobs in the current TrainJob status.",
-		}, []string{"namespace", "trainjob", "role"}),
-		replicatedJobsFailed: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: metricNamespace,
-			Name:      "trainjob_replicated_jobs_failed",
-			Help:      "Failed replicated jobs in the current TrainJob status.",
-		}, []string{"namespace", "trainjob", "role"}),
-		created: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: metricNamespace,
-			Name:      "trainjob_created_total",
-			Help:      "TrainJobs observed by the controller metrics observer.",
-		}, []string{"ml_policy", "pod_group_policy", "kueue_queue_label_present"}),
-		finished: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: metricNamespace,
-			Name:      "trainjob_finished_total",
-			Help:      "TrainJobs observed reaching a terminal outcome.",
-		}, []string{"result", "reason"}),
-		lifetime: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: metricNamespace,
-			Name:      "trainjob_lifetime_seconds",
-			Help:      "Time from TrainJob creation to its terminal condition.",
-			Buckets:   prometheus.ExponentialBuckets(60, 4, 8),
-		}, []string{"result"}),
-		suspendEvents: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: metricNamespace,
-			Name:      "trainjob_suspend_events_total",
-			Help:      "Observed TrainJob suspension and resumption transitions.",
-		}, []string{"event"}),
-		suspendedSeconds: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: metricNamespace,
-			Name:      "trainjob_suspended_seconds",
-			Help:      "Time a TrainJob remained suspended before resuming.",
-			Buckets:   prometheus.ExponentialBuckets(1, 4, 8),
-		}, nil),
-		seen: make(map[string]observedTrainJob),
 	}
 }
 
-func (m *trainerMetrics) installObserver(ctx context.Context, c cache.Cache) error {
-	informer, err := c.GetInformer(ctx, &trainer.TrainJob{})
+func (m *trainerMetrics) installObserver(c cache.Cache) error {
+	informer, err := c.GetInformer(context.Background(), &trainer.TrainJob{}, cache.BlockUntilSynced(false))
 	if err != nil {
 		return fmt.Errorf("get TrainJob informer: %w", err)
 	}
-	_, err = informer.AddEventHandler(toolscache.ResourceEventHandlerFuncs{
+	_, err = informer.AddEventHandler(toolscache.ResourceEventHandlerDetailedFuncs{
 		AddFunc:    m.onAdd,
 		UpdateFunc: m.onUpdate,
 		DeleteFunc: m.onDelete,
@@ -160,203 +112,136 @@ func (m *trainerMetrics) installObserver(ctx context.Context, c cache.Cache) err
 	return nil
 }
 
-func (m *trainerMetrics) onAdd(obj any) {
+func (m *trainerMetrics) onAdd(obj any, isInInitialList bool) {
 	trainJob, ok := obj.(*trainer.TrainJob)
-	if !ok {
+	if !ok || isInInitialList {
 		return
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	key := string(trainJob.UID)
-	if key == "" {
-		key = trainJob.Namespace + "/" + trainJob.Name
-	}
-	if _, exists := m.seen[key]; exists {
-		return
-	}
-	state := m.observeCurrentLocked(trainJob)
-	if state.suspended {
-		state.suspendedAt = time.Now()
-	}
-	m.seen[key] = state
-	m.created.WithLabelValues(policyLabels(trainJob, m)...).Inc()
-	if state.terminal {
-		m.observeTerminalLocked(trainJob)
+	runtimeRef := runtimeReference(trainJob)
+	trainJobCreated.WithLabelValues(trainJob.Namespace, runtimeRef).Inc()
+	m.observeRequestedWorkload(trainJob, runtimeRef)
+	if isTerminal(trainJob) {
+		m.observeTerminal(trainJob, runtimeRef)
 	}
 }
 
 func (m *trainerMetrics) onUpdate(oldObj, newObj any) {
 	oldJob, oldOK := oldObj.(*trainer.TrainJob)
 	newJob, newOK := newObj.(*trainer.TrainJob)
-	if !oldOK || !newOK {
+	if !oldOK || !newOK || isTerminal(oldJob) || !isTerminal(newJob) {
 		return
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	key := string(newJob.UID)
-	if key == "" {
-		key = newJob.Namespace + "/" + newJob.Name
-	}
-	previous, exists := m.seen[key]
-	if !exists {
-		previous = m.observeCurrentLocked(oldJob)
-	}
-	if previous.infoLabels != nil {
-		m.trainJobInfo.DeleteLabelValues(previous.infoLabels...)
-		m.trainJobStatus.DeleteLabelValues(previous.statusLabels...)
-		m.requestedTrainingNodes.DeleteLabelValues(previous.requestedNodesLabels...)
-	}
-	m.observeCurrentLocked(newJob)
-	if !previous.terminal && isTerminal(newJob) {
-		m.observeTerminalLocked(newJob)
-	}
-	previousSuspended := previous.suspended
-	currentSuspended := isSuspended(newJob)
-	if previousSuspended != currentSuspended {
-		if currentSuspended {
-			m.suspendEvents.WithLabelValues("suspend").Inc()
-		} else {
-			m.suspendEvents.WithLabelValues("resume").Inc()
-			if !previous.suspendedAt.IsZero() {
-				m.suspendedSeconds.WithLabelValues().Observe(time.Since(previous.suspendedAt).Seconds())
-			}
-		}
-	}
-	state := m.currentState(newJob)
-	if currentSuspended && previous.suspendedAt.IsZero() {
-		state.suspendedAt = time.Now()
-	}
-	m.seen[key] = state
+	m.observeTerminal(newJob, runtimeReference(newJob))
 }
 
 func (m *trainerMetrics) onDelete(obj any) {
-	trainJob, ok := obj.(*trainer.TrainJob)
-	if !ok {
-		if tombstone, tombstoneOK := obj.(toolscache.DeletedFinalStateUnknown); tombstoneOK {
-			trainJob, _ = tombstone.Obj.(*trainer.TrainJob)
-		}
-	}
-	if trainJob == nil {
-		return
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	key := string(trainJob.UID)
-	if key == "" {
-		key = trainJob.Namespace + "/" + trainJob.Name
-	}
-	if state, exists := m.seen[key]; exists {
-		m.trainJobInfo.DeleteLabelValues(state.infoLabels...)
-		m.trainJobStatus.DeleteLabelValues(state.statusLabels...)
-		m.requestedTrainingNodes.DeleteLabelValues(state.requestedNodesLabels...)
-		m.deleteReplicatedJobMetrics(trainJob.Namespace, trainJob.Name)
-		delete(m.seen, key)
-	}
+	// Deletions do not affect the event-based metrics currently exposed.
+	_, _ = obj.(*trainer.TrainJob)
 }
 
-func (m *trainerMetrics) observeCurrentLocked(trainJob *trainer.TrainJob) observedTrainJob {
-	state := m.currentState(trainJob)
-	m.trainJobInfo.WithLabelValues(state.infoLabels...).Set(1)
-	m.trainJobStatus.WithLabelValues(state.statusLabels...).Set(1)
-	if state.requestedNodesLabels != nil {
-		m.requestedTrainingNodes.WithLabelValues(state.requestedNodesLabels...).Set(state.requestedNodes)
-	}
-	m.deleteReplicatedJobMetrics(trainJob.Namespace, trainJob.Name)
-	for _, jobStatus := range trainJob.Status.JobsStatus {
-		role := normalizeRole(jobStatus.Name)
-		m.replicatedJobCount.WithLabelValues(trainJob.Namespace, trainJob.Name, role).Set(1)
-		m.replicatedJobsReady.WithLabelValues(trainJob.Namespace, trainJob.Name, role).Set(float64(ptr.Deref(jobStatus.Ready, 0)))
-		m.replicatedJobsFailed.WithLabelValues(trainJob.Namespace, trainJob.Name, role).Set(float64(ptr.Deref(jobStatus.Failed, 0)))
-	}
-	return state
-}
-
-func (m *trainerMetrics) observeTerminalLocked(trainJob *trainer.TrainJob) {
+func (m *trainerMetrics) observeTerminal(trainJob *trainer.TrainJob, runtimeRef string) {
 	condition := terminalCondition(trainJob)
 	result := "succeeded"
 	if condition.Type == trainer.TrainJobFailed {
 		result = "failed"
 	}
 	reason := condition.Reason
-	if result == "succeeded" || reason == "" {
-		reason = "none"
+	if reason == "" {
+		reason = unknownValue
 	}
-	if result == "failed" && reason == "" {
-		reason = "other"
-	}
-	m.finished.WithLabelValues(result, reason).Inc()
+	trainJobFinished.WithLabelValues(result, reason, runtimeRef).Inc()
 	if !trainJob.CreationTimestamp.IsZero() && !condition.LastTransitionTime.IsZero() {
-		m.lifetime.WithLabelValues(result).Observe(condition.LastTransitionTime.Sub(trainJob.CreationTimestamp.Time).Seconds())
+		trainJobLifetime.WithLabelValues(result, runtimeRef).Observe(
+			condition.LastTransitionTime.Sub(trainJob.CreationTimestamp.Time).Seconds(),
+		)
 	}
 }
 
-func (m *trainerMetrics) currentState(trainJob *trainer.TrainJob) observedTrainJob {
-	info := runtimeReference(trainJob)
-	mlPolicy, podGroupPolicy := m.runtimePolicies(trainJob)
-	queuePresent := "no"
-	if trainJob.Labels[kueueQueueLabel] != "" {
-		queuePresent = "yes"
+func (m *trainerMetrics) observeRequestedWorkload(trainJob *trainer.TrainJob, runtimeRef string) {
+	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
+		trainJobRequestedTrainingNodes.WithLabelValues(runtimeRef).Observe(float64(*trainJob.Spec.Trainer.NumNodes))
+	} else if nodes := m.requestedNodes(trainJob); nodes >= 0 {
+		trainJobRequestedTrainingNodes.WithLabelValues(runtimeRef).Observe(float64(nodes))
 	}
-	status := normalizedStatus(trainJob)
-	state := observedTrainJob{
-		infoLabels:   []string{trainJob.Namespace, trainJob.Name, info, mlPolicy, podGroupPolicy, queuePresent},
-		statusLabels: []string{trainJob.Namespace, trainJob.Name, status},
-		terminal:     isTerminal(trainJob),
-		suspended:    isSuspended(trainJob),
+
+	resources := m.resourcesPerNode(trainJob)
+	observedAccelerator := false
+	for resourceName, quantity := range acceleratorResources(resources) {
+		trainJobRequestedAccelerators.WithLabelValues(string(resourceName), runtimeRef).Observe(float64(quantity.Value()))
+		observedAccelerator = true
 	}
-	if nodes := m.requestedNodes(trainJob); nodes >= 0 {
-		state.requestedNodes = float64(nodes)
-		state.requestedNodesLabels = []string{trainJob.Namespace, trainJob.Name}
+	if !observedAccelerator {
+		trainJobRequestedAccelerators.WithLabelValues("none", runtimeRef).Observe(0)
 	}
-	return state
 }
 
-func (m *trainerMetrics) runtimePolicies(trainJob *trainer.TrainJob) (string, string) {
-	var mlPolicy *trainer.MLPolicy
-	var podGroupPolicy *trainer.PodGroupPolicy
+func (m *trainerMetrics) runtimeSpec(trainJob *trainer.TrainJob) (*trainer.TrainingRuntimeSpec, error) {
 	if ptr.Deref(trainJob.Spec.RuntimeRef.Kind, clusterTrainingRuntimeKind) == trainingRuntimeKind {
 		runtime := &trainer.TrainingRuntime{}
-		if err := m.client.Get(context.Background(), client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Spec.RuntimeRef.Name}, runtime); err == nil {
-			mlPolicy, podGroupPolicy = runtime.Spec.MLPolicy, runtime.Spec.PodGroupPolicy
+		if err := m.client.Get(context.Background(), client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Spec.RuntimeRef.Name}, runtime); err != nil {
+			return nil, err
 		}
-	} else {
-		runtime := &trainer.ClusterTrainingRuntime{}
-		if err := m.client.Get(context.Background(), client.ObjectKey{Name: trainJob.Spec.RuntimeRef.Name}, runtime); err == nil {
-			mlPolicy, podGroupPolicy = runtime.Spec.MLPolicy, runtime.Spec.PodGroupPolicy
-		}
+		return &runtime.Spec, nil
 	}
-	return mlPolicyName(mlPolicy), podGroupPolicyName(podGroupPolicy)
+	runtime := &trainer.ClusterTrainingRuntime{}
+	if err := m.client.Get(context.Background(), client.ObjectKey{Name: trainJob.Spec.RuntimeRef.Name}, runtime); err != nil {
+		return nil, err
+	}
+	return &runtime.Spec, nil
 }
 
 func (m *trainerMetrics) requestedNodes(trainJob *trainer.TrainJob) int32 {
-	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		return *trainJob.Spec.Trainer.NumNodes
+	if spec, err := m.runtimeSpec(trainJob); err == nil && spec.MLPolicy != nil && spec.MLPolicy.NumNodes != nil {
+		return *spec.MLPolicy.NumNodes
 	}
-	if ptr.Deref(trainJob.Spec.RuntimeRef.Kind, clusterTrainingRuntimeKind) == trainingRuntimeKind {
-		runtime := &trainer.TrainingRuntime{}
-		if err := m.client.Get(context.Background(), client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Spec.RuntimeRef.Name}, runtime); err == nil && runtime.Spec.MLPolicy != nil && runtime.Spec.MLPolicy.NumNodes != nil {
-			return *runtime.Spec.MLPolicy.NumNodes
-		}
-	} else {
-		runtime := &trainer.ClusterTrainingRuntime{}
-		if err := m.client.Get(context.Background(), client.ObjectKey{Name: trainJob.Spec.RuntimeRef.Name}, runtime); err == nil && runtime.Spec.MLPolicy != nil && runtime.Spec.MLPolicy.NumNodes != nil {
-			return *runtime.Spec.MLPolicy.NumNodes
-		}
-	}
-	return -1
+	// MLPolicy.NumNodes defaults to one node in the Trainer API.
+	return 1
 }
 
-func (m *trainerMetrics) deleteReplicatedJobMetrics(namespace, name string) {
-	for _, role := range []string{"dataset-initializer", "model-initializer", "trainer", "other"} {
-		m.replicatedJobCount.DeleteLabelValues(namespace, name, role)
-		m.replicatedJobsReady.DeleteLabelValues(namespace, name, role)
-		m.replicatedJobsFailed.DeleteLabelValues(namespace, name, role)
+func (m *trainerMetrics) resourcesPerNode(trainJob *trainer.TrainJob) *corev1.ResourceRequirements {
+	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
+		return trainJob.Spec.Trainer.ResourcesPerNode
 	}
+	spec, err := m.runtimeSpec(trainJob)
+	if err != nil {
+		return nil
+	}
+	for _, replicatedJob := range spec.Template.Spec.ReplicatedJobs {
+		if replicatedJob.Name != "node" && replicatedJob.Template.Labels["trainer.kubeflow.org/trainjob-ancestor-step"] != "trainer" {
+			continue
+		}
+		for _, container := range replicatedJob.Template.Spec.Template.Spec.Containers {
+			if container.Name == "node" {
+				resources := container.Resources
+				return &resources
+			}
+		}
+	}
+	return nil
 }
 
-// runtimeInfoCollector derives the runtime inventory from the controller-runtime
-// cache-backed client at scrape time. It does not maintain a second inventory or
-// expose a historical runtime counter.
+func acceleratorResources(resources *corev1.ResourceRequirements) corev1.ResourceList {
+	result := corev1.ResourceList{}
+	if resources == nil {
+		return result
+	}
+	for name, quantity := range resources.Requests {
+		if strings.Contains(strings.ToLower(name.String()), "gpu") {
+			result[name] = quantity
+		}
+	}
+	if len(result) == 0 {
+		for name, quantity := range resources.Limits {
+			if strings.Contains(strings.ToLower(name.String()), "gpu") {
+				result[name] = quantity
+			}
+		}
+	}
+	return result
+}
+
+// runtimeInfoCollector derives runtime inventory from the cache-backed client
+// at scrape time and therefore does not retain a second runtime inventory.
 type runtimeInfoCollector struct {
 	client client.Client
 	desc   *prometheus.Desc
@@ -368,7 +253,7 @@ func newRuntimeInfoCollector(cli client.Client) *runtimeInfoCollector {
 		desc: prometheus.NewDesc(
 			prometheus.BuildFQName(metricNamespace, "", "runtime_info"),
 			"Current TrainingRuntime and ClusterTrainingRuntime resources.",
-			[]string{"kind", "namespace", "name", "ml_policy", "pod_group_policy"}, nil,
+			[]string{"namespace", "name", "api_group", "kind", "ml_policy", "pod_group_policy"}, nil,
 		),
 	}
 }
@@ -383,8 +268,8 @@ func (c *runtimeInfoCollector) Collect(ch chan<- prometheus.Metric) {
 		for i := range runtimes.Items {
 			runtime := &runtimes.Items[i]
 			ch <- prometheus.MustNewConstMetric(c.desc, prometheus.GaugeValue, 1,
-				trainingRuntimeKind, runtime.Namespace, runtime.Name,
-				mlPolicyName(runtime.Spec.MLPolicy), podGroupPolicyName(runtime.Spec.PodGroupPolicy))
+				runtime.Namespace, runtime.Name, trainer.GroupVersion.Group,
+				trainingRuntimeKind, mlPolicyName(runtime.Spec.MLPolicy), podGroupPolicyName(runtime.Spec.PodGroupPolicy))
 		}
 	}
 
@@ -393,25 +278,25 @@ func (c *runtimeInfoCollector) Collect(ch chan<- prometheus.Metric) {
 		for i := range clusterRuntimes.Items {
 			runtime := &clusterRuntimes.Items[i]
 			ch <- prometheus.MustNewConstMetric(c.desc, prometheus.GaugeValue, 1,
-				clusterTrainingRuntimeKind, "", runtime.Name,
-				mlPolicyName(runtime.Spec.MLPolicy), podGroupPolicyName(runtime.Spec.PodGroupPolicy))
+				"", runtime.Name, trainer.GroupVersion.Group,
+				clusterTrainingRuntimeKind, mlPolicyName(runtime.Spec.MLPolicy), podGroupPolicyName(runtime.Spec.PodGroupPolicy))
 		}
 	}
 }
 
 func setupTrainerMetrics(mgr ctrl.Manager) error {
 	m := newTrainerMetrics(mgr.GetClient())
-	if err := registerTrainerCollectors(controllerMetrics.Registry, m); err != nil {
-		return err
-	}
-	return m.installObserver(context.Background(), mgr.GetCache())
+	return m.installObserver(mgr.GetCache())
 }
 
 func registerTrainerCollectors(reg prometheus.Registerer, m *trainerMetrics) error {
 	for _, collector := range []prometheus.Collector{
-		m.runtimeInfo, m.trainJobInfo, m.trainJobStatus, m.requestedTrainingNodes,
-		m.replicatedJobCount, m.replicatedJobsReady, m.replicatedJobsFailed,
-		m.created, m.finished, m.lifetime, m.suspendEvents, m.suspendedSeconds,
+		m.runtimeInfo,
+		trainJobCreated,
+		trainJobFinished,
+		trainJobLifetime,
+		trainJobRequestedAccelerators,
+		trainJobRequestedTrainingNodes,
 	} {
 		if err := reg.Register(collector); err != nil {
 			return err
@@ -430,31 +315,6 @@ func runtimeReference(trainJob *trainer.TrainJob) string {
 	return fmt.Sprintf("%s/%s/%s/%s", group, kind, namespace, trainJob.Spec.RuntimeRef.Name)
 }
 
-func policyLabels(trainJob *trainer.TrainJob, m *trainerMetrics) []string {
-	mlPolicy, podGroupPolicy := unknownValue, unknownValue
-	if m != nil {
-		mlPolicy, podGroupPolicy = m.runtimePolicies(trainJob)
-	}
-	queuePresent := "no"
-	if trainJob.Labels[kueueQueueLabel] != "" {
-		queuePresent = "yes"
-	}
-	return []string{mlPolicy, podGroupPolicy, queuePresent}
-}
-
-func normalizedStatus(trainJob *trainer.TrainJob) string {
-	if meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobFailed) {
-		return "failed"
-	}
-	if meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobComplete) {
-		return "succeeded"
-	}
-	if isSuspended(trainJob) {
-		return "suspended"
-	}
-	return "nonterminal"
-}
-
 func isTerminal(trainJob *trainer.TrainJob) bool {
 	return meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobFailed) ||
 		meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobComplete)
@@ -468,19 +328,6 @@ func terminalCondition(trainJob *trainer.TrainJob) metav1.Condition {
 		return *condition
 	}
 	return metav1.Condition{}
-}
-
-func isSuspended(trainJob *trainer.TrainJob) bool {
-	return ptr.Deref(trainJob.Spec.Suspend, false) || meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobSuspended)
-}
-
-func normalizeRole(name string) string {
-	switch name {
-	case "dataset-initializer", "model-initializer", "trainer":
-		return name
-	default:
-		return "other"
-	}
 }
 
 func mlPolicyName(policy *trainer.MLPolicy) string {
@@ -499,7 +346,7 @@ func mlPolicyName(policy *trainer.MLPolicy) string {
 	case policy.XGBoost != nil:
 		return "xgboost"
 	default:
-		return "none"
+		return unknownValue
 	}
 }
 
@@ -513,6 +360,6 @@ func podGroupPolicyName(policy *trainer.PodGroupPolicy) string {
 	case policy.Volcano != nil:
 		return "volcano"
 	default:
-		return "none"
+		return unknownValue
 	}
 }

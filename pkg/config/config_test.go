@@ -1022,7 +1022,7 @@ tls:
 
 			// TLS options from the config file are applied to the webhook server.
 			// The metrics server receives its TLS config via tlsconfig.Apply inside
-			// SetupServer, called after certs are guaranteed present.
+			// Setup, called after certs are guaranteed present.
 			webhookSrv, ok := options.WebhookServer.(*webhook.DefaultServer)
 			if !ok {
 				t.Fatal("Expected WebhookServer to be a *webhook.DefaultServer")
