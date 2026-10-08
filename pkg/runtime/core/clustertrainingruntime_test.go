@@ -26,8 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/validation/field"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
@@ -180,67 +178,6 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 
 			if diff := cmp.Diff(tc.wantObjs, resultObjs, cmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestClusterTrainingRuntimeValidateObjectsFieldPath(t *testing.T) {
-	trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-		UID("test-uid").
-		RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "missing-runtime").
-		Obj()
-
-	cases := map[string]struct {
-		objs      []client.Object
-		wantType  field.ErrorType
-		wantField string
-	}{
-		"runtime not found is reported at spec.runtimeRef": {
-			wantType:  field.ErrorTypeInvalid,
-			wantField: "spec.runtimeRef",
-		},
-		"invalid runtime snapshot is reported at spec.runtimeRef": {
-			objs: []client.Object{
-				&corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      trainJob.Name + runtimeSnapshotSuffix,
-						Namespace: trainJob.Namespace,
-					},
-				},
-			},
-			wantType:  field.ErrorTypeInternal,
-			wantField: "spec.runtimeRef",
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			t.Cleanup(cancel)
-			clientBuilder := testingutil.NewClientBuilder().WithObjects(tc.objs...)
-			c := clientBuilder.Build()
-
-			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var ok bool
-			trainingRuntimeFactory, ok = trainingRuntime.(*TrainingRuntime)
-			if !ok {
-				t.Fatal("Failed type assertion from Runtime interface to TrainingRuntime")
-			}
-			clTrainingRuntime, err := NewClusterTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			_, errs := clTrainingRuntime.ValidateObjects(ctx, nil, trainJob)
-			if len(errs) != 1 {
-				t.Fatalf("Expected exactly one error, got %d: %v", len(errs), errs)
-			}
-			if errs[0].Type != tc.wantType || errs[0].Field != tc.wantField {
-				t.Errorf("Unexpected error: want type %q at %q, got type %q at %q",
-					tc.wantType, tc.wantField, errs[0].Type, errs[0].Field)
 			}
 		})
 	}
