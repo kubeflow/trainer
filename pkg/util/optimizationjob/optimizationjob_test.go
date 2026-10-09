@@ -25,6 +25,7 @@ import (
 	katibapi "github.com/kubeflow/katib/pkg/apis/manager/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -43,15 +44,23 @@ func TestGetAlgorithmServiceName(t *testing.T) {
 			jobName: strings.Repeat("a", 46),
 			want:    strings.Repeat("a", 46) + "-search-algorithm",
 		},
-		"long name gets truncated to 63 chars": {
+		"long name gets truncated to 63 chars with a hash of the full name": {
 			jobName: strings.Repeat("a", 60),
-			want:    strings.Repeat("a", 46) + "-search-algorithm",
+			want:    strings.Repeat("a", 37) + "-11ee3912-search-algorithm",
 		},
 		"long name with hyphen at truncation boundary gets trimmed": {
-			// 45 'a's + '-' + 14 'b's = 60 chars.
-			// Truncating to 46 gives 45 'a's + '-'. TrimRight removes the hyphen.
-			jobName: strings.Repeat("a", 45) + "-" + strings.Repeat("b", 14),
-			want:    strings.Repeat("a", 45) + "-search-algorithm",
+			// 36 'a's + '-' + 23 'b's = 60 chars.
+			// Truncating to 37 gives 36 'a's + '-'. TrimRight removes the hyphen.
+			jobName: strings.Repeat("a", 36) + "-" + strings.Repeat("b", 23),
+			want:    strings.Repeat("a", 36) + "-604b735b-search-algorithm",
+		},
+		"name sharing a 46-character prefix, run-a": {
+			jobName: strings.Repeat("b", 46) + "-run-a",
+			want:    strings.Repeat("b", 37) + "-480294b5-search-algorithm",
+		},
+		"name sharing a 46-character prefix, run-b": {
+			jobName: strings.Repeat("b", 46) + "-run-b",
+			want:    strings.Repeat("b", 37) + "-6a6e29cc-search-algorithm",
 		},
 	}
 
@@ -66,6 +75,9 @@ func TestGetAlgorithmServiceName(t *testing.T) {
 			}
 			if len(got) > 63 {
 				t.Errorf("GetAlgorithmServiceName() length %d exceeds 63 characters: %q", len(got), got)
+			}
+			if errs := validation.IsDNS1035Label(got); len(errs) > 0 {
+				t.Errorf("GetAlgorithmServiceName() = %q is not a valid DNS-1035 label: %v", got, errs)
 			}
 		})
 	}
