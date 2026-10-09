@@ -162,8 +162,17 @@ manager:
 serviceMonitor:
   # -- Whether to create a Prometheus Operator ServiceMonitor.
   enabled: false
+  # -- Additional labels for selecting this ServiceMonitor from Prometheus.
+  labels: {}
   # -- Bearer token path used when metrics authentication is enabled.
+  # This is used only when authorization.credentials.name is empty.
   bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+  # -- Secret-based authorization for authenticated metrics scraping.
+  # The Secret must be available in the ServiceMonitor namespace and readable by Prometheus.
+  authorization:
+    credentials:
+      name: ""
+      key: token
   # -- TLS settings for the ServiceMonitor. Empty values use the Trainer defaults.
   tlsConfig:
     ca:

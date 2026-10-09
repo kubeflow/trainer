@@ -15,9 +15,6 @@ limitations under the License.
 */ -}}
 
 {{- if .Values.serviceMonitor.enabled }}
-{{- if and .Values.manager.config.metrics.auth.enabled (not .Values.manager.config.metrics.secureServing) }}
-{{- fail "manager.config.metrics.auth.enabled requires manager.config.metrics.secureServing to be true" }}
-{{- end }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -25,22 +22,34 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "trainer.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   selector:
     matchLabels:
-      {{- include "trainer.manager.selectorLabels" . | nindent 6 }}
+      {{- include "trainer.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/part-of: kubeflow
+      app.kubernetes.io/component: manager
   endpoints:
     - port: monitoring-port
       scheme: {{ if .Values.manager.config.metrics.secureServing }}https{{ else }}http{{ end }}
       {{- if .Values.manager.config.metrics.auth.enabled }}
+      {{- if .Values.serviceMonitor.authorization.credentials.name }}
+      authorization:
+        credentials:
+          name: {{ .Values.serviceMonitor.authorization.credentials.name | quote }}
+          key: {{ .Values.serviceMonitor.authorization.credentials.key | default "token" | quote }}
+      {{- else }}
       bearerTokenFile: {{ .Values.serviceMonitor.bearerTokenFile | quote }}
+      {{- end }}
       {{- end }}
       {{- if .Values.manager.config.metrics.secureServing }}
       tlsConfig:
         ca:
           secret:
-            name: {{ .Values.serviceMonitor.tlsConfig.ca.secret.name | default (include "trainer.webhook.secret.name" .) }}
+            name: {{ .Values.serviceMonitor.tlsConfig.ca.secret.name | default .Values.manager.config.certManagement.webhookSecretName | default (include "trainer.webhook.secret.name" .) }}
             key: {{ .Values.serviceMonitor.tlsConfig.ca.secret.key | default "ca.crt" }}
-        serverName: {{ .Values.serviceMonitor.tlsConfig.serverName | default (printf "%s.%s.svc" (include "trainer.manager.service.name" .) .Release.Namespace) }}
+        serverName: {{ .Values.serviceMonitor.tlsConfig.serverName | default (printf "%s.%s.svc" (.Values.manager.config.certManagement.webhookServiceName | default (include "trainer.webhook.service.name" .)) .Release.Namespace) }}
       {{- end }}
 {{- end }}

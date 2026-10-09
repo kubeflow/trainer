@@ -40,6 +40,9 @@ tests:
           path: spec.selector.matchLabels["app.kubernetes.io/name"]
           value: kubeflow-trainer
       - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/component"]
+          value: manager
+      - equal:
           path: spec.endpoints[0].port
           value: monitoring-port
       - equal:
@@ -66,6 +69,26 @@ tests:
           path: spec.endpoints[0].bearerTokenFile
           value: /var/run/secrets/kubernetes.io/serviceaccount/token
 
+  - it: Should support Prometheus selector labels and Secret credentials
+    set:
+      serviceMonitor.enabled: true
+      manager.config.metrics.auth.enabled: true
+      serviceMonitor.labels.release: prometheus
+      serviceMonitor.authorization.credentials.name: prometheus-token
+      serviceMonitor.authorization.credentials.key: bearer
+    asserts:
+      - equal:
+          path: metadata.labels.release
+          value: prometheus
+      - equal:
+          path: spec.endpoints[0].authorization
+          value:
+            credentials:
+              name: prometheus-token
+              key: bearer
+      - notExists:
+          path: spec.endpoints[0].bearerTokenFile
+
   - it: Should use HTTP without TLS when secure serving is disabled
     set:
       serviceMonitor.enabled: true
@@ -78,15 +101,6 @@ tests:
           path: spec.endpoints[0].bearerTokenFile
       - notExists:
           path: spec.endpoints[0].tlsConfig
-
-  - it: Should fail when authentication is enabled without secure serving
-    set:
-      serviceMonitor.enabled: true
-      manager.config.metrics.auth.enabled: true
-      manager.config.metrics.secureServing: false
-    asserts:
-      - failedTemplate:
-          errorMessage: "manager.config.metrics.auth.enabled requires manager.config.metrics.secureServing to be true"
 
   - it: Should allow overriding the TLS configuration
     set:
@@ -104,3 +118,24 @@ tests:
       - equal:
           path: spec.endpoints[0].tlsConfig.serverName
           value: metrics.example.test
+
+  - it: Should use custom certificate management names by default
+    set:
+      serviceMonitor.enabled: true
+      manager.config.certManagement.webhookSecretName: custom-webhook-secret
+      manager.config.certManagement.webhookServiceName: custom-webhook-service
+    asserts:
+      - equal:
+          path: spec.endpoints[0].tlsConfig.ca.secret.name
+          value: custom-webhook-secret
+      - equal:
+          path: spec.endpoints[0].tlsConfig.serverName
+          value: custom-webhook-service.kubeflow-system.svc
+
+  - it: Should not include custom manager selector labels in the ServiceMonitor selector
+    set:
+      serviceMonitor.enabled: true
+      manager.selectorLabels.custom-label: custom-value
+    asserts:
+      - notExists:
+          path: spec.selector.matchLabels["custom-label"]

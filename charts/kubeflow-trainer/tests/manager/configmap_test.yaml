@@ -117,6 +117,14 @@ tests:
           pattern: |
             (?s)metrics:\s+bindAddress: :8443\s+secureServing: true\s+auth:\s+enabled: true
 
+  - it: should fail when authentication is enabled without secure serving
+    set:
+      manager.config.metrics.auth.enabled: true
+      manager.config.metrics.secureServing: false
+    asserts:
+      - failedTemplate:
+          errorMessage: "manager.config.metrics.auth.enabled requires manager.config.metrics.secureServing to be true"
+
   - it: should render custom clientConnection qps and burst
     set:
       manager.config.clientConnection.qps: 200
