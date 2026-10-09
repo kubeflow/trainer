@@ -256,6 +256,17 @@ func (r *TrainingRuntime) newRuntimeInfo(
 	return runtime.NewInfo(opts...), nil
 }
 
+// withoutRuntimePatches returns a copy of the TrainJob with spec.runtimePatches cleared, so that
+// newRuntimeInfo describes the runtime template itself. The validation plugins read the patches
+// from the TrainJob; if the patches were merged first, every replicated job and container a patch
+// introduces would look like part of the runtime, and a patch that targets a job or container the
+// runtime does not define could never be rejected.
+func withoutRuntimePatches(trainJob *trainer.TrainJob) *trainer.TrainJob {
+	unpatched := trainJob.DeepCopy()
+	unpatched.Spec.RuntimePatches = nil
+	return unpatched
+}
+
 func (r *TrainingRuntime) mergeRuntimePatches(trainJob *trainer.TrainJob, jobSetTemplateSpec *trainer.JobSetTemplateSpec) error {
 	// Capture the original ReplicatedJobs ordering since SMP may reorder the list.
 	order := make(map[string]int, len(jobSetTemplateSpec.Spec.ReplicatedJobs))
@@ -343,7 +354,7 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 			constants.RuntimeDeprecationPolicyURL,
 		))
 	}
-	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
+	info, _ := r.newRuntimeInfo(withoutRuntimePatches(new), trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
 	fwWarnings, errs := r.framework.RunCustomValidationPlugins(ctx, info, old, new)
 	if len(fwWarnings) != 0 {
 		warnings = append(warnings, fwWarnings...)
