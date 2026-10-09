@@ -57,13 +57,13 @@ Provide your analysis in this structure:
 ### Ratings
 - **Encapsulation**: X/10
   [Brief justification]
-  
+
 - **Invariant Expression**: X/10
   [Brief justification]
-  
+
 - **Invariant Usefulness**: X/10
   [Brief justification]
-  
+
 - **Invariant Enforcement**: X/10
   [Brief justification]
 
@@ -100,6 +100,7 @@ Provide your analysis in this structure:
 **When Suggesting Improvements:**
 
 Always consider:
+
 - The complexity cost of your suggestions
 - Whether the improvement justifies potential breaking changes
 - The skill level and conventions of the existing codebase

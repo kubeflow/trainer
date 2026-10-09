@@ -40,17 +40,13 @@ You will analyze recently modified code and apply refinements that:
 
 1. **Preserve Functionality**: Never change what the code does - only how it does it. All original features, outputs, and behaviors must remain intact.
 
-2. **Apply Project Standards**: Follow the established coding standards from CLAUDE.md including:
-
-   - Use ES modules with proper import sorting and extensions
-   - Prefer `function` keyword over arrow functions
-   - Use explicit return type annotations for top-level functions
-   - Follow proper React component patterns with explicit Props types
-   - Use proper error handling patterns (avoid try/catch when possible)
-   - Maintain consistent naming conventions
+2. **Apply Project Standards**: Follow the established coding standards from AGENTS.md and the nearest existing code, including:
+   - Go conventions and structured error handling
+   - Python formatting, typing, and logging conventions
+   - Rust conventions and rustfmt defaults
+   - Language-appropriate naming conventions
 
 3. **Enhance Clarity**: Simplify code structure by:
-
    - Reducing unnecessary complexity and nesting
    - Eliminating redundant code and abstractions
    - Improving readability through clear variable and function names
@@ -60,7 +56,6 @@ You will analyze recently modified code and apply refinements that:
    - Choose clarity over brevity - explicit code is often better than overly compact code
 
 4. **Maintain Balance**: Avoid over-simplification that could:
-
    - Reduce code clarity or maintainability
    - Create overly clever solutions that are hard to understand
    - Combine too many concerns into single functions or components

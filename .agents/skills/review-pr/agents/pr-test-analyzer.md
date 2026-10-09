@@ -39,6 +39,7 @@ You are an expert test coverage analyst specializing in pull request review. You
 6. Consider integration points and their test coverage
 
 **Rating Guidelines:**
+
 - 9-10: Critical functionality that could cause data loss, security issues, or system failures
 - 7-8: Important business logic that could cause user-facing errors
 - 5-6: Edge cases that could cause confusion or minor issues
@@ -58,7 +59,7 @@ Structure your analysis as:
 **Important Considerations:**
 
 - Focus on tests that prevent real bugs, not academic completeness
-- Consider the project's testing standards from CLAUDE.md if available
+- Consider the project's testing standards from AGENTS.md if available
 - Remember that some code paths may be covered by existing integration tests
 - Avoid suggesting tests for trivial getters/setters unless they contain logic
 - Consider the cost/benefit of each suggested test
