@@ -28,7 +28,7 @@
 # Apply: kubectl apply -f 04-volcano-integration.yaml
 # Check: kubectl get trainjob volcano-example
 # Pods:  kubectl get pods -l jobset.sigs.k8s.io/jobset-name=volcano-example
-# Group: kubectl get podgroup -l jobset.sigs.k8s.io/jobset-name=volcano-example
+# Group: kubectl get podgroups.scheduling.volcano.sh volcano-example
 # Clean: kubectl delete trainjob volcano-example && \
 #        kubectl delete clustertrainingruntime torch-distributed-volcano
 #
@@ -57,6 +57,7 @@ spec:
             spec:
               template:
                 spec:
+                  schedulerName: volcano
                   containers:
                     - name: node
                       image: pytorch/pytorch:2.13.0-cuda13.0-cudnn9-runtime
