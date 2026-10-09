@@ -15,10 +15,4 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - deepspeed_distributed.yaml
-  - mlx_distributed.yaml
-  - torch_distributed.yaml
-  - jax_distributed.yaml
-  - xgboost_distributed.yaml
-  - torchtune
-  - grpo
+  - grpo_distributed.yaml
