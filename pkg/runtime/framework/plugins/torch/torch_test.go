@@ -2325,6 +2325,33 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 	}
 }
 
+// draNodeInfo builds a Torch runtime Info whose node container carries the given resources.
+func draNodeInfo(res *corev1ac.ResourceRequirementsApplyConfiguration) *runtime.Info {
+	return runtime.NewInfo(
+		runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+			WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().TorchPolicy().Obj()).
+			Obj(),
+		),
+		runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+			WithContainers(corev1ac.Container().WithName(constants.Node)),
+		),
+		runtime.WithTemplateSpecObjApply(jobsetv1alpha2ac.JobSetSpec().
+			WithReplicatedJobs(jobsetv1alpha2ac.ReplicatedJob().
+				WithName(constants.Node).
+				WithTemplate(batchv1ac.JobTemplateSpec().
+					WithSpec(batchv1ac.JobSpec().
+						WithTemplate(corev1ac.PodTemplateSpec().
+							WithSpec(corev1ac.PodSpec().
+								WithContainers(corev1ac.Container().WithName(constants.Node).WithResources(res)),
+							),
+						),
+					),
+				),
+			),
+		),
+	)
+}
+
 func TestTorchValidate(t *testing.T) {
 	cases := map[string]struct {
 		info         *runtime.Info
@@ -2777,6 +2804,37 @@ func TestTorchValidate(t *testing.T) {
 					fmt.Sprintf("must not set immutable config %q in trainer args; it is managed by the runtime", "tokenizer.path"),
 				),
 			},
+		},
+		"warning on create when the node container has DRA claims and numProcPerNode is unset": {
+			info: draNodeInfo(corev1ac.ResourceRequirements().WithClaims(corev1ac.ResourceClaim().WithName("gpu"))),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Obj()).
+				Obj(),
+			wantWarnings: admission.Warnings{draNumProcPerNodeWarning},
+		},
+		"no warning when numProcPerNode is set": {
+			info: draNodeInfo(corev1ac.ResourceRequirements().WithClaims(corev1ac.ResourceClaim().WithName("gpu"))),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumProcPerNode(8).Obj()).
+				Obj(),
+		},
+		"no warning when an extended GPU resource is set alongside DRA claims": {
+			info: draNodeInfo(corev1ac.ResourceRequirements().
+				WithClaims(corev1ac.ResourceClaim().WithName("gpu")).
+				WithLimits(corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")}),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Obj()).
+				Obj(),
+		},
+		"no warning on update": {
+			info: draNodeInfo(corev1ac.ResourceRequirements().WithClaims(corev1ac.ResourceClaim().WithName("gpu"))),
+			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Obj()).
+				Obj(),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Obj()).
+				Obj(),
 		},
 	}
 	for name, tc := range cases {

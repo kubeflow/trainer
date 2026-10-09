@@ -233,7 +233,8 @@ type TrainerResourceClaim struct {
 	// the container's resources.claims entries reference. It is the list map key, so it
 	// must be set.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
 	// +required
 	Name string `json:"name"`
 
@@ -356,6 +357,11 @@ useful in its own right.
 DRA usage rarely exceeds a handful of claims per pod.
 
 **Example: PodSpecPatch via runtimePatches**
+
+To configure DRA for a container other than the trainer `node`, the claim must be set in both
+places within `runtimePatches`: the Pod-level `.spec.resourceClaims` entry and the consuming
+container's `.spec.containers[*].resources.claims[*].name`. A container claim that references no
+Pod-level claim is rejected by the webhook.
 
 A user wants to add a DRA claim to a non-node replicatedJob (e.g., a `preprocessor`):
 
@@ -659,6 +665,29 @@ GPU count defaults to 0 and the user can always set `numProcPerNode` explicitly.
 `resourceclaimtemplates` and `resourceclaims` in the `resource.k8s.io` API group. This
 is added to the controller's `ClusterRole` manifest.
 
+### Feature gate
+
+The implementation is guarded by the `TrainJobDynamicResourceAllocation` alpha feature gate
+(default `false`) on the Trainer controller. With the gate disabled, the TrainJob webhook rejects
+`spec.trainer.resourceClaimsPerNode` and DRA fields in `spec.runtimePatches` on create, and the
+controller does not wire `resourceClaimsPerNode` into the JobSet. Claims defined directly in a
+runtime template are still applied. The gate is prefixed with `TrainJob` so it does not collide
+with the Kubernetes `DynamicResourceAllocation` gate.
+
+### Implementation phasing
+
+Phase 1 lands in two PRs:
+
+1. Claims wiring ([#4027](https://github.com/kubeflow/trainer/pull/4027)): the API fields, the
+   feature gate, applying claims to the node PodSpec and container, `runtimePatches` support,
+   validation, and the admission warning when `numProcPerNode` is unset.
+2. DRA-aware GPU detection (follow-up): `ResourceClaimTemplate` resolution on the build path,
+   the `PodSet` propagation, the ML policy plugin fallbacks, and the `resourceclaimtemplates` /
+   `resourceclaims` RBAC.
+
+Until the second PR lands, a DRA-only TrainJob uses the CPU-derived `numProcPerNode` and users
+set it explicitly.
+
 ### Validation
 
 - Reject `trainer.resourcesPerNode.claims` if set. That field is ignored by Trainer today;
@@ -666,7 +695,8 @@ users should use `resourceClaimsPerNode` instead.
 - Emit an admission warning (not a rejection) when the trainer `node` container has DRA claims
 but no extended GPU resource and `numProcPerNode` is not set, since the DRA GPU count may resolve
 to 0 (see [DRA-aware GPU detection](#dra-aware-gpu-detection-in-ml-policy-plugins)) and Torch
-would silently fall back to the CPU count.
+would silently fall back to the CPU count. Until GPU detection lands, the count is always
+unresolved, so the warning fires for every such TrainJob.
 - Reject a container `resources.claims` entry (set via `ContainerPatch.Resources`) whose `name`
 does not match any pod-level `resourceClaims` entry in the merged PodSpec, so users get a clear
 error instead of a Pod that is rejected later by the API server.
@@ -705,16 +735,16 @@ and CRD manifests.
 | `pkg/apis/trainer/v1alpha1/zz_generated.deepcopy.go`     | Regenerated via `make generate`                                              |
 | `pkg/apis/trainer/v1alpha1/zz_generated.openapi.go`      | Regenerated via `make generate`                                              |
 | `manifests/base/crds/`                                   | Regenerated CRD YAMLs with new fields                                        |
-| `pkg/runtime/core/trainingruntime.go`                    | Apply `resourceClaimsPerNode` to node PodSpec + `node` container claims; preserve existing `resources.claims` when merging `resourcesPerNode` |
-| `pkg/runtime/runtime.go`                                 | Propagate DRA GPU count via `PodSet`                                         |
-| `pkg/webhooks/trainjob_webhook.go`                       | Reject `resourcesPerNode.claims`; point to `resourceClaimsPerNode`           |
-| `pkg/runtime/framework/plugins/torch/torch.go`           | Use DRA GPU count as fallback when GPU count is 0                            |
-| `pkg/runtime/framework/plugins/torch/torchtune.go`       | Use DRA GPU count as fallback when GPU count is 0                            |
-| `pkg/runtime/framework/plugins/mpi/mpi.go`               | Use DRA GPU count as fallback when GPU count is 0                            |
-| `pkg/runtime/framework/plugins/xgboost/xgboost.go`       | Use DRA GPU count as fallback when GPU count is 0                            |
-| `pkg/runtime/framework/plugins/flux/flux.go`             | Use DRA GPU count as fallback when GPU count is 0                            |
-| `manifests/base/rbac/`                                   | Add `resourceclaimtemplates` and `resourceclaims` get/list/watch permission to ClusterRole |
+| `pkg/runtime/core/trainingruntime.go`                    | Apply `resourceClaimsPerNode` to node PodSpec + `node` container claims; merge `resourcesPerNode` and claims by name |
+| `pkg/features/features.go`                               | Add the `TrainJobDynamicResourceAllocation` alpha feature gate               |
+| `pkg/webhooks/trainjob_webhook.go`                       | Reject DRA fields while the gate is disabled                                 |
+| `pkg/webhooks/trainingruntime_webhook.go`                | Reject container claims with no Pod-level claim in runtime templates          |
+| `pkg/runtime/framework/plugins/jobset/jobset.go`         | Reject container claims with no Pod-level claim in the merged spec            |
+| `pkg/runtime/framework/plugins/torch/torch.go`           | Admission warning when the node container has DRA claims and `numProcPerNode` is unset |
 | `pkg/runtime/core/trainingruntime_test.go`               | Test top-level claims application and merge behavior                         |
+| `pkg/runtime/runtime.go` (follow-up PR)                  | Propagate DRA GPU count via `PodSet`                                         |
+| `pkg/runtime/framework/plugins/{torch,mpi,xgboost,flux}` (follow-up PR) | Use DRA GPU count as fallback when GPU count is 0             |
+| `manifests/base/rbac/` (follow-up PR)                    | Add `resourceclaimtemplates` and `resourceclaims` get/list/watch permission to ClusterRole |
 | `sdk/python/kubeflow/trainer/api_client.py` (or similar) | Add `list_resource_claim_templates(namespace)` method                        |
 | `docs/` (Trainer website)                                | Admin DRA setup guide: template examples, "gpu" request naming requirement for auto-detection |
 

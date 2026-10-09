@@ -40,6 +40,13 @@ import (
 
 type Torch struct{}
 
+// draNumProcPerNodeWarning is emitted on create when the node container has DRA claims but no
+// extended GPU resource and numProcPerNode is not set: the GPU count is not derived from the
+// ResourceClaimTemplate yet, so torchrun falls back to the CPU count.
+const draNumProcPerNodeWarning = "spec.trainer.numProcPerNode is not set and the node container uses DRA claims; " +
+	"the GPU count is not derived from the ResourceClaimTemplate, so torchrun will use the CPU count. " +
+	"Set numProcPerNode explicitly"
+
 var _ framework.EnforceMLPolicyPlugin = (*Torch)(nil)
 var _ framework.CustomValidationPlugin = (*Torch)(nil)
 
@@ -53,7 +60,8 @@ func (t *Torch) Name() string {
 	return Name
 }
 
-func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	var warnings admission.Warnings
 	var allErrs field.ErrorList
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil {
 		return nil, allErrs
@@ -83,7 +91,21 @@ func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj
 			allErrs = append(allErrs, torchTuneErrs...)
 		}
 	}
-	return nil, allErrs
+
+	// Warn only on create when the node container has DRA claims but no extended GPU resource
+	// and numProcPerNode is unset, since torchrun would silently fall back to the CPU count.
+	if oldObj == nil {
+		runtimeRes := runtime.ExtractResourcePerNodeFromRuntime(runtimeInfo)
+		resourcesPerNode := ptr.Deref(runtimeRes, corev1.ResourceRequirements{})
+		if jobTrainer := newObj.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
+			resourcesPerNode = *jobTrainer.ResourcesPerNode
+		}
+		numProcPerNodeSet := newObj.Spec.Trainer != nil && newObj.Spec.Trainer.NumProcPerNode != nil
+		if runtimeRes != nil && len(runtimeRes.Claims) > 0 && !numProcPerNodeSet && runtime.GetNumGPUPerNode(&resourcesPerNode) == 0 {
+			warnings = append(warnings, draNumProcPerNodeWarning)
+		}
+	}
+	return warnings, allErrs
 }
 
 func validateEnvInjectionTargets(info *runtime.Info, fldPath *field.Path) field.ErrorList {
