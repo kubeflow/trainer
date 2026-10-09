@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
@@ -132,5 +133,66 @@ func TestValidateReplicatedJobs(t *testing.T) {
 				t.Errorf("validateReplicateJobs() mismatch (-want,+got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestTrainingRuntimeValidateUpdate(t *testing.T) {
+	cases := map[string]struct {
+		oldObj    *trainer.TrainingRuntime
+		newObj    *trainer.TrainingRuntime
+		wantError bool
+	}{
+		"valid update succeeds": {
+			oldObj: testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj(),
+			newObj: func() *trainer.TrainingRuntime {
+				obj := testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj()
+				for i := range obj.Spec.Template.Spec.ReplicatedJobs {
+					obj.Spec.Template.Spec.ReplicatedJobs[i].Replicas = 1
+				}
+				return obj
+			}(),
+			wantError: false,
+		},
+		"invalid update with invalid replicas fails": {
+			oldObj: testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj(),
+			newObj: func() *trainer.TrainingRuntime {
+				obj := testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj()
+				for i := range obj.Spec.Template.Spec.ReplicatedJobs {
+					obj.Spec.Template.Spec.ReplicatedJobs[i].Replicas = 2
+				}
+				return obj
+			}(),
+			wantError: true,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			validator := &TrainingRuntimeValidator{}
+			warnings, err := validator.ValidateUpdate(ctx, tc.oldObj, tc.newObj)
+			if (err != nil) != tc.wantError {
+				t.Fatalf("ValidateUpdate() error = %v, wantError = %v", err, tc.wantError)
+			}
+			if len(warnings) != 0 {
+				t.Errorf("ValidateUpdate() warnings = %v, want nil", warnings)
+			}
+		})
+	}
+}
+
+func TestTrainingRuntimeValidateDelete(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	validator := &TrainingRuntimeValidator{}
+	obj := testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj()
+	warnings, err := validator.ValidateDelete(ctx, obj)
+	if err != nil {
+		t.Fatalf("ValidateDelete() unexpected error: %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("ValidateDelete() warnings = %v, want nil", warnings)
 	}
 }

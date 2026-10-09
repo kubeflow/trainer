@@ -79,3 +79,70 @@ func TestClusterTrainingRuntimeValidateCreate(t *testing.T) {
 		})
 	}
 }
+
+func TestClusterTrainingRuntimeValidateUpdate(t *testing.T) {
+	cases := map[string]struct {
+		oldObj    *trainer.ClusterTrainingRuntime
+		newObj    *trainer.ClusterTrainingRuntime
+		wantError bool
+	}{
+		"valid update succeeds": {
+			oldObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj(),
+			newObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: func() jobsetv1alpha2.JobSetSpec {
+							js := testingutil.MakeJobSetWrapper("", "")
+							js.Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node)
+							return js.Obj().Spec
+						}(),
+					},
+				}).Obj(),
+			wantError: false,
+		},
+		"invalid update with invalid replicas fails": {
+			oldObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj(),
+			newObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: func() jobsetv1alpha2.JobSetSpec {
+							js := testingutil.MakeJobSetWrapper("", "")
+							js.Replicas(2, constants.DatasetInitializer, constants.ModelInitializer, constants.Node)
+							return js.Obj().Spec
+						}(),
+					},
+				}).Obj(),
+			wantError: true,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			validator := &ClusterTrainingRuntimeValidator{}
+			warnings, err := validator.ValidateUpdate(ctx, tc.oldObj, tc.newObj)
+			if (err != nil) != tc.wantError {
+				t.Fatalf("ValidateUpdate() error = %v, wantError = %v", err, tc.wantError)
+			}
+			if len(warnings) != 0 {
+				t.Errorf("ValidateUpdate() warnings = %v, want nil", warnings)
+			}
+		})
+	}
+}
+
+func TestClusterTrainingRuntimeValidateDelete(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	validator := &ClusterTrainingRuntimeValidator{}
+	obj := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj()
+	warnings, err := validator.ValidateDelete(ctx, obj)
+	if err != nil {
+		t.Fatalf("ValidateDelete() unexpected error: %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("ValidateDelete() warnings = %v, want nil", warnings)
+	}
+}
