@@ -618,24 +618,24 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				return job
 			},
 		},
-		"create all trials concurrently for high parallelTrials": {
+		"create all trials at the CRD maximum": {
 			getInitObjects: func() []client.Object {
 				job := getBaseOptJob()
-				job.Spec.NumTrials = 500
-				job.Spec.ParallelTrials = 500
+				job.Spec.NumTrials = 100
+				job.Spec.ParallelTrials = 100
 				return []client.Object{job, optDeploy, optSvc}
 			},
 			searchAlgorithmClient: &mockSearchAlgorithmClient{
-				mockedAssignments: makeDistinctAssignments(500),
+				mockedAssignments: makeDistinctAssignments(100),
 			},
-			wantRequestNumber:   500,
+			wantRequestNumber:   100,
 			wantSuggestionCalls: 1,
-			wantTrainJobs:       500,
-			wantTrainJobParams:  makeWantTrialParams(500),
+			wantTrainJobs:       100,
+			wantTrainJobParams:  makeWantTrialParams(100),
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
-				job.Spec.NumTrials = 500
-				job.Spec.ParallelTrials = 500
+				job.Spec.NumTrials = 100
+				job.Spec.ParallelTrials = 100
 				job.Status = &trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -1297,16 +1297,23 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 
 func TestCreateTrainJobs(t *testing.T) {
 	cases := map[string]struct {
-		trialsToSpawn      int32
-		cancelCtx          bool
-		failCreateTrainJob bool
-		wantErrContains    string
-		wantErrCount       int
-		wantTrainJobs      int
+		trialsToSpawn int32
+		// returnedSuggestions is how many suggestions the search algorithm returns; defaults to trialsToSpawn.
+		returnedSuggestions int
+		cancelCtx           bool
+		failCreateTrainJob  bool
+		wantErrContains     string
+		wantErrCount        int
+		wantTrainJobs       int
 	}{
 		"create every requested trial": {
 			trialsToSpawn: 50,
 			wantTrainJobs: 50,
+		},
+		"create only trialsToSpawn trials when the search algorithm returns more suggestions": {
+			trialsToSpawn:       3,
+			returnedSuggestions: 5,
+			wantTrainJobs:       3,
 		},
 		"aggregate errors from every failed trial": {
 			trialsToSpawn:      3,
@@ -1330,6 +1337,10 @@ func TestCreateTrainJobs(t *testing.T) {
 			_ = trainer.AddToScheme(testScheme)
 			baseCli := utiltesting.NewClientBuilder().WithScheme(testScheme).Build()
 
+			returnedSuggestions := int(tc.trialsToSpawn)
+			if tc.returnedSuggestions > 0 {
+				returnedSuggestions = tc.returnedSuggestions
+			}
 			r := &OptimizationJobReconciler{
 				Client: &mockFailingClient{
 					Client:             baseCli,
@@ -1338,7 +1349,7 @@ func TestCreateTrainJobs(t *testing.T) {
 				Scheme:   testScheme,
 				Recorder: &events.FakeRecorder{},
 				SearchAlgorithmClient: &mockSearchAlgorithmClient{
-					mockedAssignments: makeDistinctAssignments(int(tc.trialsToSpawn)),
+					mockedAssignments: makeDistinctAssignments(returnedSuggestions),
 				},
 			}
 
