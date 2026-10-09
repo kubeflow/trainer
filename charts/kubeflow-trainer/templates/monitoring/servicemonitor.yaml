@@ -35,14 +35,13 @@ spec:
     - port: monitoring-port
       scheme: {{ if .Values.manager.config.metrics.secureServing }}https{{ else }}http{{ end }}
       {{- if .Values.manager.config.metrics.auth.enabled }}
-      {{- if .Values.serviceMonitor.authorization.credentials.name }}
+      {{- if not .Values.serviceMonitor.authorization.credentials.name }}
+      {{- fail "serviceMonitor.authorization.credentials.name is required when metrics authentication is enabled" }}
+      {{- end }}
       authorization:
         credentials:
           name: {{ .Values.serviceMonitor.authorization.credentials.name | quote }}
           key: {{ .Values.serviceMonitor.authorization.credentials.key | default "token" | quote }}
-      {{- else }}
-      bearerTokenFile: {{ .Values.serviceMonitor.bearerTokenFile | quote }}
-      {{- end }}
       {{- end }}
       {{- if .Values.manager.config.metrics.secureServing }}
       tlsConfig:

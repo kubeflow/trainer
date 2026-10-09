@@ -97,8 +97,8 @@ manager:
 
 Set `manager.config.metrics.auth.enabled=true` to require Kubernetes RBAC authentication for the metrics endpoint.
 When `serviceMonitor.enabled=true`, the Prometheus ServiceAccount must be allowed to access `/metrics` in the
-Trainer namespace. Configure that permission in the Prometheus deployment and, when needed, provide its bearer token
-through `serviceMonitor.authorization.credentials`.
+Trainer namespace. Configure that permission in the Prometheus deployment and provide the token Secret through
+`serviceMonitor.authorization.credentials`.
 
 ## Values
 
@@ -137,8 +137,7 @@ through `serviceMonitor.authorization.credentials`.
 | manager.config.statusServer.burst | int | `10` | Burst rate limit for the TrainJob Status Server api client |
 | serviceMonitor.enabled | bool | `false` | Whether to create a Prometheus Operator ServiceMonitor. |
 | serviceMonitor.labels | object | `{}` | Additional labels for selecting this ServiceMonitor from Prometheus. |
-| serviceMonitor.bearerTokenFile | string | `"/var/run/secrets/kubernetes.io/serviceaccount/token"` | Bearer token path used when metrics authentication is enabled. This is used only when authorization.credentials.name is empty. |
-| serviceMonitor.authorization | object | `{"credentials":{"key":"token","name":""}}` | Secret-based authorization for authenticated metrics scraping. The Secret must be available in the ServiceMonitor namespace and readable by Prometheus. |
+| serviceMonitor.authorization | object | `{"credentials":{"key":"token","name":""}}` | Secret-based authorization for authenticated metrics scraping. The Secret is required when metrics authentication is enabled and must be available in the ServiceMonitor namespace and readable by Prometheus. |
 | serviceMonitor.tlsConfig | object | `{"ca":{"secret":{"key":"ca.crt","name":""}},"serverName":""}` | TLS settings for the ServiceMonitor. Empty values use the Trainer defaults. |
 | webhook.failurePolicy | string | `"Fail"` | Specifies how unrecognized errors are handled. Available options are `Ignore` or `Fail`. |
 | dataCache.enabled | bool | `false` | Enable/disable data cache support (LWS dependency, ClusterRole). Set to `true` to install data cache components. |

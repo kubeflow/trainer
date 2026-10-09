@@ -57,17 +57,13 @@ tests:
           path: spec.endpoints[0].tlsConfig.serverName
           value: kubeflow-trainer-controller-manager.kubeflow-system.svc
 
-  - it: Should configure bearer-token authentication when enabled
+  - it: Should require Secret credentials when authentication is enabled
     set:
       serviceMonitor.enabled: true
       manager.config.metrics.auth.enabled: true
     asserts:
-      - equal:
-          path: spec.endpoints[0].scheme
-          value: https
-      - equal:
-          path: spec.endpoints[0].bearerTokenFile
-          value: /var/run/secrets/kubernetes.io/serviceaccount/token
+      - failedTemplate:
+          errorMessage: "serviceMonitor.authorization.credentials.name is required when metrics authentication is enabled"
 
   - it: Should support Prometheus selector labels and Secret credentials
     set:
