@@ -10,7 +10,7 @@ Run a comprehensive pull request review using multiple specialized agents, each 
 
 In the review body message keep it minimal: thank the contributor for their work and note that the review was done using AI tools. Do not include summaries or aggregated findings in the review body — only post inline comments on specific lines.
 
-Keep the inline comment text boxes small with suggestions or action items user needs to perform to improve PR.
+Keep inline comments concise, respectful, and actionable. Assume good intent and explain why a change matters without scolding or exaggerating severity. Use an encouraging tone, especially for new contributors, so they feel welcome to contribute again.
 
 **Prefer GitHub suggestions over prose comments.** Whenever a finding can be expressed as a concrete code change, post it as a committable GitHub `suggestion` block so the author can apply it in one click — do NOT describe the change in words. See [Comment Format: Prefer Suggestions](#comment-format-prefer-suggestions) for the mechanics. Only fall back to a plain prose comment when a suggestion is not feasible (see that section for when).
 
