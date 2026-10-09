@@ -21,6 +21,16 @@ RUN apt update && apt install -y --no-install-recommends \
     g++ libopenmpi-dev \
     python3-dev pip && rm -f /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python && rm -rf /var/lib/apt/lists/*
 
+RUN printf '%s\n' \
+      '#!/bin/sh' \
+      'MAX=${MPIRUN_MAX_NOFILE:-65536}' \
+      'if [ "$(ulimit -n)" -gt "$MAX" ]; then ulimit -n "$MAX"; fi' \
+      'exec /usr/bin/"$(basename "$0")" "$@"' \
+      > /usr/local/bin/mpirun \
+  && chmod 0755 /usr/local/bin/mpirun \
+  && ln -s mpirun /usr/local/bin/mpiexec \
+  && [ "$(command -v mpirun)" = /usr/local/bin/mpirun ]
+
 # Configure mpiuser and home directory.
 RUN useradd -m mpiuser
 WORKDIR /home/mpiuser
