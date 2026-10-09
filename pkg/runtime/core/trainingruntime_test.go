@@ -2278,14 +2278,16 @@ func (p *fakeWatchExtensionPlugin) ReconcilerBuilders() []jobruntimes.Reconciler
 }
 
 // fakePluginRegistry returns a Registry with one fakeWatchExtensionPlugin per entry in watchBuilderIDs,
-// whose ReconcilerBuilders record their ID in invokedBuilderIDs when called, and optionally statusPlugin.
+// whose ReconcilerBuilders record their ID in invokedBuilderIDs (when non-nil) when called, and optionally statusPlugin.
 func fakePluginRegistry(watchBuilderIDs map[string][]string, invokedBuilderIDs *[]string, statusPlugin framework.Plugin) fwkplugins.Registry {
 	registry := fwkplugins.Registry{}
 	for pluginName, builderIDs := range watchBuilderIDs {
 		plugin := &fakeWatchExtensionPlugin{name: pluginName}
 		for _, id := range builderIDs {
 			plugin.builders = append(plugin.builders, func(b *builder.Builder, _ client.Client, _ cache.Cache) *builder.Builder {
-				*invokedBuilderIDs = append(*invokedBuilderIDs, id)
+				if invokedBuilderIDs != nil {
+					*invokedBuilderIDs = append(*invokedBuilderIDs, id)
+				}
 				return b
 			})
 		}
