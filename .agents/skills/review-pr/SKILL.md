@@ -190,7 +190,7 @@ In these cases, post a small prose comment with a clear action item instead of a
 
 **code-reviewer**:
 
-- Checks CLAUDE.md compliance
+- Checks AGENTS.md compliance
 - Detects bugs and issues
 - Reviews general code quality
 
