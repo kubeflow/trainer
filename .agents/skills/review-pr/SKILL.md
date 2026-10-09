@@ -16,6 +16,37 @@ Keep inline comments concise, respectful, and actionable. Assume good intent and
 
 Before posting on GitHub ALWAYS print all proposed comments and the organized summary in the terminal for human review. The summary is for local reference only and must NOT be posted to GitHub.
 
+Post the review as a **pending** GitHub review. Never submit it yourself: the user inspects the draft and submits it in GitHub. See [Posting the Review](#posting-the-review).
+
+## Posting the Review
+
+Create the review with the [create-a-review API](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request) and **omit the `event` field**. Without `event`, GitHub creates the review in the `PENDING` state, which is visible only to the user until they submit it.
+
+```bash
+gh api repos/{owner}/{repo}/pulls/{pull_number}/reviews --method POST --input review.json
+```
+
+Where `review.json` contains:
+
+```json
+{
+  "commit_id": "<head commit SHA of the PR>",
+  "body": "Thanks for your work on this! This review was performed using AI tools.",
+  "comments": [
+    {
+      "path": "pkg/foo/bar.go",
+      "line": 42,
+      "side": "RIGHT",
+      "body": "<comment text or suggestion block>"
+    }
+  ]
+}
+```
+
+- Do NOT set `event` (`APPROVE`, `REQUEST_CHANGES`, or `COMMENT`) and do NOT call the submit-review endpoint.
+- GitHub allows only one pending review per user per PR. If the request fails because a pending review already exists, stop and ask the user whether to delete it or add to it.
+- After the review is created, print its `html_url` and tell the user to open the PR's **Files changed** tab, adjust or remove comments as needed, and submit the review there.
+
 ## Comment Format: Prefer Suggestions
 
 The default and preferred format for every actionable inline comment is a GitHub suggested change. A suggestion renders a "Commit suggestion" button, so the author applies the fix without hand-editing.
@@ -133,6 +164,11 @@ In these cases, post a small prose comment with a clear action item instead of a
    3. Consider suggestions
    4. Re-run review after fixes
    ```
+
+8. **Post a Pending Review**
+
+   For a PR, create a pending GitHub review with the inline comments as described in
+   [Posting the Review](#posting-the-review), then share its link so the user can submit it.
 
 ## Usage Examples:
 

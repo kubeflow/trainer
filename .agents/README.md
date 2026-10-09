@@ -12,8 +12,9 @@ Shared resources for AI coding agents working on Kubeflow Trainer.
 
 ## review-pr
 
-Runs a comprehensive pull request review using specialized subagents, prints the proposed inline
-comments locally for human approval, and only then posts them to GitHub.
+Runs a comprehensive pull request review using specialized subagents and posts the inline comments
+as a pending GitHub review. Pending reviews are visible only to you: inspect the draft in the PR's
+**Files changed** tab, edit or remove comments, and submit it yourself.
 
 ```
 skills/review-pr/
