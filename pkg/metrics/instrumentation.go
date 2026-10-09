@@ -33,53 +33,8 @@ import (
 	controllerMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	trainjobutil "github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
-
-const (
-	metricNamespace = "kubeflow_trainer"
-	unknownValue    = "unknown"
-
-	trainingRuntimeKind        = "TrainingRuntime"
-	clusterTrainingRuntimeKind = "ClusterTrainingRuntime"
-)
-
-var (
-	trainJobCreated = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: metricNamespace,
-		Name:      "trainjob_created_total",
-		Help:      "Number of TrainJobs observed after the initial cache listing.",
-	}, []string{"namespace", "runtime_ref"})
-	trainJobFinished = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: metricNamespace,
-		Name:      "trainjob_finished_total",
-		Help:      "Number of TrainJobs that reached a terminal outcome.",
-	}, []string{"result", "reason", "runtime_ref"})
-	trainJobLifetime = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: metricNamespace,
-		Name:      "trainjob_lifetime_seconds",
-		Help:      "Time from TrainJob creation to its terminal outcome.",
-	}, []string{"result", "runtime_ref"})
-	trainJobRequestedAccelerators = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: metricNamespace,
-		Name:      "trainjob_requested_accelerators",
-		Help:      "Accelerators requested per TrainJob training node.",
-	}, []string{"accelerator_class", "runtime_ref"})
-	trainJobRequestedTrainingNodes = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: metricNamespace,
-		Name:      "trainjob_requested_training_nodes_per_job",
-		Help:      "Training nodes requested by each TrainJob.",
-	}, []string{"runtime_ref"})
-)
-
-func init() {
-	controllerMetrics.Registry.MustRegister(
-		trainJobCreated,
-		trainJobFinished,
-		trainJobLifetime,
-		trainJobRequestedAccelerators,
-		trainJobRequestedTrainingNodes,
-	)
-}
 
 // trainerMetrics observes TrainJob events and records event-based metrics. It
 // intentionally does not retain TrainJob state: counters and histograms are
@@ -97,6 +52,8 @@ func newTrainerMetrics(cli client.Client) *trainerMetrics {
 }
 
 func (m *trainerMetrics) installObserver(c cache.Cache) error {
+	// Skip the cache sync wait to avoid delaying status server startup and
+	// causing liveness probe failures. onAdd ignores initial-list objects.
 	informer, err := c.GetInformer(context.Background(), &trainer.TrainJob{}, cache.BlockUntilSynced(false))
 	if err != nil {
 		return fmt.Errorf("get TrainJob informer: %w", err)
@@ -117,27 +74,21 @@ func (m *trainerMetrics) onAdd(obj any, isInInitialList bool) {
 	if !ok || isInInitialList {
 		return
 	}
-	runtimeRef := runtimeReference(trainJob)
+	runtimeRef := runtimeRefLabel(trainJob)
 	trainJobCreated.WithLabelValues(trainJob.Namespace, runtimeRef).Inc()
 	m.observeRequestedWorkload(trainJob, runtimeRef)
-	if isTerminal(trainJob) {
-		m.observeTerminal(trainJob, runtimeRef)
-	}
 }
 
 func (m *trainerMetrics) onUpdate(oldObj, newObj any) {
 	oldJob, oldOK := oldObj.(*trainer.TrainJob)
 	newJob, newOK := newObj.(*trainer.TrainJob)
-	if !oldOK || !newOK || isTerminal(oldJob) || !isTerminal(newJob) {
+	if !oldOK || !newOK || trainjobutil.IsTrainJobFinished(oldJob) || !trainjobutil.IsTrainJobFinished(newJob) {
 		return
 	}
-	m.observeTerminal(newJob, runtimeReference(newJob))
+	m.observeTerminal(newJob, runtimeRefLabel(newJob))
 }
 
-func (m *trainerMetrics) onDelete(obj any) {
-	// Deletions do not affect the event-based metrics currently exposed.
-	_, _ = obj.(*trainer.TrainJob)
-}
+func (m *trainerMetrics) onDelete(any) {}
 
 func (m *trainerMetrics) observeTerminal(trainJob *trainer.TrainJob, runtimeRef string) {
 	condition := terminalCondition(trainJob)
@@ -302,7 +253,7 @@ func registerTrainerCollectors(reg prometheus.Registerer, m *trainerMetrics) err
 	return nil
 }
 
-func runtimeReference(trainJob *trainer.TrainJob) string {
+func runtimeRefLabel(trainJob *trainer.TrainJob) string {
 	group := ptr.Deref(trainJob.Spec.RuntimeRef.APIGroup, trainer.GroupVersion.Group)
 	kind := ptr.Deref(trainJob.Spec.RuntimeRef.Kind, clusterTrainingRuntimeKind)
 	namespace := ""
@@ -310,11 +261,6 @@ func runtimeReference(trainJob *trainer.TrainJob) string {
 		namespace = trainJob.Namespace
 	}
 	return fmt.Sprintf("%s/%s/%s/%s", group, kind, namespace, trainJob.Spec.RuntimeRef.Name)
-}
-
-func isTerminal(trainJob *trainer.TrainJob) bool {
-	return meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobFailed) ||
-		meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobComplete)
 }
 
 func terminalCondition(trainJob *trainer.TrainJob) metav1.Condition {
