@@ -48,7 +48,7 @@ var (
 	trainJobRequestedAccelerators = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: metricNamespace,
 		Name:      "trainjob_requested_accelerators",
-		Help:      "Accelerators requested per TrainJob training node.",
+		Help:      "Accelerators requested per TrainJob.",
 	}, []string{"accelerator_class", "runtime_ref"})
 	trainJobRequestedTrainingNodes = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: metricNamespace,

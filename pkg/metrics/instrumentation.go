@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	controllerMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	trainjobutil "github.com/kubeflow/trainer/v2/pkg/util/trainjob"
@@ -96,10 +97,7 @@ func (m *trainerMetrics) observeTerminal(trainJob *trainer.TrainJob, runtimeRef 
 	if condition.Type == trainer.TrainJobFailed {
 		result = "failed"
 	}
-	reason := condition.Reason
-	if reason == "" {
-		reason = unknownValue
-	}
+	reason := terminalReason(condition, result)
 	trainJobFinished.WithLabelValues(result, reason, runtimeRef).Inc()
 	if !trainJob.CreationTimestamp.IsZero() && !condition.LastTransitionTime.IsZero() {
 		trainJobLifetime.WithLabelValues(result, runtimeRef).Observe(
@@ -115,10 +113,16 @@ func (m *trainerMetrics) observeRequestedWorkload(trainJob *trainer.TrainJob, ru
 		trainJobRequestedTrainingNodes.WithLabelValues(runtimeRef).Observe(float64(nodes))
 	}
 
+	nodes := int32(1)
+	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
+		nodes = *trainJob.Spec.Trainer.NumNodes
+	} else if requestedNodes := m.requestedNodes(trainJob); requestedNodes >= 0 {
+		nodes = requestedNodes
+	}
 	resources := m.resourcesPerNode(trainJob)
 	observedAccelerator := false
 	for resourceName, quantity := range acceleratorResources(resources) {
-		trainJobRequestedAccelerators.WithLabelValues(string(resourceName), runtimeRef).Observe(float64(quantity.Value()))
+		trainJobRequestedAccelerators.WithLabelValues(string(resourceName), runtimeRef).Observe(float64(quantity.Value() * int64(nodes)))
 		observedAccelerator = true
 	}
 	if !observedAccelerator {
@@ -237,22 +241,6 @@ func setupTrainerMetrics(mgr ctrl.Manager) error {
 	return m.installObserver(mgr.GetCache())
 }
 
-func registerTrainerCollectors(reg prometheus.Registerer, m *trainerMetrics) error {
-	for _, collector := range []prometheus.Collector{
-		m.runtimeInfo,
-		trainJobCreated,
-		trainJobFinished,
-		trainJobLifetime,
-		trainJobRequestedAccelerators,
-		trainJobRequestedTrainingNodes,
-	} {
-		if err := reg.Register(collector); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func runtimeRefLabel(trainJob *trainer.TrainJob) string {
 	group := ptr.Deref(trainJob.Spec.RuntimeRef.APIGroup, trainer.GroupVersion.Group)
 	kind := ptr.Deref(trainJob.Spec.RuntimeRef.Kind, clusterTrainingRuntimeKind)
@@ -261,6 +249,18 @@ func runtimeRefLabel(trainJob *trainer.TrainJob) string {
 		namespace = trainJob.Namespace
 	}
 	return fmt.Sprintf("%s/%s/%s/%s", group, kind, namespace, trainJob.Spec.RuntimeRef.Name)
+}
+
+func terminalReason(condition metav1.Condition, result string) string {
+	if result == "succeeded" {
+		return "none"
+	}
+	switch condition.Reason {
+	case trainer.TrainJobRuntimeNotSupportedReason, trainer.TrainJobDeadlineExceededReason, jobsetconsts.FailedJobsReason:
+		return condition.Reason
+	default:
+		return "other"
+	}
 }
 
 func terminalCondition(trainJob *trainer.TrainJob) metav1.Condition {

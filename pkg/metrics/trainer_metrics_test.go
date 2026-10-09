@@ -29,9 +29,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/cache/informertest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	controllerMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 )
@@ -89,6 +93,30 @@ kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="ClusterTrai
 			}
 			assertMetric(t, reg, test.want, "kubeflow_trainer_runtime_info")
 		})
+	}
+}
+
+func TestSetupTrainerMetricsRegistersRuntimeCollector(t *testing.T) {
+	previousRegistry := controllerMetrics.Registry
+	t.Cleanup(func() { controllerMetrics.Registry = previousRegistry })
+	controllerMetrics.Registry = prometheus.NewRegistry()
+
+	scheme := newMetricsScheme(t)
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(&trainer.TrainingRuntime{
+		ObjectMeta: metav1.ObjectMeta{Name: "torch", Namespace: "team-a"},
+	}).Build()
+	fakeCache := &informertest.FakeInformers{Scheme: scheme}
+	mgr := &metricsTestManager{client: cli, cache: fakeCache}
+	if err := setupTrainerMetrics(mgr); err != nil {
+		t.Fatalf("setup Trainer metrics: %v", err)
+	}
+
+	want := `# HELP kubeflow_trainer_runtime_info Current TrainingRuntime and ClusterTrainingRuntime resources.
+# TYPE kubeflow_trainer_runtime_info gauge
+kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRuntime",ml_policy="none",name="torch",namespace="team-a",pod_group_policy="none"} 1
+`
+	if err := testutil.GatherAndCompare(controllerMetrics.Registry, strings.NewReader(want), "kubeflow_trainer_runtime_info"); err != nil {
+		t.Fatalf("unexpected runtime metrics: %v", err)
 	}
 }
 
@@ -212,8 +240,12 @@ func TestTrainJobUpdate(t *testing.T) {
 					conditionType = trainer.TrainJobFailed
 					result = "failed"
 				}
+				reason := "Completed"
+				if test.failed {
+					reason = jobsetconsts.FailedJobsReason
+				}
 				updated.Status.Conditions = []metav1.Condition{{
-					Type: conditionType, Status: metav1.ConditionTrue, Reason: "Completed",
+					Type: conditionType, Status: metav1.ConditionTrue, Reason: reason,
 					LastTransitionTime: metav1.NewTime(time.Unix(1060, 0)),
 				}}
 				m.onUpdate(job, updated)
@@ -221,7 +253,7 @@ func TestTrainJobUpdate(t *testing.T) {
 					m.onUpdate(updated, updated.DeepCopy())
 				}
 				runtimeRef := runtimeRefLabel(job)
-				if got := testutil.ToFloat64(trainJobFinished.WithLabelValues(result, "Completed", runtimeRef)); got != test.wantFinished {
+				if got := testutil.ToFloat64(trainJobFinished.WithLabelValues(result, terminalReason(updated.Status.Conditions[0], result), runtimeRef)); got != test.wantFinished {
 					t.Fatalf("finished counter = %v, want %v", got, test.wantFinished)
 				}
 				reg := prometheus.NewRegistry()
@@ -259,7 +291,7 @@ func TestTrainJobAddRecordsAcceleratorClass(t *testing.T) {
 	assertHistogramObservation(t, reg, "kubeflow_trainer_trainjob_requested_accelerators", map[string]string{
 		"accelerator_class": "nvidia.com/gpu",
 		"runtime_ref":       runtimeRefLabel(job),
-	}, 1, 2)
+	}, 1, 4)
 }
 
 func resetMetrics(t *testing.T) {
@@ -271,6 +303,32 @@ func resetMetrics(t *testing.T) {
 	trainJobRequestedTrainingNodes.Reset()
 }
 
+type metricsTestManager struct {
+	ctrl.Manager
+	client client.Client
+	cache  cache.Cache
+}
+
+func (m *metricsTestManager) GetClient() client.Client { return m.client }
+
+func (m *metricsTestManager) GetCache() cache.Cache { return m.cache }
+
+func registerTrainerCollectors(reg prometheus.Registerer, m *trainerMetrics) error {
+	for _, collector := range []prometheus.Collector{
+		m.runtimeInfo,
+		trainJobCreated,
+		trainJobFinished,
+		trainJobLifetime,
+		trainJobRequestedAccelerators,
+		trainJobRequestedTrainingNodes,
+	} {
+		if err := reg.Register(collector); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func withRuntime(job *trainer.TrainJob, name string) *trainer.TrainJob {
 	job.Spec.RuntimeRef.Name = name
 	return job
@@ -279,6 +337,13 @@ func withRuntime(job *trainer.TrainJob, name string) *trainer.TrainJob {
 func assertMetric(t *testing.T, reg *prometheus.Registry, want, name string) {
 	t.Helper()
 	if want == "" {
+		families, err := reg.Gather()
+		if err != nil {
+			t.Fatalf("gather %s metrics: %v", name, err)
+		}
+		if len(families) != 0 {
+			t.Fatalf("expected no metrics, got %d families", len(families))
+		}
 		return
 	}
 	if err := testutil.GatherAndCompare(reg, strings.NewReader(want), name); err != nil {
