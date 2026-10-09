@@ -97,8 +97,8 @@ manager:
 
 Set `manager.config.metrics.auth.enabled=true` to require Kubernetes RBAC authentication for the metrics endpoint.
 When `serviceMonitor.enabled=true`, the Prometheus ServiceAccount must be allowed to access `/metrics` in the
-Trainer namespace. Configure that permission in the Prometheus deployment and provide the token Secret through
-`serviceMonitor.authorization.credentials`.
+Trainer namespace. Configure a ClusterRole rule for the `/metrics` non-resource URL with the `get` verb, bind it to
+the Prometheus ServiceAccount, and provide the token Secret through `serviceMonitor.authorization.credentials`.
 
 ## Values
 
