@@ -25,6 +25,7 @@ import (
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -561,6 +562,15 @@ func TestOptionalTrainerFields(t *testing.T) {
 			wantFlags:     "-N 3 -n 6",
 			wantViewImage: "example.com/flux-view:test",
 			wantHostlist:  "test-job-node-0-[0-2]",
+		},
+		"GPUs per node are divided across the tasks on the node": {
+			podSetCount: 1,
+			jobTrainer: utiltesting.MakeTrainJobTrainerWrapper().
+				NumProcPerNode(4).
+				Container("image", nil, nil, corev1.ResourceList{"example.com/gpu": resource.MustParse("4")}).
+				Obj(),
+			wantFlags:    "-N 1 -n 4 -g 1",
+			wantHostlist: "test-job-node-0-[0]",
 		},
 	}
 
