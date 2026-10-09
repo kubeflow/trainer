@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Copyright The Kubeflow Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/usr/bin/env bash
 # PreToolUse guard for review-pr skill.
 #
 # Forces a confirmation prompt before any Bash command that PUBLISHES to GitHub
@@ -34,13 +34,17 @@ else
   cmd="$(printf '%s' "$payload" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("tool_input", {}).get("command", ""))')"
 fi
 
+# `gh` followed by any global options (e.g. `--repo owner/repo`, `-R owner/repo`).
+gh_re='gh([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]][^[:space:]]*)?)*[[:space:]]+'
+
 # Commands that write to GitHub. `gh api` is only flagged when it uses a
 # write HTTP method, since it defaults to GET (read-only).
-write_re='gh[[:space:]]+(pr|issue)[[:space:]]+(review|comment|merge|create|edit|close|reopen|ready)'
-write_re+='|gh[[:space:]]+release[[:space:]]+(create|edit|delete)'
-write_re+='|gh[[:space:]]+api[[:space:]].*(--method[[:space:]]+(POST|PATCH|PUT|DELETE)|-X[[:space:]]+(POST|PATCH|PUT|DELETE))'
+write_re="${gh_re}(pr|issue)[[:space:]]+(review|comment|merge|create|edit|close|reopen|ready)"
+write_re+="|${gh_re}release[[:space:]]+(create|edit|delete)"
+write_re+="|${gh_re}api[[:space:]].*(--method([[:space:]]+|=)|-X[[:space:]]*)(POST|PATCH|PUT|DELETE)"
 
-if printf '%s' "$cmd" | grep -Eiq "$write_re"; then
+# Join shell line continuations so options split across lines are matched.
+if printf '%s' "${cmd//$'\\\n'/ }" | grep -Eiq "$write_re"; then
   cat <<'JSON'
 {
   "hookSpecificOutput": {
