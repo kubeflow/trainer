@@ -15,7 +15,7 @@
 suite: Test ServiceMonitor
 
 templates:
-  - monitoring/servicemonitor.yaml
+  - prometheus/servicemonitor.yaml
 
 release:
   name: kubeflow-trainer
