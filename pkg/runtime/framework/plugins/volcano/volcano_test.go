@@ -89,28 +89,33 @@ func TestVolcano(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	createBaseInfo := &runtime.Info{
-		TemplateSpec: runtime.TemplateSpec{
-			ObjApply: jobSetSpecApply,
-			PodSets: []runtime.PodSet{
-				{
-					Name:  "launcher",
-					Count: ptr.To[int32](1),
-					SinglePodRequests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("300m"),
-						corev1.ResourceMemory: resource.MustParse("1Gi"),
+	// newBaseInfo returns a fresh Info so cases do not share PodSet ResourceLists.
+	// Fractional binary quantities (e.g. 0.5Gi) parse into the Dec form of Quantity;
+	// without a DeepCopy before Mul, Build would mutate those shared maps.
+	newBaseInfo := func() *runtime.Info {
+		return &runtime.Info{
+			TemplateSpec: runtime.TemplateSpec{
+				ObjApply: jobSetSpecApply,
+				PodSets: []runtime.PodSet{
+					{
+						Name:  "launcher",
+						Count: ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("300m"),
+							corev1.ResourceMemory: resource.MustParse("1Gi"),
+						},
 					},
-				},
-				{
-					Name:  "worker",
-					Count: ptr.To[int32](4),
-					SinglePodRequests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("500m"),
-						corev1.ResourceMemory: resource.MustParse("0.5Gi"),
+					{
+						Name:  "worker",
+						Count: ptr.To[int32](4),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("0.5Gi"),
+						},
 					},
 				},
 			},
-		},
+		}
 	}
 
 	cases := map[string]struct {
@@ -296,7 +301,7 @@ func TestVolcano(t *testing.T) {
 				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(false)},
 			},
 			info: &runtime.Info{
-				TemplateSpec: createBaseInfo.TemplateSpec,
+				TemplateSpec: newBaseInfo().TemplateSpec,
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
@@ -312,7 +317,7 @@ func TestVolcano(t *testing.T) {
 				},
 			},
 			expectInfo: &runtime.Info{
-				TemplateSpec: createBaseInfo.TemplateSpec,
+				TemplateSpec: newBaseInfo().TemplateSpec,
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
@@ -336,7 +341,7 @@ func TestVolcano(t *testing.T) {
 				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(true)},
 			},
 			info: &runtime.Info{
-				TemplateSpec: createBaseInfo.TemplateSpec,
+				TemplateSpec: newBaseInfo().TemplateSpec,
 				Annotations: map[string]string{
 					"scheduling.volcano.sh/queue-name": "q1",
 				},
@@ -358,7 +363,7 @@ func TestVolcano(t *testing.T) {
 				&volcanov1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "job-update", Namespace: "test-ns"}},
 			},
 			expectInfo: &runtime.Info{
-				TemplateSpec: createBaseInfo.TemplateSpec,
+				TemplateSpec: newBaseInfo().TemplateSpec,
 				Annotations: map[string]string{
 					"scheduling.volcano.sh/queue-name": "q1",
 				},
@@ -522,7 +527,7 @@ func TestVolcano(t *testing.T) {
 				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(false)},
 			},
 			info: &runtime.Info{
-				TemplateSpec: createBaseInfo.TemplateSpec,
+				TemplateSpec: newBaseInfo().TemplateSpec,
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
@@ -534,7 +539,7 @@ func TestVolcano(t *testing.T) {
 			},
 			objs: nil,
 			expectInfo: &runtime.Info{
-				TemplateSpec: createBaseInfo.TemplateSpec,
+				TemplateSpec: newBaseInfo().TemplateSpec,
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
@@ -595,6 +600,11 @@ func TestVolcano(t *testing.T) {
 			objs, err = plugin.(framework.ComponentBuilderPlugin).Build(ctx, c.info, c.trainJob)
 			if diff := gocmp.Diff(c.expectBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)
+			}
+			if c.expectInfo != nil && c.info != nil {
+				if diff := gocmp.Diff(c.expectInfo.TemplateSpec.PodSets, c.info.TemplateSpec.PodSets); len(diff) != 0 {
+					t.Errorf("Build mutated info.TemplateSpec.PodSets (-want, +got):\n%s", diff)
+				}
 			}
 
 			// Convert objects and compare
