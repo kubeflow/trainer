@@ -241,6 +241,10 @@ test-python: ## Run Python unit test.
 	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/pkg/initializers/model
 	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/pkg/initializers/utils
 
+	uv sync --locked --directory ./cmd/search-algorithms/optuna
+	uv run --no-sync --directory ./cmd/search-algorithms/optuna python -m grpc_tools.protoc -I $(PROJECT_DIR) --python_out=$(PROJECT_DIR) --grpc_python_out=$(PROJECT_DIR) $(PROJECT_DIR)/pkg/search_algorithm/optuna/proto/api.proto
+	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/search-algorithms/optuna pytest $(PROJECT_DIR)/pkg/search_algorithm/optuna
+
 .PHONY: test-python-integration
 test-python-integration: ## Run Python integration test.
 	uv sync --locked --no-dev --directory ./cmd/initializers/dataset
