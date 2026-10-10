@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -48,6 +49,8 @@ import (
 	optimizationjob "github.com/kubeflow/trainer/v2/pkg/util/optimizationjob"
 	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
+
+const maxTrainJobCreationWorkers = 16
 
 // SearchAlgorithmClient abstracts the gRPC call so we can mock it in unit tests
 type SearchAlgorithmClient interface {
@@ -370,30 +373,38 @@ func (r *OptimizationJobReconciler) createTrainJobs(ctx context.Context, optJob 
 		return fmt.Errorf("search algorithm returned %d suggestions, requested %d", len(suggestions), trialsToSpawn)
 	}
 
-	// TODO: For scale (ParallelTrials > 1000), implement a WorkQueue pattern to spawn TrainJobs.
-	var errMsgs []string
-	for i, paramAssignments := range suggestions {
-		if int32(i) >= trialsToSpawn {
-			break
-		}
-		newTrainJob, err := r.constructTrainJob(optJob, paramAssignments)
+	suggestions = suggestions[:trialsToSpawn]
+
+	trialErrMsgs := make([]string, len(suggestions))
+	workqueue.ParallelizeUntil(ctx, maxTrainJobCreationWorkers, len(suggestions), func(i int) {
+		newTrainJob, err := r.constructTrainJob(optJob, suggestions[i])
 		if err != nil {
 			msg := fmt.Sprintf("failed to build TrainJob: %v", err)
 			log.Error(err, msg)
-			errMsgs = append(errMsgs, msg)
-			continue
+			trialErrMsgs[i] = msg
+			return
 		}
 		if err := r.Create(ctx, newTrainJob); err != nil {
 			if errors.IsAlreadyExists(err) {
-				continue
+				return
 			}
 			msg := fmt.Sprintf("Failed to create TrainJob trial: %v", err)
 			log.Error(err, msg)
 			r.Recorder.Eventf(optJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "Creating", "%s", msg)
+			trialErrMsgs[i] = msg
+		}
+	})
+
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("trial creation interrupted: %w", err)
+	}
+
+	var errMsgs []string
+	for _, msg := range trialErrMsgs {
+		if msg != "" {
 			errMsgs = append(errMsgs, msg)
 		}
 	}
-
 	if len(errMsgs) > 0 {
 		return fmt.Errorf("errors spawning trials:\n - %s", strings.Join(errMsgs, "\n - "))
 	}
