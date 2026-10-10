@@ -51,6 +51,32 @@ class TestS3Storage:
                 },
                 "auto",
             ),
+            (
+                {
+                    "bucket": "minio-bucket",
+                    "endpoint": "http://minio.minio.svc:9000",
+                    "access_key_id": "minio_key",
+                    "secret_access_key": "minio_secret",
+                },
+                "auto",
+            ),
+            (
+                {
+                    "bucket": "aws-bucket",
+                    "access_key_id": "aws_key",
+                    "secret_access_key": "aws_secret",
+                    "region": "eu-central-1",
+                },
+                "eu-central-1",
+            ),
+            (
+                {
+                    "bucket": "aws-bucket",
+                    "access_key_id": "aws_key",
+                    "secret_access_key": "aws_secret",
+                },
+                None,
+            ),
         ],
     )
     def test_init(self, config, expected_region):
@@ -70,7 +96,12 @@ class TestS3Storage:
 
             # Check required parameters
             assert call_kwargs["bucket"] == config["bucket"]
-            assert call_kwargs["region"] == expected_region
+            if expected_region is None:
+                # Without an endpoint, the region is left to OpenDAL, which resolves it
+                # from AWS_REGION / AWS_DEFAULT_REGION.
+                assert "region" not in call_kwargs
+            else:
+                assert call_kwargs["region"] == expected_region
 
             # Check optional parameters if provided
             for key in ["endpoint", "access_key_id", "secret_access_key"]:

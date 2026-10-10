@@ -60,8 +60,13 @@ class S3Storage(OpenDALStorage):
 
         if region:
             config["region"] = region
-        else:
+        elif endpoint:
+            # S3-compatible endpoints such as MinIO or Cloudflare R2 do not use AWS
+            # regions; "auto" satisfies them without a real region.
             config["region"] = "auto"
+        # Without an endpoint the operator talks to AWS S3, where the region selects
+        # the endpoint and signs requests, so leave it to OpenDAL to resolve it from
+        # AWS_REGION / AWS_DEFAULT_REGION rather than pin the bogus "auto".
 
         if role_arn:
             config["role_arn"] = role_arn
