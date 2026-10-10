@@ -126,6 +126,10 @@ func (r *JAXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if !r.MatchesJobLabels(jaxjob) {
+		return ctrl.Result{}, nil
+	}
+
 	// log := ctrl.LoggerFrom(ctx).WithValues("jaxjob", klog.KObj(&jaxjob))
 	// ctrl.LoggerInto(ctx, log)
 	// log.V(2).Info("Reconciling JAXJob")
@@ -467,6 +471,9 @@ func (r *JAXJobReconciler) IsMasterRole(replicas map[kubeflowv1.ReplicaType]*kub
 // onOwnerCreateFunc modify creation condition.
 func (r *JAXJobReconciler) onOwnerCreateFunc() func(createEvent event.TypedCreateEvent[*kubeflowv1.JAXJob]) bool {
 	return func(e event.TypedCreateEvent[*kubeflowv1.JAXJob]) bool {
+		if !r.MatchesJobLabels(e.Object) {
+			return false
+		}
 		jaxjob := e.Object
 		r.scheme.Default(jaxjob)
 		msg := fmt.Sprintf("JAXJob %s is created.", e.Object.GetName())

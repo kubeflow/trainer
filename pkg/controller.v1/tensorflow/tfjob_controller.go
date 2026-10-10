@@ -127,6 +127,10 @@ func (r *TFJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if !r.MatchesJobLabels(tfjob) {
+		return ctrl.Result{}, nil
+	}
+
 	if manager := r.ManagedByExternalController(tfjob.Spec.RunPolicy.ManagedBy); manager != nil {
 		logger.Info("Skipping TFJob managed by a custom controller", "managed-by", manager)
 		return ctrl.Result{}, nil
@@ -651,6 +655,9 @@ func (r *TFJobReconciler) getPodSlices(tfjob *kubeflowv1.TFJob, replicasNum *int
 // onOwnerCreateFunc modify creation condition.
 func (r *TFJobReconciler) onOwnerCreateFunc() func(createEvent event.TypedCreateEvent[*kubeflowv1.TFJob]) bool {
 	return func(e event.TypedCreateEvent[*kubeflowv1.TFJob]) bool {
+		if !r.MatchesJobLabels(e.Object) {
+			return false
+		}
 		tfJob := e.Object
 		r.Scheme.Default(tfJob)
 		msg := fmt.Sprintf("TFJob %s is created.", e.Object.GetName())

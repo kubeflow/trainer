@@ -132,6 +132,10 @@ func (r *PyTorchJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if !r.MatchesJobLabels(pytorchjob) {
+		return ctrl.Result{}, nil
+	}
+
 	if manager := r.ManagedByExternalController(pytorchjob.Spec.RunPolicy.ManagedBy); manager != nil {
 		logger.Info("Skipping PyTorchJob managed by a custom controller", "managed-by", manager)
 		return ctrl.Result{}, nil
@@ -516,6 +520,9 @@ func (r *PyTorchJobReconciler) GetDefaultContainerPortName() string {
 // onOwnerCreateFunc modify creation condition.
 func (r *PyTorchJobReconciler) onOwnerCreateFunc() func(createEvent event.TypedCreateEvent[*kubeflowv1.PyTorchJob]) bool {
 	return func(e event.TypedCreateEvent[*kubeflowv1.PyTorchJob]) bool {
+		if !r.MatchesJobLabels(e.Object) {
+			return false
+		}
 		pytorchjob := e.Object
 		r.Scheme.Default(pytorchjob)
 		msg := fmt.Sprintf("PyTorchJob %s is created.", e.Object.GetName())
