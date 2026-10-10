@@ -82,11 +82,25 @@ manager:
   # -- Node selector for manager pods.
   nodeSelector: {}
 
-  # -- Affinity for manager pods.
+  # -- Affinity for manager pods. Empty by default, which falls back to a soft (preferred)
+  # pod anti-affinity that spreads manager replicas across different nodes by hostname
+  # (see `trainer.manager.defaultAffinity` in templates/manager/_helpers.tpl). This is a
+  # scheduling preference only: it never blocks a pod from being scheduled, including on a
+  # single-node cluster. Setting any value here fully replaces the default (it is not
+  # merged with it), so your own affinity is used exactly as given.
   affinity: {}
+
+  # -- Topology spread constraints for manager pods. Empty by default (no behavior change).
+  # Useful for spreading replicas across zones/regions in addition to the default
+  # host-level anti-affinity above. See the chart README for an example.
+  topologySpreadConstraints: []
 
   # -- List of node taints to tolerate for manager pods.
   tolerations: []
+
+  # -- Priority class name for manager pods. Empty by default: no PriorityClass is created by
+  # this chart, so the named class must already exist in the cluster.
+  priorityClassName: ""
 
   # -- Environment variables for manager containers.
   env: []
@@ -159,6 +173,14 @@ manager:
       # -- Burst rate limit for the TrainJob Status Server api client
       burst: 10
     featureGates: {}
+
+  # -- PodDisruptionBudget for manager pods. Disabled by default (no behavior change).
+  # Enabling this with `manager.replicas` less than 2 fails the chart: a PDB on a single
+  # replica blocks voluntary node drains and evictions indefinitely.
+  podDisruptionBudget:
+    enabled: false
+    # -- Minimum number of manager pods that must remain available during a voluntary disruption.
+    minAvailable: 1
 
 webhook:
   # -- Specifies how unrecognized errors are handled.

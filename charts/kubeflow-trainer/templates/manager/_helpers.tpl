@@ -59,6 +59,26 @@ Pod annotations for the manager.
 {{- end -}}
 
 {{/*
+Default affinity for the manager Deployment, used when .Values.manager.affinity is empty.
+A soft (preferred) pod anti-affinity that spreads manager replicas across different nodes
+by hostname. This is a scheduling preference only: it never blocks a pod from being
+scheduled, including on a single-node cluster. Kept out of values.yaml (rather than shipped
+as a non-empty default there) so that a user-supplied affinity fully replaces this default
+instead of being deep-merged with it.
+*/}}
+{{- define "trainer.manager.defaultAffinity" -}}
+podAntiAffinity:
+  preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        topologyKey: kubernetes.io/hostname
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/part-of: kubeflow
+            app.kubernetes.io/component: manager
+{{- end -}}
+
+{{/*
 Create the name of the manager deployment.
 */}}
 {{- define "trainer.manager.deployment.name" -}}

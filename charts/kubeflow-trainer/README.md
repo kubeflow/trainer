@@ -106,6 +106,51 @@ manager:
     traffic.sidecar.istio.io/excludeInboundPorts: "9443"
 ```
 
+### High availability
+
+Running more than one manager replica keeps `TrainJob`/`TrainingRuntime` admission available
+through routine disruptions such as node drains, autoscaler scale-down, or preemption. Since
+the webhooks default to `failurePolicy: Fail`, any moment with no Ready manager pod rejects all
+TrainJob and TrainingRuntime creates and updates, so the following settings matter once you run
+more than one replica:
+
+- `manager.affinity` defaults to a soft (preferred) pod anti-affinity that spreads replicas
+  across nodes by hostname. This is a scheduling preference only: it never blocks a pod from
+  being scheduled, including on a single-node cluster. Setting your own `manager.affinity`
+  fully replaces this default.
+- `manager.topologySpreadConstraints` is empty by default. Use it for stricter control over how
+  replicas spread across nodes or zones, for example:
+
+  ```yaml
+  manager:
+    replicas: 2
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: kubeflow-trainer
+            app.kubernetes.io/component: manager
+  ```
+
+- `manager.podDisruptionBudget` is disabled by default. Enabling it with `manager.replicas` less
+  than 2 fails the chart, since a PodDisruptionBudget on a single replica blocks voluntary node
+  drains indefinitely:
+
+  ```yaml
+  manager:
+    replicas: 2
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+  ```
+
+- `manager.priorityClassName` is empty by default. Set it to an existing `PriorityClass` to
+  protect the manager from preemption, for example on clusters where it would otherwise run
+  at default priority alongside higher-priority GPU training workloads. The chart does not
+  create the `PriorityClass` itself.
+
 ## Values
 
 | Key | Type | Default | Description |
@@ -128,8 +173,10 @@ manager:
 | manager.labels | object | `{}` | Extra labels for manager resources (including the Deployment and pods). |
 | manager.volumes | list | `[]` | Volumes for manager pods. |
 | manager.nodeSelector | object | `{}` | Node selector for manager pods. |
-| manager.affinity | object | `{}` | Affinity for manager pods. |
+| manager.affinity | object | `{}` | Affinity for manager pods. Empty by default, which falls back to a soft (preferred) pod anti-affinity that spreads manager replicas across different nodes by hostname (see `trainer.manager.defaultAffinity` in templates/manager/_helpers.tpl). This is a scheduling preference only: it never blocks a pod from being scheduled, including on a single-node cluster. Setting any value here fully replaces the default (it is not merged with it), so your own affinity is used exactly as given. |
+| manager.topologySpreadConstraints | list | `[]` | Topology spread constraints for manager pods. Empty by default (no behavior change). Useful for spreading replicas across zones/regions in addition to the default host-level anti-affinity above. See the chart README for an example. |
 | manager.tolerations | list | `[]` | List of node taints to tolerate for manager pods. |
+| manager.priorityClassName | string | `""` | Priority class name for manager pods. Empty by default: no PriorityClass is created by this chart, so the named class must already exist in the cluster. |
 | manager.env | list | `[]` | Environment variables for manager containers. |
 | manager.envFrom | list | `[]` | Environment variable sources for manager containers. |
 | manager.volumeMounts | list | `[]` | Volume mounts for manager containers. |
@@ -141,6 +188,8 @@ manager:
 | manager.config.statusServer.port | int | `10443` | Port that the TrainJob status server serves on. |
 | manager.config.statusServer.qps | int | `5` | QPS rate limit for the TrainJob Status Server api client |
 | manager.config.statusServer.burst | int | `10` | Burst rate limit for the TrainJob Status Server api client |
+| manager.podDisruptionBudget | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget for manager pods. Disabled by default (no behavior change). Enabling this with `manager.replicas` less than 2 fails the chart: a PDB on a single replica blocks voluntary node drains and evictions indefinitely. |
+| manager.podDisruptionBudget.minAvailable | int | `1` | Minimum number of manager pods that must remain available during a voluntary disruption. |
 | webhook.failurePolicy | string | `"Fail"` | Specifies how unrecognized errors are handled. Available options are `Ignore` or `Fail`. |
 | dataCache.enabled | bool | `false` | Enable/disable data cache support (LWS dependency, ClusterRole). Set to `true` to install data cache components. |
 | dataCache.lws.install | bool | `true` | Whether to install LeaderWorkerSet as a dependency. Set to `false` if LeaderWorkerSet is already installed in the cluster. |
