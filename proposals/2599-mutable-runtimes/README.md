@@ -59,6 +59,8 @@ We propose making the TrainJob only look up the runtime configuration on first r
 * The reconciliation is otherwise unchanged.
 * The snapshot ConfigMap is automatically deleted when the TrainJob is deleted using an `ownerReference` on the ConfigMap.
 
+> Note: the snapshot must capture the **effective** runtime — i.e. after cluster-level `RuntimeDefaults` are merged during runtime resolution (see [KEP-2170](../2170-kubeflow-trainer-v2/README.md#initializer-defaults-via-runtimedefaults)). This ensures a later change to `RuntimeDefaults` does not retroactively affect already-created TrainJobs.
+
 An example ConfigMap is:
 ```yaml
 apiVersion: v1
@@ -192,3 +194,9 @@ Make runtimes immutable via webhook and CRD annotations.
 **Cons**
 - Adds friction to platform admins for maintaining and updating runtimes.
 - Proliferation of similar runtimes that differ only in minor version details.
+
+## Implementation History
+
+- 2026-06-22 Creation date
+- 2026-09-02 Clarified that the snapshot must capture the effective runtime after
+  `RuntimeDefaults` are merged ([KEP-2170](../2170-kubeflow-trainer-v2/README.md#initializer-defaults-via-runtimedefaults))
