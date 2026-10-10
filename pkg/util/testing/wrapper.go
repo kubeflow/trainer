@@ -796,6 +796,54 @@ func (t *TrainJobModelInitializerWrapper) Obj() *trainer.ModelInitializer {
 	return &t.ModelInitializer
 }
 
+type OptimizationJobWrapper struct {
+	trainer.OptimizationJob
+}
+
+func MakeOptimizationJobWrapper(namespace, name string) *OptimizationJobWrapper {
+	return &OptimizationJobWrapper{
+		OptimizationJob: trainer.OptimizationJob{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: trainer.GroupVersion.String(),
+				Kind:       "OptimizationJob",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+			},
+		},
+	}
+}
+
+func (o *OptimizationJobWrapper) Objectives(objectives ...trainer.Objective) *OptimizationJobWrapper {
+	o.Spec.Objectives = objectives
+	return o
+}
+
+func (o *OptimizationJobWrapper) Parameters(parameters ...trainer.Parameter) *OptimizationJobWrapper {
+	o.Spec.Parameters = parameters
+	return o
+}
+
+func (o *OptimizationJobWrapper) NumTrials(numTrials int32) *OptimizationJobWrapper {
+	o.Spec.NumTrials = numTrials
+	return o
+}
+
+func (o *OptimizationJobWrapper) ParallelTrials(parallelTrials int32) *OptimizationJobWrapper {
+	o.Spec.ParallelTrials = parallelTrials
+	return o
+}
+
+func (o *OptimizationJobWrapper) TrainJobTemplate(trainJobTemplate trainer.TrainJobTemplateSpec) *OptimizationJobWrapper {
+	o.Spec.TrainJobTemplate = trainJobTemplate
+	return o
+}
+
+func (o *OptimizationJobWrapper) Obj() *trainer.OptimizationJob {
+	return &o.OptimizationJob
+}
+
 type TrainingRuntimeWrapper struct {
 	trainer.TrainingRuntime
 }
