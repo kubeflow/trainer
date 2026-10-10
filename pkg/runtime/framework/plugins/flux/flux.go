@@ -431,13 +431,16 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	// flux R encode --hosts=${hosts} --cores=0-1 --gpu=0
 	coreSpec := generateRange(int32(tasks), 0)
 	Rspec := fmt.Sprintf("--cores=%s", coreSpec)
-	if gpus > 0 {
-		// gpus is per node while -g is per task, so divide it across the tasks on the node.
-		if tasks > 0 {
-			if gpusPerTask := gpus / int(tasks); gpusPerTask > 0 {
-				flags = fmt.Sprintf("%s -g %d", flags, gpusPerTask)
-			}
+	// gpus is per node while -g is per task, so divide it across the tasks on the node.
+	// Rounding down is intentional: any GPUs left over stay listed in the resource file
+	// but are not requested per task, and -g is omitted when there are more tasks than GPUs.
+	if tasks > 0 && gpus > 0 {
+		gpusPerTask := int64(gpus) / int64(tasks)
+		if gpusPerTask > 0 {
+			flags = fmt.Sprintf("%s -g %d", flags, gpusPerTask)
 		}
+	}
+	if gpus > 0 {
 		gpuSpec := generateRange(int32(gpus), 0)
 		Rspec = fmt.Sprintf("%s --gpu=%s", Rspec, gpuSpec)
 	}
