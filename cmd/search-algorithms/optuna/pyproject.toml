@@ -1,0 +1,18 @@
+[project]
+name = "search-algorithm-optuna"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "grpcio>=1.84.0",
+  "grpcio-health-checking>=1.84.0",
+  "optuna>=5.0.0",
+  "protobuf>=7.35.1",
+]
+
+[dependency-groups]
+dev = [
+  "grpcio-tools>=1.84.0",
+]
+
+[tool.uv]
+package = false
