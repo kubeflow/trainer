@@ -83,6 +83,20 @@ Integrate with Kueue, Slurm Bridge, KAI Scheduler, Coscheduling, and Volcano
 
 :::::
 
+## Observability
+
+:::::{grid} 1 1 2 2
+:gutter: 3
+
+::::{grid-item-card} Controller Metrics
+:link: metrics
+:link-type: doc
+
+Prometheus metrics for runtime inventory, TrainJob activity, and requested workload capacity
+::::
+
+:::::
+
 ----
 
 ```{toctree}
@@ -97,4 +111,5 @@ job-template
 runtime-patches
 extension-framework
 job-scheduling/index
+metrics
 ```

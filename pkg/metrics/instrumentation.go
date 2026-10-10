@@ -1,0 +1,308 @@
+/*
+Copyright The Kubeflow Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package metrics
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	toolscache "k8s.io/client-go/tools/cache"
+	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	controllerMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
+
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	trainjobutil "github.com/kubeflow/trainer/v2/pkg/util/trainjob"
+)
+
+// trainerMetrics observes TrainJob events and records event-based metrics. It
+// intentionally does not retain TrainJob state: counters and histograms are
+// derived from add/update events and current object data.
+type trainerMetrics struct {
+	client      client.Client
+	runtimeInfo *runtimeInfoCollector
+}
+
+func newTrainerMetrics(cli client.Client) *trainerMetrics {
+	return &trainerMetrics{
+		client:      cli,
+		runtimeInfo: newRuntimeInfoCollector(cli),
+	}
+}
+
+func (m *trainerMetrics) installObserver(c cache.Cache) error {
+	// Skip the cache sync wait to avoid delaying status server startup and
+	// causing liveness probe failures. onAdd ignores initial-list objects.
+	informer, err := c.GetInformer(context.Background(), &trainer.TrainJob{}, cache.BlockUntilSynced(false))
+	if err != nil {
+		return fmt.Errorf("get TrainJob informer: %w", err)
+	}
+	_, err = informer.AddEventHandler(toolscache.ResourceEventHandlerDetailedFuncs{
+		AddFunc:    m.onAdd,
+		UpdateFunc: m.onUpdate,
+		DeleteFunc: m.onDelete,
+	})
+	if err != nil {
+		return fmt.Errorf("register TrainJob metrics observer: %w", err)
+	}
+	return nil
+}
+
+func (m *trainerMetrics) onAdd(obj any, isInInitialList bool) {
+	trainJob, ok := obj.(*trainer.TrainJob)
+	if !ok || isInInitialList {
+		return
+	}
+	runtimeRef := runtimeRefLabel(trainJob)
+	trainJobCreated.WithLabelValues(trainJob.Namespace, runtimeRef).Inc()
+	m.observeRequestedWorkload(trainJob, runtimeRef)
+}
+
+func (m *trainerMetrics) onUpdate(oldObj, newObj any) {
+	oldJob, oldOK := oldObj.(*trainer.TrainJob)
+	newJob, newOK := newObj.(*trainer.TrainJob)
+	if !oldOK || !newOK || trainjobutil.IsTrainJobFinished(oldJob) || !trainjobutil.IsTrainJobFinished(newJob) {
+		return
+	}
+	m.observeTerminal(newJob, runtimeRefLabel(newJob))
+}
+
+func (m *trainerMetrics) onDelete(any) {}
+
+func (m *trainerMetrics) observeTerminal(trainJob *trainer.TrainJob, runtimeRef string) {
+	condition := terminalCondition(trainJob)
+	result := "succeeded"
+	if condition.Type == trainer.TrainJobFailed {
+		result = "failed"
+	}
+	reason := terminalReason(condition, result)
+	trainJobFinished.WithLabelValues(result, reason, runtimeRef).Inc()
+	if !trainJob.CreationTimestamp.IsZero() && !condition.LastTransitionTime.IsZero() {
+		trainJobLifetime.WithLabelValues(result, runtimeRef).Observe(
+			condition.LastTransitionTime.Sub(trainJob.CreationTimestamp.Time).Seconds(),
+		)
+	}
+}
+
+func (m *trainerMetrics) observeRequestedWorkload(trainJob *trainer.TrainJob, runtimeRef string) {
+	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
+		trainJobRequestedTrainingNodes.WithLabelValues(runtimeRef).Observe(float64(*trainJob.Spec.Trainer.NumNodes))
+	} else if nodes := m.requestedNodes(trainJob); nodes >= 0 {
+		trainJobRequestedTrainingNodes.WithLabelValues(runtimeRef).Observe(float64(nodes))
+	}
+
+	nodes := int32(1)
+	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
+		nodes = *trainJob.Spec.Trainer.NumNodes
+	} else if requestedNodes := m.requestedNodes(trainJob); requestedNodes >= 0 {
+		nodes = requestedNodes
+	}
+	resources := m.resourcesPerNode(trainJob)
+	observedAccelerator := false
+	for resourceName, quantity := range acceleratorResources(resources) {
+		trainJobRequestedAccelerators.WithLabelValues(string(resourceName), runtimeRef).Observe(float64(quantity.Value() * int64(nodes)))
+		observedAccelerator = true
+	}
+	if !observedAccelerator {
+		trainJobRequestedAccelerators.WithLabelValues("none", runtimeRef).Observe(0)
+	}
+}
+
+func (m *trainerMetrics) runtimeSpec(trainJob *trainer.TrainJob) (*trainer.TrainingRuntimeSpec, error) {
+	if ptr.Deref(trainJob.Spec.RuntimeRef.Kind, clusterTrainingRuntimeKind) == trainingRuntimeKind {
+		runtime := &trainer.TrainingRuntime{}
+		if err := m.client.Get(context.Background(), client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Spec.RuntimeRef.Name}, runtime); err != nil {
+			return nil, err
+		}
+		return &runtime.Spec, nil
+	}
+	runtime := &trainer.ClusterTrainingRuntime{}
+	if err := m.client.Get(context.Background(), client.ObjectKey{Name: trainJob.Spec.RuntimeRef.Name}, runtime); err != nil {
+		return nil, err
+	}
+	return &runtime.Spec, nil
+}
+
+func (m *trainerMetrics) requestedNodes(trainJob *trainer.TrainJob) int32 {
+	if spec, err := m.runtimeSpec(trainJob); err == nil && spec.MLPolicy != nil && spec.MLPolicy.NumNodes != nil {
+		return *spec.MLPolicy.NumNodes
+	}
+	// MLPolicy.NumNodes defaults to one node in the Trainer API.
+	return 1
+}
+
+func (m *trainerMetrics) resourcesPerNode(trainJob *trainer.TrainJob) *corev1.ResourceRequirements {
+	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
+		return trainJob.Spec.Trainer.ResourcesPerNode
+	}
+	spec, err := m.runtimeSpec(trainJob)
+	if err != nil {
+		return nil
+	}
+	for _, replicatedJob := range spec.Template.Spec.ReplicatedJobs {
+		if replicatedJob.Name != "node" && replicatedJob.Template.Labels["trainer.kubeflow.org/trainjob-ancestor-step"] != "trainer" {
+			continue
+		}
+		for _, container := range replicatedJob.Template.Spec.Template.Spec.Containers {
+			if container.Name == "node" {
+				resources := container.Resources
+				return &resources
+			}
+		}
+	}
+	return nil
+}
+
+func acceleratorResources(resources *corev1.ResourceRequirements) corev1.ResourceList {
+	result := corev1.ResourceList{}
+	if resources == nil {
+		return result
+	}
+	for name, quantity := range resources.Requests {
+		if strings.Contains(strings.ToLower(name.String()), "gpu") {
+			result[name] = quantity
+		}
+	}
+	if len(result) == 0 {
+		for name, quantity := range resources.Limits {
+			if strings.Contains(strings.ToLower(name.String()), "gpu") {
+				result[name] = quantity
+			}
+		}
+	}
+	return result
+}
+
+// runtimeInfoCollector derives runtime inventory from the cache-backed client
+// at scrape time and therefore does not retain a second runtime inventory.
+type runtimeInfoCollector struct {
+	client client.Client
+}
+
+func newRuntimeInfoCollector(cli client.Client) *runtimeInfoCollector {
+	return &runtimeInfoCollector{
+		client: cli,
+	}
+}
+
+func (c *runtimeInfoCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- runtimeInfoDesc
+}
+
+func (c *runtimeInfoCollector) Collect(ch chan<- prometheus.Metric) {
+	var runtimes trainer.TrainingRuntimeList
+	if err := c.client.List(context.Background(), &runtimes); err == nil {
+		for i := range runtimes.Items {
+			runtime := &runtimes.Items[i]
+			ch <- prometheus.MustNewConstMetric(runtimeInfoDesc, prometheus.GaugeValue, 1,
+				runtime.Namespace, runtime.Name, trainer.GroupVersion.Group,
+				trainingRuntimeKind, mlPolicyName(runtime.Spec.MLPolicy), podGroupPolicyName(runtime.Spec.PodGroupPolicy))
+		}
+	}
+
+	var clusterRuntimes trainer.ClusterTrainingRuntimeList
+	if err := c.client.List(context.Background(), &clusterRuntimes); err == nil {
+		for i := range clusterRuntimes.Items {
+			runtime := &clusterRuntimes.Items[i]
+			ch <- prometheus.MustNewConstMetric(runtimeInfoDesc, prometheus.GaugeValue, 1,
+				"", runtime.Name, trainer.GroupVersion.Group,
+				clusterTrainingRuntimeKind, mlPolicyName(runtime.Spec.MLPolicy), podGroupPolicyName(runtime.Spec.PodGroupPolicy))
+		}
+	}
+}
+
+func setupTrainerMetrics(mgr ctrl.Manager) error {
+	m := newTrainerMetrics(mgr.GetClient())
+	if err := controllerMetrics.Registry.Register(m.runtimeInfo); err != nil {
+		return fmt.Errorf("register runtime metrics: %w", err)
+	}
+	return m.installObserver(mgr.GetCache())
+}
+
+func runtimeRefLabel(trainJob *trainer.TrainJob) string {
+	group := ptr.Deref(trainJob.Spec.RuntimeRef.APIGroup, trainer.GroupVersion.Group)
+	kind := ptr.Deref(trainJob.Spec.RuntimeRef.Kind, clusterTrainingRuntimeKind)
+	namespace := ""
+	if kind == trainingRuntimeKind {
+		namespace = trainJob.Namespace
+	}
+	return fmt.Sprintf("%s/%s/%s/%s", group, kind, namespace, trainJob.Spec.RuntimeRef.Name)
+}
+
+func terminalReason(condition metav1.Condition, result string) string {
+	if result == "succeeded" {
+		return "none"
+	}
+	switch condition.Reason {
+	case trainer.TrainJobRuntimeNotSupportedReason, trainer.TrainJobDeadlineExceededReason, jobsetconsts.FailedJobsReason:
+		return condition.Reason
+	default:
+		return "other"
+	}
+}
+
+func terminalCondition(trainJob *trainer.TrainJob) metav1.Condition {
+	if condition := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed); condition != nil && condition.Status == metav1.ConditionTrue {
+		return *condition
+	}
+	if condition := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobComplete); condition != nil && condition.Status == metav1.ConditionTrue {
+		return *condition
+	}
+	return metav1.Condition{}
+}
+
+func mlPolicyName(policy *trainer.MLPolicy) string {
+	if policy == nil {
+		return "none"
+	}
+	switch {
+	case policy.Torch != nil:
+		return "torch"
+	case policy.MPI != nil:
+		return "mpi"
+	case policy.Flux != nil:
+		return "flux"
+	case policy.JAX != nil:
+		return "jax"
+	case policy.XGBoost != nil:
+		return "xgboost"
+	default:
+		return unknownValue
+	}
+}
+
+func podGroupPolicyName(policy *trainer.PodGroupPolicy) string {
+	if policy == nil {
+		return "none"
+	}
+	switch {
+	case policy.Coscheduling != nil:
+		return "coscheduling"
+	case policy.Volcano != nil:
+		return "volcano"
+	default:
+		return unknownValue
+	}
+}
