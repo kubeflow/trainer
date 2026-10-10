@@ -1,3 +1,6 @@
+# Always check-out / check-in files with LF line endings.
+* text=auto eol=lf
+
 **/zz_generated.*.go linguist-generated=true
 api/** linguist-generated=true
 pkg/client/** linguist-generated=true

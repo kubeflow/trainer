@@ -416,7 +416,7 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.NumProcPerNode != nil {
 		tasks = *jobTrainer.NumProcPerNode
 	} else {
-		tasks = *info.RuntimePolicy.MLPolicySource.Flux.NumProcPerNode
+		tasks = ptr.Deref(info.RuntimePolicy.MLPolicySource.Flux.NumProcPerNode, 1)
 	}
 	flags = fmt.Sprintf("-N %d -n %d", numNodes, tasks*numNodes)
 

@@ -20,6 +20,9 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    {{- if .Values.crds.keep }}
+    helm.sh/resource-policy: keep
+    {{- end }}
     controller-gen.kubebuilder.io/version: v0.21.0
   name: clustertrainingruntimes.trainer.kubeflow.org
 spec:
@@ -212,6 +215,11 @@ spec:
                         type: object
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: at most one of the fields in [coscheduling volcano] may
+                    be set
+                  rule: '[has(self.coscheduling),has(self.volcano)].filter(x,x==true).size()
+                    <= 1'
               template:
                 description: template for the JobSet which will be used by TrainJob.
                 minProperties: 1

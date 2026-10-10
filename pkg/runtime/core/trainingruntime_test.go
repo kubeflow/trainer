@@ -1395,6 +1395,65 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Obj(),
 			},
 		},
+		"succeeded to build JobSet with Torch values from the Runtime when the TrainJob omits spec.trainer.": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(2).
+							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+								TorchPolicy().
+								Obj(),
+							).
+							Obj(),
+					).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+					NumNodes(2).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
+					Env(constants.Node, constants.Node,
+						[]corev1.EnvVar{
+							{
+								Name:  constants.TorchEnvNumNodes,
+								Value: "2",
+							},
+							{
+								Name:  constants.TorchEnvNumProcPerNode,
+								Value: "1",
+							},
+							{
+								Name: constants.TorchEnvNodeRank,
+								ValueFrom: &corev1.EnvVarSource{
+									FieldRef: &corev1.ObjectFieldSelector{
+										FieldPath: constants.JobCompletionIndexFieldPath,
+									},
+								},
+							},
+							{
+								Name:  constants.TorchEnvMasterAddr,
+								Value: fmt.Sprintf("test-job-%s-0-0.test-job", constants.Node),
+							},
+							{
+								Name:  constants.TorchEnvMasterPort,
+								Value: fmt.Sprintf("%d", constants.ContainerTrainerPort),
+							},
+						}...,
+					).
+					Obj(),
+			},
+		},
 		"succeeded to build JobSet with TorchTune values from the TrainJob": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "torchtune-llama3.3-70b").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "torchtune-llama3.3-70b").Spec).

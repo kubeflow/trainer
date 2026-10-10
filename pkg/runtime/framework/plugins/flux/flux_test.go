@@ -524,7 +524,9 @@ func TestGetOriginalCommand(t *testing.T) {
 func TestOptionalTrainerFields(t *testing.T) {
 	cases := map[string]struct {
 		podSetCount int32
-		jobTrainer  *trainer.Trainer
+		// fluxPolicy overrides the runtime's FluxMLPolicySource; defaults to numProcPerNode=1.
+		fluxPolicy *trainer.FluxMLPolicySource
+		jobTrainer *trainer.Trainer
 		// wantCommand is only asserted when set.
 		wantCommand []string
 		wantFlags   string
@@ -541,6 +543,12 @@ func TestOptionalTrainerFields(t *testing.T) {
 		"num nodes is not set": {
 			podSetCount:  2,
 			jobTrainer:   utiltesting.MakeTrainJobTrainerWrapper().Container("image", []string{"python", "train.py"}, nil, nil).Obj(),
+			wantFlags:    "-N 2 -n 2",
+			wantHostlist: "test-job-node-0-[0-1]",
+		},
+		"numProcPerNode is not set in the runtime and TrainJob": {
+			podSetCount:  2,
+			fluxPolicy:   &trainer.FluxMLPolicySource{},
 			wantFlags:    "-N 2 -n 2",
 			wantHostlist: "test-job-node-0-[0-1]",
 		},
@@ -568,9 +576,9 @@ func TestOptionalTrainerFields(t *testing.T) {
 			info := &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: &trainer.MLPolicySource{
-						Flux: &trainer.FluxMLPolicySource{
+						Flux: cmp.Or(tc.fluxPolicy, &trainer.FluxMLPolicySource{
 							NumProcPerNode: ptr.To[int32](1),
-						},
+						}),
 					},
 				},
 				TemplateSpec: runtime.TemplateSpec{

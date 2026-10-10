@@ -207,7 +207,7 @@ fn collect_literals(expr: &Expr) -> Option<u64> {
             op: _,
             right,
         }) => {
-            if let Expr::Literal(scalar) = &**right {
+            if let Expr::Literal(scalar, _) = &**right {
                 if let ScalarValue::UInt64(Some(val)) = scalar {
                     return Some(*val);
                 }

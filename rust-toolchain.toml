@@ -1,0 +1,10 @@
+# The only Rust code in this repo (pkg/data_cache and pkg/data_cache/test)
+# depends on iceberg / iceberg-datafusion 0.10.x (and fastnum), which require
+# rustc >= 1.94. This file lives at the repo root so the toolchain is resolved
+# regardless of the working directory cargo is invoked from -- the pre-commit
+# `cargo check` hook and `make test-rust` both run cargo from the repo root
+# with `--manifest-path`, and rustup resolves rust-toolchain.toml from the CWD,
+# not the manifest directory. Pinning to `stable` matches CI (setup-rust-toolchain
+# uses `stable`) and the release image (rust:1.97).
+[toolchain]
+channel = "stable"

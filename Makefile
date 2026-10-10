@@ -26,7 +26,7 @@ PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 REPO := github.com/kubeflow/trainer
 TRAINER_CHART_DIR := $(PROJECT_DIR)/charts/kubeflow-trainer
 # Year-less copyright header prepended to generated manifests (controller-gen
-# emits none). Single source of truth shared with the boilerplate verifier.
+# emits none). The shared verifier uses its own templates from kubeflow/testing.
 BOILERPLATE_HEADER := $(PROJECT_DIR)/hack/boilerplate/boilerplate.sh.txt
 HELM_BOILERPLATE_HEADER := $(PROJECT_DIR)/hack/boilerplate/boilerplate.helm.txt
 # Location to install tool binaries
@@ -189,9 +189,12 @@ manifests: controller-gen ## Generate manifests.
 			manifests/base/webhook/manifests.yaml; do \
 		{ cat $(BOILERPLATE_HEADER); echo; cat "$$f"; } > "$$f.tmp" && mv "$$f.tmp" "$$f"; \
 	done
-	# Prepend the Helm license block and wrap the chart CRD templates so
-	# installation can be toggled via `crds.enabled`.
+	# Annotate the chart CRD templates with `helm.sh/resource-policy: keep` (toggled
+	# via `crds.keep`) so that `helm uninstall` does not delete the CRDs and, with
+	# them, every custom resource in the cluster. Then prepend the Helm license block
+	# and wrap the templates so installation can be toggled via `crds.enabled`.
 	for f in $(TRAINER_CHART_DIR)/templates/crd/trainer.kubeflow.org_*.yaml; do \
+		awk '{ print } /^  annotations:$$/ && !done { print "    {{- if .Values.crds.keep }}"; print "    helm.sh/resource-policy: keep"; print "    {{- end }}"; done = 1 }' $$f > $$f.tmp && mv $$f.tmp $$f; \
 		{ cat $(HELM_BOILERPLATE_HEADER); echo; echo '{{- if .Values.crds.enabled }}'; cat $$f; echo '{{- end }}'; } > $$f.tmp && mv $$f.tmp $$f; \
 	done
 
@@ -219,10 +222,6 @@ vet: ## Run go vet against the code.
 golangci-lint: golangci-lint-install golangci-lint-kal ## Run golangci-lint to verify Go files.
 	$(GOLANGCI_LINT) run --timeout 5m $(LINT_PKG)
 	$(GOLANGCI_LINT_KAL) run -v --config $(PROJECT_DIR)/.golangci-kal.yml
-
-.PHONY: verify-boilerplate
-verify-boilerplate: ## Verify copyright boilerplate headers in source files.
-	python3 hack/boilerplate/boilerplate.py --base-ref "$(TARGET_BRANCH)"
 
 # Instructions to run tests.
 .PHONY: test

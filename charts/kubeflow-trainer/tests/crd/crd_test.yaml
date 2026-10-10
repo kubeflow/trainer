@@ -57,6 +57,20 @@ tests:
           kind: CustomResourceDefinition
           name: optimizationjobs.trainer.kubeflow.org
 
+  - it: Should keep the CRDs on helm uninstall by default
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+
+  - it: Should not keep the CRDs on helm uninstall when crds.keep is false
+    set:
+      crds:
+        keep: false
+    asserts:
+      - notExists:
+          path: metadata.annotations["helm.sh/resource-policy"]
+
   - it: Should not render the CRDs when crds.enabled is false
     set:
       crds:

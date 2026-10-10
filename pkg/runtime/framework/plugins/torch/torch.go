@@ -135,11 +135,10 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 
 	// Update envs for Info object.
-	var trainerContainer *runtime.Container
-	if trainJob.Spec.Trainer != nil {
-		if trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
-			apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
-		}
+	// PET_* envs and the trainer port are injected even when spec.trainer is omitted.
+	trainerContainer := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node)
+	if trainerContainer != nil && trainJob.Spec.Trainer != nil {
+		apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
 	}
 
 	petEnvs := []corev1ac.EnvVarApplyConfiguration{
@@ -172,7 +171,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
 		apply.UpsertEnvVars(&trainerContainer.Env, petEnvs...)
 
-		if !slices.Equal(trainJob.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
+		if trainJob.Spec.Trainer == nil || !slices.Equal(trainJob.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
 			apply.UpsertEnvVars(&trainerContainer.Env, masterEnvVars...)
 		} else {
 			// Mutate trainer command for torchtune.

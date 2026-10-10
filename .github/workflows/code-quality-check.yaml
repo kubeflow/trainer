@@ -33,11 +33,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Setup Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: 3.12
-
       - name: Check KubeLinter
         run: make lint-manifests
 
@@ -45,4 +40,4 @@ jobs:
         run: make helm-lint TARGET_BRANCH=${{ github.event.pull_request.base.ref || github.event.repository.default_branch || 'master' }}
 
       - name: Check boilerplate headers
-        run: make verify-boilerplate
+        uses: kubeflow/testing/.github/actions/verify-boilerplate@50eacdea9a3ed831bc5915da43634ec07c02898d # master

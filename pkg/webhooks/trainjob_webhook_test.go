@@ -340,7 +340,7 @@ func TestValidateCreate(t *testing.T) {
 			wantError: field.ErrorList{
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
-					Field: "spec.RuntimeRef",
+					Field: "spec.runtimeRef",
 					BadValue: trainer.RuntimeRef{
 						Name:     "unsupported-runtime",
 						APIGroup: ptr.To(trainer.SchemeGroupVersion.Group),

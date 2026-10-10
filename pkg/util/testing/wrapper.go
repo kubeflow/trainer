@@ -594,6 +594,69 @@ type TrainJobWrapper struct {
 	trainer.TrainJob
 }
 
+// OptimizationJobWrapper provides a fluent builder for OptimizationJob test objects.
+type OptimizationJobWrapper struct {
+	trainer.OptimizationJob
+}
+
+// MakeOptimizationJobWrapper creates an OptimizationJob with the supplied namespace and name.
+func MakeOptimizationJobWrapper(namespace, name string) *OptimizationJobWrapper {
+	return &OptimizationJobWrapper{
+		OptimizationJob: trainer.OptimizationJob{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: trainer.SchemeGroupVersion.String(),
+				Kind:       trainer.OptimizationJobKind,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+			},
+			Spec: trainer.OptimizationJobSpec{},
+		},
+	}
+}
+
+// NumTrials sets the total number of trials to run.
+func (o *OptimizationJobWrapper) NumTrials(numTrials int32) *OptimizationJobWrapper {
+	o.Spec.NumTrials = numTrials
+	return o
+}
+
+// ParallelTrials sets the number of trials to run concurrently.
+func (o *OptimizationJobWrapper) ParallelTrials(parallelTrials int32) *OptimizationJobWrapper {
+	o.Spec.ParallelTrials = parallelTrials
+	return o
+}
+
+// SearchAlgorithm sets the search algorithm configuration.
+func (o *OptimizationJobWrapper) SearchAlgorithm(searchAlgorithm *trainer.SearchAlgorithm) *OptimizationJobWrapper {
+	o.Spec.SearchAlgorithm = searchAlgorithm
+	return o
+}
+
+// Objectives sets the metrics to optimize.
+func (o *OptimizationJobWrapper) Objectives(objectives ...trainer.Objective) *OptimizationJobWrapper {
+	o.Spec.Objectives = objectives
+	return o
+}
+
+// Parameters sets the hyperparameter search spaces.
+func (o *OptimizationJobWrapper) Parameters(parameters ...trainer.Parameter) *OptimizationJobWrapper {
+	o.Spec.Parameters = parameters
+	return o
+}
+
+// TrainJobTemplate sets the template used to create trial TrainJobs.
+func (o *OptimizationJobWrapper) TrainJobTemplate(template trainer.TrainJobTemplateSpec) *OptimizationJobWrapper {
+	o.Spec.TrainJobTemplate = template
+	return o
+}
+
+// Obj returns the constructed OptimizationJob.
+func (o *OptimizationJobWrapper) Obj() *trainer.OptimizationJob {
+	return &o.OptimizationJob
+}
+
 func MakeTrainJobWrapper(namespace, name string) *TrainJobWrapper {
 	return &TrainJobWrapper{
 		TrainJob: trainer.TrainJob{
@@ -794,54 +857,6 @@ func (t *TrainJobModelInitializerWrapper) SecretRef(secretRef corev1.LocalObject
 
 func (t *TrainJobModelInitializerWrapper) Obj() *trainer.ModelInitializer {
 	return &t.ModelInitializer
-}
-
-type OptimizationJobWrapper struct {
-	trainer.OptimizationJob
-}
-
-func MakeOptimizationJobWrapper(namespace, name string) *OptimizationJobWrapper {
-	return &OptimizationJobWrapper{
-		OptimizationJob: trainer.OptimizationJob{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: trainer.GroupVersion.String(),
-				Kind:       "OptimizationJob",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: namespace,
-				Name:      name,
-			},
-		},
-	}
-}
-
-func (o *OptimizationJobWrapper) Objectives(objectives ...trainer.Objective) *OptimizationJobWrapper {
-	o.Spec.Objectives = objectives
-	return o
-}
-
-func (o *OptimizationJobWrapper) Parameters(parameters ...trainer.Parameter) *OptimizationJobWrapper {
-	o.Spec.Parameters = parameters
-	return o
-}
-
-func (o *OptimizationJobWrapper) NumTrials(numTrials int32) *OptimizationJobWrapper {
-	o.Spec.NumTrials = numTrials
-	return o
-}
-
-func (o *OptimizationJobWrapper) ParallelTrials(parallelTrials int32) *OptimizationJobWrapper {
-	o.Spec.ParallelTrials = parallelTrials
-	return o
-}
-
-func (o *OptimizationJobWrapper) TrainJobTemplate(trainJobTemplate trainer.TrainJobTemplateSpec) *OptimizationJobWrapper {
-	o.Spec.TrainJobTemplate = trainJobTemplate
-	return o
-}
-
-func (o *OptimizationJobWrapper) Obj() *trainer.OptimizationJob {
-	return &o.OptimizationJob
 }
 
 type TrainingRuntimeWrapper struct {
@@ -1285,6 +1300,14 @@ func (s *TrainingRuntimeSpecWrapper) PodGroupPolicyCoscheduling(src *trainer.Cos
 			Coscheduling: src,
 		},
 	}
+	return s
+}
+
+func (s *TrainingRuntimeSpecWrapper) PodGroupPolicyVolcano(src *trainer.VolcanoPodGroupPolicySource) *TrainingRuntimeSpecWrapper {
+	if s.PodGroupPolicy == nil {
+		s.PodGroupPolicy = &trainer.PodGroupPolicy{}
+	}
+	s.PodGroupPolicy.Volcano = src
 	return s
 }
 

@@ -82,6 +82,15 @@ const (
 	// {"type": "Suspended", "status": "True", "reason": "Resumed"} condition.
 	TrainJobResumedMessage = "TrainJob is resumed"
 
+	// OptimizationJobComplete is the status condition type indicating all trials finished successfully.
+	OptimizationJobComplete string = "Complete"
+
+	// OptimizationJobFailed is the status condition type indicating the optimization job failed.
+	OptimizationJobFailed string = "Failed"
+
+	// OptimizationJobCreated is the status condition type indicating the Algorithm service is running.
+	OptimizationJobCreated string = "Created"
+
 	// TrainJobDeadlineExceededMessage is the status condition message for the
 	// {"type": "Failed", "reason": "DeadlineExceeded"} condition
 	// when the TrainJob exceeds its ActiveDeadlineSeconds.
@@ -134,6 +143,11 @@ const (
 
 	// MPISSHAuthVolumeName is the volume name for Secret with MPI SSH keys.
 	MPISSHAuthVolumeName string = "mpi-ssh-auth"
+
+	// MPISSHAuthDefaultMountPath is the fallback directory where the MPI SSH keys are mounted
+	// when the MPI policy leaves sshAuthMountPath unset. It must match the kubebuilder default
+	// on MPIMLPolicySource.SSHAuthMountPath.
+	MPISSHAuthDefaultMountPath string = "/root/.ssh"
 
 	// MPISSHPrivateKeyFile is the file name for the private key.
 	MPISSHPrivateKeyFile string = "id_rsa"
@@ -276,6 +290,27 @@ const (
 
 	// XGBoostEnvNumWorker is the env name for the total number of workers.
 	XGBoostEnvNumWorker string = "DMLC_NUM_WORKER"
+
+	// SearchAlgorithmServicePort is the port for the Optuna GRPC service.
+	SearchAlgorithmServicePort int32 = 6789
+
+	// SearchAlgorithmServiceName is the service name used for the Katib gRPC health check.
+	SearchAlgorithmServiceName string = "manager.v1beta1.Suggestion"
+
+	// EnvVarPrefix is the prefix for the Optuna environment variables.
+	EnvVarPrefix string = "KUBEFLOW_TRAINER_OPT_"
+
+	// DefaultSearchAlgorithmImage is the image for the Optuna search algorithm.
+	DefaultSearchAlgorithmImage string = "ghcr.io/kubeflow/katib/suggestion-optuna:v0.19.0"
+
+	// OptimizationJobNameLabel is the label for the OptimizationJob name.
+	OptimizationJobNameLabel string = "trainer.kubeflow.org/optimization-job"
+
+	// OptimizationJobComponentLabel identifies resources belonging to a specific OptimizationJob component.
+	OptimizationJobComponentLabel string = "trainer.kubeflow.org/optimization-job-component"
+
+	// SearchAlgorithmComponent identifies the search algorithm Deployment and Service resources.
+	SearchAlgorithmComponent string = "search-algorithm"
 )
 
 const (
