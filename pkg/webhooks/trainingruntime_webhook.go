@@ -33,8 +33,9 @@ import (
 )
 
 const (
-	rJobReplicasErrorMsg       = "always must be 1"
-	rJobContainerNamesErrorMsg = "must contain the required container for the ancestor: %s"
+	rJobReplicasErrorMsg          = "always must be 1"
+	rJobContainerNamesErrorMsg    = "must contain the required container for the ancestor: %s"
+	rJobPriorityClassNameErrorMsg = "must not be set on this replicatedJob: every Pod in a gang-scheduled TrainJob is scheduled at a single priority, so only the replicatedJob labelled with the %q ancestor may set it"
 )
 
 var (
@@ -69,7 +70,9 @@ func (w *TrainingRuntimeValidator) ValidateCreate(ctx context.Context, obj *trai
 			constants.RuntimeDeprecationPolicyURL,
 		))
 	}
-	return warnings, validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+	allErrs := validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs)
+	allErrs = append(allErrs, validatePriorityClassName(obj.Spec.Template.Spec.ReplicatedJobs)...)
+	return warnings, allErrs.ToAggregate()
 }
 
 func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorList {
@@ -109,6 +112,36 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 				))
 			}
 		}
+	}
+	return allErrs
+}
+
+// validatePriorityClassName ensures that at most one replicatedJob declares a priorityClassName,
+// and that it is the one labelled as the trainer ancestor.
+//
+// A gang-scheduled TrainJob is scheduled as a single unit: the Volcano PodGroup built from these
+// replicatedJobs carries exactly one priorityClassName for the whole gang. Allowing several
+// replicatedJobs to declare different values leaves no well-defined priority for the gang, so the
+// trainer ancestor is taken as the single source of truth and the plugin propagates its value to
+// every Pod template.
+func validatePriorityClassName(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorList {
+	rJobsPath := field.NewPath("spec").
+		Child("template").
+		Child("spec").
+		Child("replicatedJobs")
+	var allErrs field.ErrorList
+	for idx, rJob := range rJobs {
+		if rJob.Template.Spec.Template.Spec.PriorityClassName == "" {
+			continue
+		}
+		if rJob.Template.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer {
+			continue
+		}
+		allErrs = append(allErrs, field.Invalid(
+			rJobsPath.Index(idx).Child("template").Child("spec").Child("template").Child("spec").Child("priorityClassName"),
+			rJob.Template.Spec.Template.Spec.PriorityClassName,
+			fmt.Sprintf(rJobPriorityClassNameErrorMsg, constants.AncestorTrainer),
+		))
 	}
 	return allErrs
 }
