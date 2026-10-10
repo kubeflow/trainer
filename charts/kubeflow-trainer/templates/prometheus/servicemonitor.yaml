@@ -1,0 +1,54 @@
+{{- /*
+Copyright The Kubeflow Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/ -}}
+
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "trainer.fullname" . }}-metrics-monitor
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "trainer.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "trainer.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/part-of: kubeflow
+      app.kubernetes.io/component: manager
+  endpoints:
+    - port: monitoring-port
+      scheme: {{ if .Values.manager.config.metrics.secureServing }}https{{ else }}http{{ end }}
+      {{- if .Values.manager.config.metrics.auth.enabled }}
+      {{- if not .Values.serviceMonitor.authorization.credentials.name }}
+      {{- fail "serviceMonitor.authorization.credentials.name is required when metrics authentication is enabled" }}
+      {{- end }}
+      authorization:
+        credentials:
+          name: {{ .Values.serviceMonitor.authorization.credentials.name | quote }}
+          key: {{ .Values.serviceMonitor.authorization.credentials.key | default "token" | quote }}
+      {{- end }}
+      {{- if .Values.manager.config.metrics.secureServing }}
+      tlsConfig:
+        ca:
+          secret:
+            name: {{ .Values.serviceMonitor.tlsConfig.ca.secret.name | default .Values.manager.config.certManagement.webhookSecretName | default (include "trainer.webhook.secret.name" .) }}
+            key: {{ .Values.serviceMonitor.tlsConfig.ca.secret.key | default "ca.crt" }}
+        serverName: {{ .Values.serviceMonitor.tlsConfig.serverName | default (printf "%s.%s.svc" (.Values.manager.config.certManagement.webhookServiceName | default (include "trainer.webhook.service.name" .)) .Release.Namespace) }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,137 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Test ServiceMonitor
+
+templates:
+  - prometheus/servicemonitor.yaml
+
+release:
+  name: kubeflow-trainer
+  namespace: kubeflow-system
+
+tests:
+  - it: Should not create a ServiceMonitor by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: Should create a secure unauthenticated ServiceMonitor when enabled
+    set:
+      serviceMonitor.enabled: true
+    asserts:
+      - containsDocument:
+          apiVersion: monitoring.coreos.com/v1
+          kind: ServiceMonitor
+          name: kubeflow-trainer-metrics-monitor
+          namespace: kubeflow-system
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: kubeflow-trainer
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/component"]
+          value: manager
+      - equal:
+          path: spec.endpoints[0].port
+          value: monitoring-port
+      - equal:
+          path: spec.endpoints[0].scheme
+          value: https
+      - notExists:
+          path: spec.endpoints[0].bearerTokenFile
+      - equal:
+          path: spec.endpoints[0].tlsConfig.ca.secret.name
+          value: kubeflow-trainer-webhook-cert
+      - equal:
+          path: spec.endpoints[0].tlsConfig.serverName
+          value: kubeflow-trainer-controller-manager.kubeflow-system.svc
+
+  - it: Should require Secret credentials when authentication is enabled
+    set:
+      serviceMonitor.enabled: true
+      manager.config.metrics.auth.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "serviceMonitor.authorization.credentials.name is required when metrics authentication is enabled"
+
+  - it: Should support Prometheus selector labels and Secret credentials
+    set:
+      serviceMonitor.enabled: true
+      manager.config.metrics.auth.enabled: true
+      serviceMonitor.labels.release: prometheus
+      serviceMonitor.authorization.credentials.name: prometheus-token
+      serviceMonitor.authorization.credentials.key: bearer
+    asserts:
+      - equal:
+          path: metadata.labels.release
+          value: prometheus
+      - equal:
+          path: spec.endpoints[0].authorization
+          value:
+            credentials:
+              name: prometheus-token
+              key: bearer
+      - notExists:
+          path: spec.endpoints[0].bearerTokenFile
+
+  - it: Should use HTTP without TLS when secure serving is disabled
+    set:
+      serviceMonitor.enabled: true
+      manager.config.metrics.secureServing: false
+    asserts:
+      - equal:
+          path: spec.endpoints[0].scheme
+          value: http
+      - notExists:
+          path: spec.endpoints[0].bearerTokenFile
+      - notExists:
+          path: spec.endpoints[0].tlsConfig
+
+  - it: Should allow overriding the TLS configuration
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.tlsConfig.ca.secret.name: custom-metrics-ca
+      serviceMonitor.tlsConfig.ca.secret.key: tls.crt
+      serviceMonitor.tlsConfig.serverName: metrics.example.test
+    asserts:
+      - equal:
+          path: spec.endpoints[0].tlsConfig.ca.secret.name
+          value: custom-metrics-ca
+      - equal:
+          path: spec.endpoints[0].tlsConfig.ca.secret.key
+          value: tls.crt
+      - equal:
+          path: spec.endpoints[0].tlsConfig.serverName
+          value: metrics.example.test
+
+  - it: Should use custom certificate management names by default
+    set:
+      serviceMonitor.enabled: true
+      manager.config.certManagement.webhookSecretName: custom-webhook-secret
+      manager.config.certManagement.webhookServiceName: custom-webhook-service
+    asserts:
+      - equal:
+          path: spec.endpoints[0].tlsConfig.ca.secret.name
+          value: custom-webhook-secret
+      - equal:
+          path: spec.endpoints[0].tlsConfig.serverName
+          value: custom-webhook-service.kubeflow-system.svc
+
+  - it: Should not include custom manager selector labels in the ServiceMonitor selector
+    set:
+      serviceMonitor.enabled: true
+      manager.selectorLabels.custom-label: custom-value
+    asserts:
+      - notExists:
+          path: spec.selector.matchLabels["custom-label"]

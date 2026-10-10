@@ -126,6 +126,9 @@ manager:
     metrics:
       bindAddress: ":8443"
       secureServing: true
+      auth:
+        # -- Whether to require Kubernetes RBAC authentication for /metrics.
+        enabled: false
     webhook:
       port: 9443
       host: ""
@@ -159,6 +162,26 @@ manager:
       # -- Burst rate limit for the TrainJob Status Server api client
       burst: 10
     featureGates: {}
+
+serviceMonitor:
+  # -- Whether to create a Prometheus Operator ServiceMonitor.
+  enabled: false
+  # -- Additional labels for selecting this ServiceMonitor from Prometheus.
+  labels: {}
+  # -- Secret-based authorization for authenticated metrics scraping.
+  # Required when metrics authentication is enabled. The Secret must be available in the
+  # ServiceMonitor namespace and readable by Prometheus.
+  authorization:
+    credentials:
+      name: ""
+      key: token
+  # -- TLS settings for the ServiceMonitor. Empty values use the Trainer defaults.
+  tlsConfig:
+    ca:
+      secret:
+        name: ""
+        key: ca.crt
+    serverName: ""
 
 webhook:
   # -- Specifies how unrecognized errors are handled.

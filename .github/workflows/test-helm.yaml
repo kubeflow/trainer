@@ -40,6 +40,9 @@ jobs:
       - name: Install Helm
         run: make helm
 
+      - name: Validate monitoring Kustomize overlay
+        run: kubectl kustomize manifests/overlays/monitoring >/dev/null
+
       # Setup Kind (skip Kustomize deploy)
       - name: Setup Kind Cluster
         run: make test-e2e-setup-cluster INSTALL_METHOD=helm
