@@ -130,6 +130,10 @@ func (r *XGBoostJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if !r.MatchesJobLabels(xgboostjob) {
+		return ctrl.Result{}, nil
+	}
+
 	if manager := r.ManagedByExternalController(xgboostjob.Spec.RunPolicy.ManagedBy); manager != nil {
 		logger.Info("Skipping XGBoostJob managed by a custom controller", "managed-by", manager)
 		return ctrl.Result{}, nil
@@ -456,6 +460,9 @@ func (r *XGBoostJobReconciler) IsMasterRole(replicas map[kubeflowv1.ReplicaType]
 // onOwnerCreateFunc modify creation condition.
 func (r *XGBoostJobReconciler) onOwnerCreateFunc() func(createEvent event.TypedCreateEvent[*kubeflowv1.XGBoostJob]) bool {
 	return func(e event.TypedCreateEvent[*kubeflowv1.XGBoostJob]) bool {
+		if !r.MatchesJobLabels(e.Object) {
+			return false
+		}
 		xgboostJob := e.Object
 		r.Scheme.Default(xgboostJob)
 		msg := fmt.Sprintf("XGBoostJob %s is created.", e.Object.GetName())

@@ -25,6 +25,7 @@ import (
 
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -78,6 +79,7 @@ func main() {
 	var enabledSchemes controllerv1.EnabledSchemes
 	var gangSchedulerName string
 	var namespace string
+	var jobLabelSelector string
 	var controllerThreads int
 	var webhookServerPort int
 	var webhookServiceName string
@@ -97,6 +99,7 @@ func main() {
 		" Note: If you set another scheduler name, the training-operator assumes it's the scheduler-plugins.")
 	flag.StringVar(&namespace, "namespace", os.Getenv(EnvKubeflowNamespace), "The namespace to monitor kubeflow jobs. If unset, it monitors all namespaces cluster-wide."+
 		"If set, it only monitors kubeflow jobs in the given namespace.")
+	flag.StringVar(&jobLabelSelector, "job-label-selector", "", "Only reconcile training jobs matching this Kubernetes label selector. Empty selects all jobs; does not scope admission webhooks.")
 	flag.IntVar(&controllerThreads, "controller-threads", 1, "Number of worker threads used by the controller.")
 	flag.IntVar(&clientQps, "kube-api-qps", 20, "QPS indicates the maximum QPS to the master from this client.")
 	flag.IntVar(&clientBurst, "kube-api-burst", 30, "Maximum burst for throttle.")
@@ -125,6 +128,12 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	selector, err := labels.Parse(jobLabelSelector)
+	if err != nil {
+		setupLog.Error(err, "invalid --job-label-selector")
+		os.Exit(1)
+	}
 
 	var cacheOpts cache.Options
 	if namespace != "" {
@@ -170,7 +179,7 @@ func main() {
 
 	setupProbeEndpoints(mgr, certsReady)
 	// Set up controllers using goroutines to start the manager quickly.
-	go setupControllers(mgr, enabledSchemes, gangSchedulerName, controllerThreads, certsReady)
+	go setupControllers(mgr, enabledSchemes, gangSchedulerName, controllerThreads, selector, certsReady)
 
 	//+kubebuilder:scaffold:builder
 
@@ -181,7 +190,7 @@ func main() {
 	}
 }
 
-func setupControllers(mgr ctrl.Manager, enabledSchemes controllerv1.EnabledSchemes, gangSchedulerName string, controllerThreads int, certsReady <-chan struct{}) {
+func setupControllers(mgr ctrl.Manager, enabledSchemes controllerv1.EnabledSchemes, gangSchedulerName string, controllerThreads int, selector labels.Selector, certsReady <-chan struct{}) {
 	setupLog.Info("Waiting for certificate generation to complete")
 	<-certsReady
 	setupLog.Info("Certs ready")
@@ -213,7 +222,7 @@ func setupControllers(mgr ctrl.Manager, enabledSchemes controllerv1.EnabledSchem
 			setupLog.Error(errors.New(errMsg), "scheme is not supported", "scheme", s)
 			os.Exit(1)
 		}
-		if err := setupReconcilerFunc(mgr, gangSchedulingSetupFunc, controllerThreads); err != nil {
+		if err := setupReconcilerFunc(mgr, gangSchedulingSetupFunc, controllerThreads, selector); err != nil {
 			setupLog.Error(errors.New(errMsg), "unable to create controller", "scheme", s)
 			os.Exit(1)
 		}

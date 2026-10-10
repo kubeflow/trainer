@@ -136,6 +136,10 @@ func (jc *MPIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if !jc.MatchesJobLabels(mpijob) {
+		return ctrl.Result{}, nil
+	}
+
 	if manager := jc.ManagedByExternalController(mpijob.Spec.RunPolicy.ManagedBy); manager != nil {
 		logger.Info("Skipping MPIJob managed by a custom controller", "managed-by", manager)
 		return ctrl.Result{}, nil
@@ -317,6 +321,9 @@ func (jc *MPIJobReconciler) GetJobFromInformerCache(namespace, name string) (met
 // onOwnerCreateFunc modify creation condition.
 func (jc *MPIJobReconciler) onOwnerCreateFunc() func(createEvent event.TypedCreateEvent[*kubeflowv1.MPIJob]) bool {
 	return func(e event.TypedCreateEvent[*kubeflowv1.MPIJob]) bool {
+		if !jc.MatchesJobLabels(e.Object) {
+			return false
+		}
 		mpiJob := e.Object
 		jc.Scheme.Default(mpiJob)
 		msg := fmt.Sprintf("MPIJob %s is created.", e.Object.GetName())

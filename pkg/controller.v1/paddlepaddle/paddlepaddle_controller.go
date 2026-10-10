@@ -131,6 +131,10 @@ func (r *PaddleJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if !r.MatchesJobLabels(paddlejob) {
+		return ctrl.Result{}, nil
+	}
+
 	if manager := r.ManagedByExternalController(paddlejob.Spec.RunPolicy.ManagedBy); manager != nil {
 		logger.Info("Skipping PaddleJob managed by a custom controller", "managed-by", manager)
 		return ctrl.Result{}, nil
@@ -510,6 +514,9 @@ func (r *PaddleJobReconciler) IsMasterRole(replicas map[kubeflowv1.ReplicaType]*
 // onOwnerCreateFunc modify creation condition.
 func (r *PaddleJobReconciler) onOwnerCreateFunc() func(createEvent event.TypedCreateEvent[*kubeflowv1.PaddleJob]) bool {
 	return func(e event.TypedCreateEvent[*kubeflowv1.PaddleJob]) bool {
+		if !r.MatchesJobLabels(e.Object) {
+			return false
+		}
 		paddlejob := e.Object
 		r.Scheme.Default(paddlejob)
 		msg := fmt.Sprintf("PaddleJob %s is created.", e.Object.GetName())

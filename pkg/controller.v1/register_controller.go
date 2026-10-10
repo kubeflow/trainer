@@ -27,31 +27,44 @@ import (
 	tensorflowcontroller "github.com/kubeflow/training-operator/pkg/controller.v1/tensorflow"
 	xgboostcontroller "github.com/kubeflow/training-operator/pkg/controller.v1/xgboost"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 const ErrTemplateSchemeNotSupported = "scheme %s is not supported yet"
 
-type ReconcilerSetupFunc func(manager manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int) error
+type ReconcilerSetupFunc func(manager manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int, selector labels.Selector) error
 
 var SupportedSchemeReconciler = map[string]ReconcilerSetupFunc{
-	kubeflowv1.TFJobKind: func(mgr manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int) error {
-		return tensorflowcontroller.NewReconciler(mgr, gangSchedulingSetupFunc).SetupWithManager(mgr, controllerThreads)
+	kubeflowv1.TFJobKind: func(mgr manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int, selector labels.Selector) error {
+		r := tensorflowcontroller.NewReconciler(mgr, gangSchedulingSetupFunc)
+		r.JobLabelSelector = selector
+		return r.SetupWithManager(mgr, controllerThreads)
 	},
-	kubeflowv1.PyTorchJobKind: func(mgr manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int) error {
-		return pytorchcontroller.NewReconciler(mgr, gangSchedulingSetupFunc).SetupWithManager(mgr, controllerThreads)
+	kubeflowv1.PyTorchJobKind: func(mgr manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int, selector labels.Selector) error {
+		r := pytorchcontroller.NewReconciler(mgr, gangSchedulingSetupFunc)
+		r.JobLabelSelector = selector
+		return r.SetupWithManager(mgr, controllerThreads)
 	},
-	kubeflowv1.XGBoostJobKind: func(mgr manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int) error {
-		return xgboostcontroller.NewReconciler(mgr, gangSchedulingSetupFunc).SetupWithManager(mgr, controllerThreads)
+	kubeflowv1.XGBoostJobKind: func(mgr manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int, selector labels.Selector) error {
+		r := xgboostcontroller.NewReconciler(mgr, gangSchedulingSetupFunc)
+		r.JobLabelSelector = selector
+		return r.SetupWithManager(mgr, controllerThreads)
 	},
-	kubeflowv1.MPIJobKind: func(mgr manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int) error {
-		return mpicontroller.NewReconciler(mgr, gangSchedulingSetupFunc).SetupWithManager(mgr, controllerThreads)
+	kubeflowv1.MPIJobKind: func(mgr manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int, selector labels.Selector) error {
+		r := mpicontroller.NewReconciler(mgr, gangSchedulingSetupFunc)
+		r.JobLabelSelector = selector
+		return r.SetupWithManager(mgr, controllerThreads)
 	},
-	kubeflowv1.PaddleJobKind: func(mgr manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int) error {
-		return paddlecontroller.NewReconciler(mgr, gangSchedulingSetupFunc).SetupWithManager(mgr, controllerThreads)
+	kubeflowv1.PaddleJobKind: func(mgr manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int, selector labels.Selector) error {
+		r := paddlecontroller.NewReconciler(mgr, gangSchedulingSetupFunc)
+		r.JobLabelSelector = selector
+		return r.SetupWithManager(mgr, controllerThreads)
 	},
-	kubeflowv1.JAXJobKind: func(mgr manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int) error {
-		return jaxcontroller.NewReconciler(mgr, gangSchedulingSetupFunc).SetupWithManager(mgr, controllerThreads)
+	kubeflowv1.JAXJobKind: func(mgr manager.Manager, gangSchedulingSetupFunc common.GangSchedulingSetupFunc, controllerThreads int, selector labels.Selector) error {
+		r := jaxcontroller.NewReconciler(mgr, gangSchedulingSetupFunc)
+		r.JobLabelSelector = selector
+		return r.SetupWithManager(mgr, controllerThreads)
 	},
 }
 

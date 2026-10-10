@@ -29,6 +29,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	kubeinformers "k8s.io/client-go/informers"
 	kubeclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -90,6 +91,10 @@ func (c *JobControllerConfiguration) EnableGangScheduling() bool {
 //	jobStatus apiv1.JobStatus,
 //	runPolicy *apiv1.RunPolicy) error
 type JobController struct {
+	// JobLabelSelector restricts reconciliation to matching jobs. Nil selects all jobs.
+	// Configure before starting the controller; do not change it at runtime.
+	JobLabelSelector labels.Selector
+
 	Controller common.ControllerInterface
 
 	Config JobControllerConfiguration
@@ -260,4 +265,9 @@ func (jc *JobController) resolveControllerRef(namespace string, controllerRef *m
 		return nil
 	}
 	return job
+}
+
+// MatchesJobLabels reports whether this controller manages the job labels.
+func (jc *JobController) MatchesJobLabels(job metav1.Object) bool {
+	return jc.JobLabelSelector == nil || jc.JobLabelSelector.Matches(labels.Set(job.GetLabels()))
 }
