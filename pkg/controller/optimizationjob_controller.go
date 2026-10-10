@@ -117,10 +117,6 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, client.IgnoreNotFound(getErr)
 	}
 
-	if optJob.Status == nil {
-		optJob.Status = &trainer.OptimizationJobStatus{}
-	}
-
 	prevOptJob := optJob.DeepCopy()
 
 	// Defer the single Status Patch operation
@@ -147,11 +143,8 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	var validTrainJobs []trainer.TrainJob
 	var activeTrials, succeededTrials, failedTrials int32
 	var invalidMetricTrial string
+	var invalidMetricName string
 	var invalidMetricErr error
-	targetMetric := ""
-	if len(optJob.Spec.Objectives) > 0 {
-		targetMetric = optJob.Spec.Objectives[0].Metric
-	}
 
 	for _, tj := range allTrainJobs.Items {
 		if owner := metav1.GetControllerOf(&tj); owner == nil || owner.UID != optJob.UID {
@@ -164,11 +157,21 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			if meta.IsStatusConditionTrue(tj.Status.Conditions, trainer.TrainJobFailed) {
 				failedTrials++
 			} else {
-				if _, _, metricErr := optimizationjob.GetFinalObjectiveMetric(&tj, targetMetric); metricErr != nil {
+				var trialErr error
+				var failedObjMetric string
+				for _, obj := range optJob.Spec.Objectives {
+					if _, _, metricErr := optimizationjob.GetFinalObjectiveMetric(&tj, obj.Metric); metricErr != nil {
+						trialErr = metricErr
+						failedObjMetric = obj.Metric
+						break
+					}
+				}
+				if trialErr != nil {
 					failedTrials++
 					if invalidMetricErr == nil {
 						invalidMetricTrial = tj.Name
-						invalidMetricErr = metricErr
+						invalidMetricName = failedObjMetric
+						invalidMetricErr = trialErr
 					}
 					continue
 				}
@@ -183,8 +186,8 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// 2. Continuous Best Result Tracking
 	if len(validTrainJobs) > 0 {
-		if bestResult := optimizationjob.ExtractBestResult(optJob, validTrainJobs); bestResult != nil {
-			optJob.Status.Result = *bestResult
+		if optimalTrials := optimizationjob.ExtractOptimalTrials(optJob, validTrainJobs); len(optimalTrials) > 0 {
+			optJob.Status.Results = optimalTrials
 		}
 	}
 
@@ -203,7 +206,7 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			Type:    constants.OptimizationJobFailed,
 			Status:  metav1.ConditionTrue,
 			Reason:  reason,
-			Message: fmt.Sprintf("completed trial %q did not report a valid objective metric %q: %v", invalidMetricTrial, targetMetric, invalidMetricErr),
+			Message: fmt.Sprintf("completed trial %q did not report a valid objective metric %q: %v", invalidMetricTrial, invalidMetricName, invalidMetricErr),
 		})
 		return ctrl.Result{}, nil
 	}
@@ -452,7 +455,7 @@ func (r *OptimizationJobReconciler) SetupWithManager(mgr ctrl.Manager, options c
 }
 
 func isJobCompleted(optJob *trainer.OptimizationJob) bool {
-	if optJob == nil || optJob.Status == nil || len(optJob.Status.Conditions) == 0 {
+	if optJob == nil || len(optJob.Status.Conditions) == 0 {
 		return false
 	}
 	return meta.IsStatusConditionTrue(optJob.Status.Conditions, constants.OptimizationJobComplete) ||

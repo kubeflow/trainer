@@ -488,7 +488,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			wantFailureMessage:    "completed trial \"tj-missing-metric\" did not report a valid objective metric \"accuracy\": objective metric is missing: \"accuracy\"",
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
-				job.Status = &trainer.OptimizationJobStatus{Conditions: []metav1.Condition{{
+				job.Status = trainer.OptimizationJobStatus{Conditions: []metav1.Condition{{
 					Type: constants.OptimizationJobFailed, Status: metav1.ConditionTrue, Reason: "ObjectiveMetricMissing",
 				}}}
 				return job
@@ -503,7 +503,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			wantFailureMessage:    "completed trial \"tj-invalid-metric\" did not report a valid objective metric \"accuracy\": objective metric \"accuracy\" has invalid value \"NaN\"",
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
-				job.Status = &trainer.OptimizationJobStatus{Conditions: []metav1.Condition{{
+				job.Status = trainer.OptimizationJobStatus{Conditions: []metav1.Condition{{
 					Type: constants.OptimizationJobFailed, Status: metav1.ConditionTrue, Reason: "ObjectiveMetricInvalid",
 				}}}
 				return job
@@ -524,7 +524,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				job.Spec.SearchAlgorithm = &trainer.SearchAlgorithm{
 					Grid: &trainer.GridAlgorithm{},
 				}
-				job.Status = &trainer.OptimizationJobStatus{
+				job.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobFailed,
@@ -555,7 +555,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			wantRequeue: false,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
-				job.Status = &trainer.OptimizationJobStatus{
+				job.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobCreated,
@@ -588,7 +588,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
 				job.Spec.ParallelTrials = 2
-				job.Status = &trainer.OptimizationJobStatus{
+				job.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobCreated,
@@ -612,7 +612,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 		"mark optimizationjob complete when all trials finish": {
 			getInitObjects: func() []client.Object {
 				job := getBaseOptJob()
-				job.Status = &trainer.OptimizationJobStatus{
+				job.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobCreated,
@@ -685,7 +685,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			wantRequeue: false,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
-				job.Status = &trainer.OptimizationJobStatus{
+				job.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobCreated,
@@ -700,9 +700,14 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 							Message: "All trials have completed successfully",
 						},
 					},
-					Result: trainer.Result{
-						TrainJobName: "tj-2",
-						Parameters:   []trainer.ParameterAssignment{{Name: "lr", Value: "0.05"}},
+					Results: []trainer.OptimalTrial{
+						{
+							TrainJobName: "tj-2",
+							Parameters:   []trainer.ParameterAssignment{{Name: "lr", Value: "0.05"}},
+							Metrics: []trainer.ObjectiveMetricValue{
+								{Metric: "accuracy", Value: "0.95"},
+							},
+						},
 					},
 				}
 				return job
@@ -714,7 +719,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				job := getBaseOptJob()
 				job.Spec.NumTrials = 2
 				job.Spec.ParallelTrials = 2
-				job.Status = &trainer.OptimizationJobStatus{
+				job.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobCreated,
@@ -798,7 +803,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				job.Spec.NumTrials = 2
 				job.Spec.ParallelTrials = 2
 
-				job.Status = &trainer.OptimizationJobStatus{
+				job.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobCreated,
@@ -824,7 +829,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				minJob.Spec.Objectives = []trainer.Objective{
 					{Metric: "loss", Direction: trainer.ObjectiveDirectionMinimize},
 				}
-				minJob.Status = &trainer.OptimizationJobStatus{
+				minJob.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobCreated,
@@ -901,7 +906,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				job.Spec.Objectives = []trainer.Objective{
 					{Metric: "loss", Direction: trainer.ObjectiveDirectionMinimize},
 				}
-				job.Status = &trainer.OptimizationJobStatus{
+				job.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobCreated,
@@ -916,9 +921,14 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 							Message: "All trials have completed successfully",
 						},
 					},
-					Result: trainer.Result{
-						TrainJobName: "tj-2",
-						Parameters:   []trainer.ParameterAssignment{{Name: "lr", Value: "0.05"}},
+					Results: []trainer.OptimalTrial{
+						{
+							TrainJobName: "tj-2",
+							Parameters:   []trainer.ParameterAssignment{{Name: "lr", Value: "0.05"}},
+							Metrics: []trainer.ObjectiveMetricValue{
+								{Metric: "loss", Value: "0.10"},
+							},
+						},
 					},
 				}
 				return job
@@ -961,7 +971,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				job := getBaseOptJob()
 				job.Spec.NumTrials = 5
 				job.Spec.ParallelTrials = 1
-				job.Status = &trainer.OptimizationJobStatus{
+				job.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobCreated,
@@ -985,7 +995,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			wantErr:     true,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
-				job.Status = &trainer.OptimizationJobStatus{
+				job.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobCreated,
@@ -1021,7 +1031,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			wantSuggestionCalls: 1,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
-				job.Status = &trainer.OptimizationJobStatus{
+				job.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobCreated,
@@ -1046,7 +1056,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 		"cleanup algorithm service when optimizationjob is completed": {
 			getInitObjects: func() []client.Object {
 				job := getBaseOptJob()
-				job.Status = &trainer.OptimizationJobStatus{
+				job.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobComplete,
@@ -1064,7 +1074,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			wantSvcDeleted:    true,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
-				job.Status = &trainer.OptimizationJobStatus{
+				job.Status = trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:    constants.OptimizationJobComplete,
@@ -1251,12 +1261,12 @@ func TestGetAlgorithmServiceName(t *testing.T) {
 	}
 }
 
-func TestExtractBestResult(t *testing.T) {
+func TestExtractOptimalTrials(t *testing.T) {
 	tests := []struct {
-		name       string
-		optJob     *trainer.OptimizationJob
-		trainJobs  []trainer.TrainJob
-		wantResult *trainer.Result
+		name        string
+		optJob      *trainer.OptimizationJob
+		trainJobs   []trainer.TrainJob
+		wantResults []trainer.OptimalTrial
 	}{
 		{
 			name: "no objectives returns nil",
@@ -1276,7 +1286,7 @@ func TestExtractBestResult(t *testing.T) {
 					},
 				},
 			},
-			wantResult: nil,
+			wantResults: nil,
 		},
 		{
 			name: "maximize chooses highest metric value",
@@ -1326,11 +1336,16 @@ func TestExtractBestResult(t *testing.T) {
 					},
 				},
 			},
-			wantResult: &trainer.Result{
-				TrainJobName: "tj-high",
-				Parameters: []trainer.ParameterAssignment{
-					{Name: "epochs", Value: "10"},
-					{Name: "lr", Value: "0.01"},
+			wantResults: []trainer.OptimalTrial{
+				{
+					TrainJobName: "tj-high",
+					Parameters: []trainer.ParameterAssignment{
+						{Name: "epochs", Value: "10"},
+						{Name: "lr", Value: "0.01"},
+					},
+					Metrics: []trainer.ObjectiveMetricValue{
+						{Metric: "accuracy", Value: "0.95"},
+					},
 				},
 			},
 		},
@@ -1381,10 +1396,15 @@ func TestExtractBestResult(t *testing.T) {
 					},
 				},
 			},
-			wantResult: &trainer.Result{
-				TrainJobName: "tj-low-loss",
-				Parameters: []trainer.ParameterAssignment{
-					{Name: "lr", Value: "0.01"},
+			wantResults: []trainer.OptimalTrial{
+				{
+					TrainJobName: "tj-low-loss",
+					Parameters: []trainer.ParameterAssignment{
+						{Name: "lr", Value: "0.01"},
+					},
+					Metrics: []trainer.ObjectiveMetricValue{
+						{Metric: "loss", Value: "0.12"},
+					},
 				},
 			},
 		},
@@ -1435,10 +1455,15 @@ func TestExtractBestResult(t *testing.T) {
 					},
 				},
 			},
-			wantResult: &trainer.Result{
-				TrainJobName: "tj-valid",
-				Parameters: []trainer.ParameterAssignment{
-					{Name: "lr", Value: "0.01"},
+			wantResults: []trainer.OptimalTrial{
+				{
+					TrainJobName: "tj-valid",
+					Parameters: []trainer.ParameterAssignment{
+						{Name: "lr", Value: "0.01"},
+					},
+					Metrics: []trainer.ObjectiveMetricValue{
+						{Metric: "accuracy", Value: "0.85"},
+					},
 				},
 			},
 		},
@@ -1495,10 +1520,15 @@ func TestExtractBestResult(t *testing.T) {
 					},
 				},
 			},
-			wantResult: &trainer.Result{
-				TrainJobName: "tj-2",
-				Parameters: []trainer.ParameterAssignment{
-					{Name: "lr", Value: "0.02"},
+			wantResults: []trainer.OptimalTrial{
+				{
+					TrainJobName: "tj-2",
+					Parameters: []trainer.ParameterAssignment{
+						{Name: "lr", Value: "0.02"},
+					},
+					Metrics: []trainer.ObjectiveMetricValue{
+						{Metric: "accuracy", Value: "0.80"},
+					},
 				},
 			},
 		},
@@ -1506,9 +1536,9 @@ func TestExtractBestResult(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := optimizationjob.ExtractBestResult(tt.optJob, tt.trainJobs)
-			if diff := cmp.Diff(tt.wantResult, got); diff != "" {
-				t.Errorf("ExtractBestResult() mismatch (-want +got):\n%s", diff)
+			got := optimizationjob.ExtractOptimalTrials(tt.optJob, tt.trainJobs)
+			if diff := cmp.Diff(tt.wantResults, got); diff != "" {
+				t.Errorf("ExtractOptimalTrials() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

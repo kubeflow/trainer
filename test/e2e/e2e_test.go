@@ -990,9 +990,9 @@ var _ = ginkgo.Describe("OptimizationJob e2e", func() {
 			ginkgo.By("Verifying best result is populated in OptimizationJob status", func() {
 				gotOptJob := &trainer.OptimizationJob{}
 				gomega.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(optJob), gotOptJob)).Should(gomega.Succeed())
-				gomega.Expect(gotOptJob.Status).ShouldNot(gomega.BeNil())
-				gomega.Expect(gotOptJob.Status.Result.TrainJobName).ShouldNot(gomega.BeEmpty())
-				gomega.Expect(gotOptJob.Status.Result.Parameters).Should(gomega.ContainElement(
+				gomega.Expect(gotOptJob.Status.Results).ShouldNot(gomega.BeEmpty())
+				gomega.Expect(gotOptJob.Status.Results[0].TrainJobName).ShouldNot(gomega.BeEmpty())
+				gomega.Expect(gotOptJob.Status.Results[0].Parameters).Should(gomega.ContainElement(
 					gomega.HaveField("Name", "learning_rate"),
 				))
 			})

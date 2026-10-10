@@ -407,13 +407,18 @@ var _ = ginkgo.Describe("OptimizationJob Controller", ginkgo.Ordered, func() {
 				g.Expect(cond.Reason).Should(gomega.Equal("OptimizationJobCompleted"))
 			}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
-			ginkgo.By("Verifying Status.Result points to Trial 2 (accuracy=0.95)")
+			ginkgo.By("Verifying Status.Results points to Trial 2 (accuracy=0.95)")
 			gotJob := &trainer.OptimizationJob{}
 			gomega.Expect(k8sClient.Get(ctx, optJobKey, gotJob)).Should(gomega.Succeed())
-			gomega.Expect(gotJob.Status.Result.TrainJobName).Should(gomega.Equal(trial2.Name))
-			gomega.Expect(gotJob.Status.Result.Parameters).Should(gomega.ContainElement(trainer.ParameterAssignment{
+			gomega.Expect(gotJob.Status.Results).Should(gomega.HaveLen(1))
+			gomega.Expect(gotJob.Status.Results[0].TrainJobName).Should(gomega.Equal(trial2.Name))
+			gomega.Expect(gotJob.Status.Results[0].Parameters).Should(gomega.ContainElement(trainer.ParameterAssignment{
 				Name:  "lr",
 				Value: "0.05",
+			}))
+			gomega.Expect(gotJob.Status.Results[0].Metrics).Should(gomega.ContainElement(trainer.ObjectiveMetricValue{
+				Metric: "accuracy",
+				Value:  "0.95",
 			}))
 
 			ginkgo.By("Verifying automated cleanup: Search Algorithm Deployment and Service are deleted")
@@ -541,9 +546,7 @@ var _ = ginkgo.Describe("OptimizationJob Controller", ginkgo.Ordered, func() {
 			gomega.Consistently(func(g gomega.Gomega) {
 				gotJob := &trainer.OptimizationJob{}
 				g.Expect(k8sClient.Get(ctx, optJobKey, gotJob)).Should(gomega.Succeed())
-				if gotJob.Status != nil {
-					g.Expect(meta.IsStatusConditionTrue(gotJob.Status.Conditions, constants.OptimizationJobFailed)).Should(gomega.BeFalse())
-				}
+				g.Expect(meta.IsStatusConditionTrue(gotJob.Status.Conditions, constants.OptimizationJobFailed)).Should(gomega.BeFalse())
 			}, 1*time.Second, 200*time.Millisecond).Should(gomega.Succeed())
 
 			ginkgo.By("Clearing transient error")
