@@ -82,6 +82,27 @@ func (r *ClusterTrainingRuntime) NewObjects(ctx context.Context, trainJob *train
 	return r.framework.RunComponentBuilderPlugins(ctx, info, trainJob)
 }
 
+// DeleteObjects mirrors TrainingRuntime.DeleteObjects but resolves a ClusterTrainingRuntime
+// instead: it cannot simply delegate to the embedded TrainingRuntime, since that would look
+// up the wrong (namespace-scoped) runtime kind.
+func (r *ClusterTrainingRuntime) DeleteObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]client.Object, error) {
+	var clTrainingRuntime trainer.ClusterTrainingRuntime
+	if err := getRuntimeSnapshot(ctx, r.client, trainJob, &clTrainingRuntime); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("getting runtime snapshot: %w", err)
+		}
+		if err := r.client.Get(ctx, client.ObjectKey{Name: trainJob.Spec.RuntimeRef.Name}, &clTrainingRuntime); err != nil {
+			return nil, client.IgnoreNotFound(err)
+		}
+	}
+
+	info, err := r.RuntimeInfo(trainJob, clTrainingRuntime.Spec.Template, clTrainingRuntime.Spec.MLPolicy, clTrainingRuntime.Spec.PodGroupPolicy)
+	if err != nil {
+		return nil, err
+	}
+	return r.framework.RunComponentDeleterPlugins(ctx, info, trainJob)
+}
+
 func (r *ClusterTrainingRuntime) RuntimeInfo(
 	trainJob *trainer.TrainJob, runtimeTemplateSpec any, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
 ) (*runtime.Info, error) {
