@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/ptr"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
@@ -178,6 +180,58 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 
 			if diff := cmp.Diff(tc.wantObjs, resultObjs, cmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestClusterTrainingRuntimeTrainJobStatus checks that ClusterTrainingRuntime delegates to the
+// embedded TrainingRuntime; the TrainingRuntime cases are covered by TestTrainingRuntimeTrainJobStatus.
+func TestClusterTrainingRuntimeTrainJobStatus(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	statusPlugin := &fakeTrainJobStatusPlugin{
+		status: &trainer.TrainJobStatus{
+			JobsStatus: []trainer.JobStatus{{Name: "node", Succeeded: ptr.To[int32](1)}},
+		},
+	}
+	clTrainingRuntime := &ClusterTrainingRuntime{
+		TrainingRuntime: newTrainingRuntimeWithRegistry(ctx, t, fakePluginRegistry(nil, nil, statusPlugin)),
+	}
+	trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj()
+
+	gotStatus, err := clTrainingRuntime.TrainJobStatus(ctx, trainJob)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	wantStatus := &trainer.TrainJobStatus{
+		JobsStatus: []trainer.JobStatus{{Name: "node", Succeeded: ptr.To[int32](1)}},
+	}
+	if diff := cmp.Diff(wantStatus, gotStatus); len(diff) != 0 {
+		t.Errorf("Unexpected TrainJobStatus (-want,+got):\n%s", diff)
+	}
+	if statusPlugin.gotTrainJob != trainJob {
+		t.Errorf("Expected TrainJobStatus plugin to receive TrainJob %v, got %v", trainJob, statusPlugin.gotTrainJob)
+	}
+}
+
+func TestClusterTrainingRuntimeEventHandlerRegistrars(t *testing.T) {
+	cases := map[string]struct {
+		watchBuilderIDs map[string][]string
+	}{
+		"no plugins are registered": {},
+		"WatchExtension plugins on the underlying TrainingRuntime are not registered again": {
+			watchBuilderIDs: map[string][]string{"watch-a": {"a-1"}},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			clTrainingRuntime := &ClusterTrainingRuntime{
+				TrainingRuntime: newTrainingRuntimeWithRegistry(ctx, t, fakePluginRegistry(tc.watchBuilderIDs, nil, nil)),
+			}
+
+			if builders := clTrainingRuntime.EventHandlerRegistrars(); builders != nil {
+				t.Errorf("Expected nil ReconcilerBuilders, got %d", len(builders))
 			}
 		})
 	}
