@@ -15249,7 +15249,7 @@
         ],
         "properties": {
           "name": {
-            "description": "name is the name of the hyperparameter.",
+            "description": "name is the name of the hyperparameter. Only letters, digits and underscores are allowed, and it cannot start with a digit.",
             "type": "string"
           },
           "searchSpace": {

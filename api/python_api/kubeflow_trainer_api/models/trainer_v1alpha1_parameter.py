@@ -41,7 +41,7 @@ class TrainerV1alpha1Parameter(BaseModel):
     """
     TrainerV1alpha1Parameter
     """ # noqa: E501
-    name: StrictStr = Field(description="name is the name of the hyperparameter.")
+    name: StrictStr = Field(description="name is the name of the hyperparameter. Only letters, digits and underscores are allowed, and it cannot start with a digit.")
     search_space: TrainerV1alpha1SearchSpace = Field(description="searchSpace is the search space for the hyperparameter.", alias="searchSpace")
     __properties: ClassVar[List[str]] = ["name", "searchSpace"]
 
