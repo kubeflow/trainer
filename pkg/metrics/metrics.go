@@ -45,11 +45,6 @@ var (
 		Name:      "trainjob_lifetime_seconds",
 		Help:      "Time from TrainJob creation to its terminal outcome.",
 	}, []string{"result", "runtime_ref"})
-	trainJobRequestedAccelerators = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: metricNamespace,
-		Name:      "trainjob_requested_accelerators",
-		Help:      "Accelerators requested per TrainJob.",
-	}, []string{"accelerator_class", "runtime_ref"})
 	trainJobRequestedTrainingNodes = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: metricNamespace,
 		Name:      "trainjob_requested_training_nodes_per_job",
@@ -62,7 +57,6 @@ func init() {
 		trainJobCreated,
 		trainJobFinished,
 		trainJobLifetime,
-		trainJobRequestedAccelerators,
 		trainJobRequestedTrainingNodes,
 	)
 }

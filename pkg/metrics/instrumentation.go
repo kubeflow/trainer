@@ -19,10 +19,8 @@ package metrics
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	toolscache "k8s.io/client-go/tools/cache"
@@ -112,22 +110,6 @@ func (m *trainerMetrics) observeRequestedWorkload(trainJob *trainer.TrainJob, ru
 	} else if nodes := m.requestedNodes(trainJob); nodes >= 0 {
 		trainJobRequestedTrainingNodes.WithLabelValues(runtimeRef).Observe(float64(nodes))
 	}
-
-	nodes := int32(1)
-	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		nodes = *trainJob.Spec.Trainer.NumNodes
-	} else if requestedNodes := m.requestedNodes(trainJob); requestedNodes >= 0 {
-		nodes = requestedNodes
-	}
-	resources := m.resourcesPerNode(trainJob)
-	observedAccelerator := false
-	for resourceName, quantity := range acceleratorResources(resources) {
-		trainJobRequestedAccelerators.WithLabelValues(string(resourceName), runtimeRef).Observe(float64(quantity.Value() * int64(nodes)))
-		observedAccelerator = true
-	}
-	if !observedAccelerator {
-		trainJobRequestedAccelerators.WithLabelValues("none", runtimeRef).Observe(0)
-	}
 }
 
 func (m *trainerMetrics) runtimeSpec(trainJob *trainer.TrainJob) (*trainer.TrainingRuntimeSpec, error) {
@@ -151,48 +133,6 @@ func (m *trainerMetrics) requestedNodes(trainJob *trainer.TrainJob) int32 {
 	}
 	// MLPolicy.NumNodes defaults to one node in the Trainer API.
 	return 1
-}
-
-func (m *trainerMetrics) resourcesPerNode(trainJob *trainer.TrainJob) *corev1.ResourceRequirements {
-	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
-		return trainJob.Spec.Trainer.ResourcesPerNode
-	}
-	spec, err := m.runtimeSpec(trainJob)
-	if err != nil {
-		return nil
-	}
-	for _, replicatedJob := range spec.Template.Spec.ReplicatedJobs {
-		if replicatedJob.Name != "node" && replicatedJob.Template.Labels["trainer.kubeflow.org/trainjob-ancestor-step"] != "trainer" {
-			continue
-		}
-		for _, container := range replicatedJob.Template.Spec.Template.Spec.Containers {
-			if container.Name == "node" {
-				resources := container.Resources
-				return &resources
-			}
-		}
-	}
-	return nil
-}
-
-func acceleratorResources(resources *corev1.ResourceRequirements) corev1.ResourceList {
-	result := corev1.ResourceList{}
-	if resources == nil {
-		return result
-	}
-	for name, quantity := range resources.Requests {
-		if strings.Contains(strings.ToLower(name.String()), "gpu") {
-			result[name] = quantity
-		}
-	}
-	if len(result) == 0 {
-		for name, quantity := range resources.Limits {
-			if strings.Contains(strings.ToLower(name.String()), "gpu") {
-				result[name] = quantity
-			}
-		}
-	}
-	return result
 }
 
 // runtimeInfoCollector derives runtime inventory from the cache-backed client

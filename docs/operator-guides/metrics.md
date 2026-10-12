@@ -16,7 +16,6 @@ Prometheus integration.
 | `kubeflow_trainer_trainjob_created_total` | Counter | `namespace`, `runtime_ref` | TrainJobs observed after the controller's initial informer listing. |
 | `kubeflow_trainer_trainjob_finished_total` | Counter | `result`, `reason`, `runtime_ref` | TrainJobs observed transitioning to a terminal condition. `result` is `succeeded` or `failed`; successful jobs use reason `none`. |
 | `kubeflow_trainer_trainjob_lifetime_seconds` | Histogram | `result`, `runtime_ref` | Time from TrainJob creation to its terminal condition. |
-| `kubeflow_trainer_trainjob_requested_accelerators` | Histogram | `accelerator_class`, `runtime_ref` | Requested accelerator capacity per TrainJob, including zero-accelerator jobs. This is requested capacity, not actual utilization. |
 | `kubeflow_trainer_trainjob_requested_training_nodes_per_job` | Histogram | `runtime_ref` | Logical training nodes requested by each TrainJob after runtime defaults are applied. |
 
 `runtime_ref` is a normalized identifier in the form
@@ -30,9 +29,6 @@ Prometheus integration.
   informer listing are not counted as newly created.
 - Runtime inventory is evaluated at scrape time, so it reflects the current
   runtime resources.
-- Accelerator metrics describe requests configured on the TrainJob or its
-  selected runtime. They do not measure allocation, utilization, or training
-  framework runtime behavior.
 - The metrics do not currently provide checkpoint, progress, suspend/resume,
   or per-replicated-job runtime instrumentation.
 - Labels intentionally use bounded identifiers such as runtime references and
@@ -63,3 +59,9 @@ histogram_quantile(
 The controller metrics are intended for cluster-local observability. Any
 export, retention, filtering, or aggregation into an external telemetry
 system should be reviewed and configured downstream.
+
+## Metric stability
+
+Metric names, labels, and semantics are part of the public observability
+contract. Changes will follow the [Kubernetes metrics deprecation
+policy](https://kubernetes.io/docs/concepts/extend-kubernetes/metrics/#metrics-deprecation-policy).

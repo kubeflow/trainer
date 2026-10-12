@@ -24,8 +24,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -274,32 +272,11 @@ func TestTrainJobUpdate(t *testing.T) {
 	}
 }
 
-func TestTrainJobAddRecordsAcceleratorClass(t *testing.T) {
-	resetMetrics(t)
-	scheme := newMetricsScheme(t)
-	m := newTrainerMetrics(fake.NewClientBuilder().WithScheme(scheme).Build())
-	job := trainJob("gpu-job", false)
-	job.Spec.Trainer.ResourcesPerNode = &corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")},
-	}
-	m.onAdd(job, false)
-
-	reg := prometheus.NewRegistry()
-	if err := registerTrainerCollectors(reg, m); err != nil {
-		t.Fatalf("register Trainer metrics: %v", err)
-	}
-	assertHistogramObservation(t, reg, "kubeflow_trainer_trainjob_requested_accelerators", map[string]string{
-		"accelerator_class": "nvidia.com/gpu",
-		"runtime_ref":       runtimeRefLabel(job),
-	}, 1, 4)
-}
-
 func resetMetrics(t *testing.T) {
 	t.Helper()
 	trainJobCreated.Reset()
 	trainJobFinished.Reset()
 	trainJobLifetime.Reset()
-	trainJobRequestedAccelerators.Reset()
 	trainJobRequestedTrainingNodes.Reset()
 }
 
@@ -319,7 +296,6 @@ func registerTrainerCollectors(reg prometheus.Registerer, m *trainerMetrics) err
 		trainJobCreated,
 		trainJobFinished,
 		trainJobLifetime,
-		trainJobRequestedAccelerators,
 		trainJobRequestedTrainingNodes,
 	} {
 		if err := reg.Register(collector); err != nil {
