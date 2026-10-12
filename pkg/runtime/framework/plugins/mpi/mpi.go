@@ -113,15 +113,25 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 		return nil
 	}
 
-	// TrainJob contains the actual information for the Trainer.
+	// The runtime numNodes is stored in the trainer PodSet count, which is the launcher
+	// in the built-in MPI runtimes. TrainJob contains the actual information for the Trainer.
+	var numNodes *int32
+	if trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer); trainerPS != nil && trainerPS.Count != nil {
+		numNodes = ptr.To(*trainerPS.Count)
+	}
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		if node := info.FindPodSetByName(constants.Node); node != nil && node.Count != nil {
-			if ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false) {
-				// When runLauncherAsNode is enabled, 1 nodes should be allocated to launcher.
-				*node.Count = max(*trainJob.Spec.Trainer.NumNodes-1, 1)
-			} else {
-				*node.Count = *trainJob.Spec.Trainer.NumNodes
-			}
+		numNodes = trainJob.Spec.Trainer.NumNodes
+	}
+	// The launcher runs a single mpirun process.
+	if launcher := info.FindPodSetByName(constants.Launcher); launcher != nil && launcher.Count != nil {
+		*launcher.Count = 1
+	}
+	if node := info.FindPodSetByName(constants.Node); numNodes != nil && node != nil && node.Count != nil {
+		if ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false) {
+			// When runLauncherAsNode is enabled, 1 nodes should be allocated to launcher.
+			*node.Count = max(*numNodes-1, 1)
+		} else {
+			*node.Count = *numNodes
 		}
 	}
 
