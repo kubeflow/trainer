@@ -120,4 +120,5 @@ dynamic-resource-allocation
 extension-framework
 job-scheduling/index
 metrics
+prometheus-monitoring
 ```
