@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -32,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache/informertest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	controllerMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 
@@ -78,13 +78,19 @@ kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="ClusterTrai
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Cleanup(func() { resetMetrics(t) })
-			scheme := newMetricsScheme(t)
 			objects := make([]client.Object, 0, len(test.objects))
 			for _, object := range test.objects {
 				objects = append(objects, object.(client.Object))
 			}
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
-			m := newTrainerMetrics(cli)
+			m := newTrainerMetrics(nil)
+			for _, object := range objects {
+				switch runtimeObject := object.(type) {
+				case *trainer.TrainingRuntime:
+					m.runtimeInfo.upsert(runtimeObject, trainingRuntimeKind)
+				case *trainer.ClusterTrainingRuntime:
+					m.runtimeInfo.upsert(runtimeObject, clusterTrainingRuntimeKind)
+				}
+			}
 			reg := prometheus.NewRegistry()
 			if err := registerTrainerCollectors(reg, m); err != nil {
 				t.Fatalf("register Trainer metrics: %v", err)
@@ -109,6 +115,8 @@ func TestSetupTrainerMetricsRegistersRuntimeCollector(t *testing.T) {
 		t.Fatalf("setup Trainer metrics: %v", err)
 	}
 
+	collector := mgr.added[0].(*runtimeInfoCollector)
+	collector.upsert(&trainer.TrainingRuntime{ObjectMeta: metav1.ObjectMeta{Name: "torch", Namespace: "team-a"}}, trainingRuntimeKind)
 	want := `# HELP kubeflow_trainer_runtime_info Current TrainingRuntime and ClusterTrainingRuntime resources.
 # TYPE kubeflow_trainer_runtime_info gauge
 kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRuntime",ml_policy="none",name="torch",namespace="team-a",pod_group_policy="none"} 1
@@ -116,6 +124,127 @@ kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRun
 	if err := testutil.GatherAndCompare(controllerMetrics.Registry, strings.NewReader(want), "kubeflow_trainer_runtime_info"); err != nil {
 		t.Fatalf("unexpected runtime metrics: %v", err)
 	}
+}
+
+func TestMetricsRunnablesUseExpectedLeadership(t *testing.T) {
+	m := newTrainerMetrics(nil)
+	if !m.NeedLeaderElection() {
+		t.Fatal("TrainJob metrics observer must require leader election")
+	}
+	collector := newRuntimeInfoCollector(nil)
+	if collector.NeedLeaderElection() {
+		t.Fatal("runtime inventory collector must run on every replica")
+	}
+}
+
+func TestRuntimeInfoCollectorSnapshotUpdates(t *testing.T) {
+	t.Cleanup(func() { resetMetrics(t) })
+	collector := newRuntimeInfoCollector(nil)
+	runtime := &trainer.TrainingRuntime{ObjectMeta: metav1.ObjectMeta{Name: "torch", Namespace: "team-a"}}
+	collector.upsert(runtime, trainingRuntimeKind)
+
+	reg := prometheus.NewRegistry()
+	if err := reg.Register(collector); err != nil {
+		t.Fatalf("register runtime collector: %v", err)
+	}
+	if err := testutil.GatherAndCompare(reg, strings.NewReader(`# HELP kubeflow_trainer_runtime_info Current TrainingRuntime and ClusterTrainingRuntime resources.
+# TYPE kubeflow_trainer_runtime_info gauge
+kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRuntime",ml_policy="none",name="torch",namespace="team-a",pod_group_policy="none"} 1
+`), "kubeflow_trainer_runtime_info"); err != nil {
+		t.Fatalf("unexpected runtime snapshot: %v", err)
+	}
+
+	collector.delete(runtime, trainingRuntimeKind)
+	assertMetric(t, reg, "", "kubeflow_trainer_runtime_info")
+}
+
+func TestRequestedNodesLookupFailureSkipsObservation(t *testing.T) {
+	t.Cleanup(func() { resetMetrics(t) })
+	m := newTrainerMetrics(nil)
+	m.ready.Store(true)
+	job := trainJob("job-a", false)
+	job.Spec.Trainer = nil
+	m.onAdd(job)
+
+	reg := prometheus.NewRegistry()
+	if err := registerTrainerCollectors(reg, m); err != nil {
+		t.Fatalf("register Trainer metrics: %v", err)
+	}
+	if err := testutil.GatherAndCompare(reg, strings.NewReader(""), "kubeflow_trainer_trainjob_requested_training_nodes_per_job"); err != nil {
+		t.Fatalf("unexpected requested-node metric: %v", err)
+	}
+}
+
+func TestRequestedNodesUsesRuntimeSnapshot(t *testing.T) {
+	tests := map[string]struct {
+		runtime client.Object
+		kind    string
+	}{
+		"namespaced runtime": {
+			runtime: &trainer.TrainingRuntime{
+				ObjectMeta: metav1.ObjectMeta{Name: "torch", Namespace: "team-a"},
+				Spec:       trainer.TrainingRuntimeSpec{MLPolicy: &trainer.MLPolicy{NumNodes: ptrInt32(4)}},
+			},
+			kind: trainingRuntimeKind,
+		},
+		"cluster runtime": {
+			runtime: &trainer.ClusterTrainingRuntime{
+				ObjectMeta: metav1.ObjectMeta{Name: "torch"},
+				Spec:       trainer.TrainingRuntimeSpec{MLPolicy: &trainer.MLPolicy{NumNodes: ptrInt32(4)}},
+			},
+			kind: clusterTrainingRuntimeKind,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Cleanup(func() { resetMetrics(t) })
+			collector := newRuntimeInfoCollector(nil)
+			collector.upsert(test.runtime, test.kind)
+			m := newTrainerMetrics(nil)
+			m.runtimeInfo = collector
+			m.ready.Store(true)
+			job := trainJob("job-a", false)
+			if test.kind == trainingRuntimeKind {
+				kind := trainingRuntimeKind
+				job.Spec.RuntimeRef.Kind = &kind
+			}
+			job.Spec.Trainer = nil
+			m.onAdd(job)
+
+			reg := prometheus.NewRegistry()
+			if err := registerTrainerCollectors(reg, m); err != nil {
+				t.Fatalf("register Trainer collectors: %v", err)
+			}
+			assertHistogramObservation(t, reg, "kubeflow_trainer_trainjob_requested_training_nodes_per_job", map[string]string{
+				"runtime_ref": runtimeRefLabel(job),
+			}, 1, 4)
+		})
+	}
+}
+
+func TestRequestedNodesDefaultsToOneFromRuntimeSnapshot(t *testing.T) {
+	t.Cleanup(func() { resetMetrics(t) })
+	collector := newRuntimeInfoCollector(nil)
+	collector.upsert(&trainer.ClusterTrainingRuntime{
+		ObjectMeta: metav1.ObjectMeta{Name: "torch"},
+		Spec: trainer.TrainingRuntimeSpec{
+			MLPolicy: &trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{Torch: &trainer.TorchMLPolicySource{}}},
+		},
+	}, clusterTrainingRuntimeKind)
+	m := newTrainerMetrics(nil)
+	m.runtimeInfo = collector
+	m.ready.Store(true)
+	job := trainJob("job-a", false)
+	job.Spec.Trainer = nil
+	m.onAdd(job)
+
+	reg := prometheus.NewRegistry()
+	if err := registerTrainerCollectors(reg, m); err != nil {
+		t.Fatalf("register Trainer collectors: %v", err)
+	}
+	assertHistogramObservation(t, reg, "kubeflow_trainer_trainjob_requested_training_nodes_per_job", map[string]string{
+		"runtime_ref": runtimeRefLabel(job),
+	}, 1, 1)
 }
 
 func TestTrainJobAdd(t *testing.T) {
@@ -177,21 +306,10 @@ func TestTrainJobAdd(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Cleanup(func() { resetMetrics(t) })
-			scheme := newMetricsScheme(t)
-			m := newTrainerMetrics(fake.NewClientBuilder().WithScheme(scheme).Build())
-			fakeCache := &informertest.FakeInformers{Scheme: scheme}
-			if err := m.installObserver(fakeCache); err != nil {
-				t.Fatalf("install observer: %v", err)
-			}
-			informer, err := fakeCache.FakeInformerFor(context.Background(), &trainer.TrainJob{})
-			if err != nil {
-				t.Fatalf("get fake informer: %v", err)
-			}
-			for _, job := range test.initialTrainJobs {
-				m.onAdd(job, true)
-			}
+			m := newTrainerMetrics(nil)
+			m.ready.Store(true)
 			for _, job := range test.addedTrainJobs {
-				informer.Add(job)
+				m.onAdd(job)
 			}
 			for _, want := range test.wantTrainJobCreated {
 				if got := testutil.ToFloat64(trainJobCreated.WithLabelValues(want.labels["namespace"], want.labels["runtime_ref"])); got != want.value {
@@ -225,11 +343,11 @@ func TestTrainJobUpdate(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Cleanup(func() { resetMetrics(t) })
-			scheme := newMetricsScheme(t)
-			m := newTrainerMetrics(fake.NewClientBuilder().WithScheme(scheme).Build())
+			m := newTrainerMetrics(nil)
+			m.ready.Store(true)
 			job := trainJob("job-a", false)
 			job.CreationTimestamp = metav1.NewTime(time.Unix(1000, 0))
-			m.onAdd(job, false)
+			m.onAdd(job)
 			updated := job.DeepCopy()
 			if test.terminalUpdate {
 				conditionType := trainer.TrainJobComplete
@@ -284,11 +402,17 @@ type metricsTestManager struct {
 	ctrl.Manager
 	client client.Client
 	cache  cache.Cache
+	added  []manager.Runnable
 }
 
 func (m *metricsTestManager) GetClient() client.Client { return m.client }
 
 func (m *metricsTestManager) GetCache() cache.Cache { return m.cache }
+
+func (m *metricsTestManager) Add(runnable manager.Runnable) error {
+	m.added = append(m.added, runnable)
+	return nil
+}
 
 func registerTrainerCollectors(reg prometheus.Registerer, m *trainerMetrics) error {
 	for _, collector := range []prometheus.Collector{
