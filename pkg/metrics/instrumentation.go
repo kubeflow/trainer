@@ -84,6 +84,10 @@ func (m *trainerMetrics) Start(ctx context.Context) error {
 		}
 		return fmt.Errorf("wait for runtime metrics snapshot: %w", err)
 	}
+	if err := registerLeaderMetrics(m.runtimeInfo); err != nil {
+		return err
+	}
+	defer unregisterLeaderMetrics(m.runtimeInfo)
 	m.ready.Store(false)
 
 	informer, err := m.cache.GetInformer(ctx, &trainer.TrainJob{})
@@ -191,11 +195,9 @@ func (m *trainerMetrics) observeRequestedWorkload(trainJob *trainer.TrainJob, ru
 type runtimeInfoCollector struct {
 	cache cache.Cache
 
-	mu        sync.RWMutex
-	snapshot  map[string]runtimeInfo
-	ready     atomic.Bool
-	readyCh   chan struct{}
-	readyOnce sync.Once
+	mu       sync.RWMutex
+	snapshot map[string]runtimeInfo
+	ready    atomic.Bool
 }
 
 type runtimeInfo struct {
@@ -212,14 +214,13 @@ func newRuntimeInfoCollector(c cache.Cache) *runtimeInfoCollector {
 	return &runtimeInfoCollector{
 		cache:    c,
 		snapshot: make(map[string]runtimeInfo),
-		readyCh:  make(chan struct{}),
 	}
 }
 
-// NeedLeaderElection keeps the current runtime inventory available on every
-// controller replica. It is a scrape-time gauge, not an event counter.
+// NeedLeaderElection ensures runtime inventory is exposed only by the elected
+// controller replica, alongside the event-based TrainJob metrics.
 func (c *runtimeInfoCollector) NeedLeaderElection() bool {
-	return false
+	return true
 }
 
 func (c *runtimeInfoCollector) Start(ctx context.Context) error {
@@ -227,7 +228,12 @@ func (c *runtimeInfoCollector) Start(ctx context.Context) error {
 		return fmt.Errorf("metrics cache is required")
 	}
 	c.ready.Store(false)
-	defer c.ready.Store(false)
+	defer func() {
+		c.ready.Store(false)
+		c.mu.Lock()
+		c.snapshot = make(map[string]runtimeInfo)
+		c.mu.Unlock()
+	}()
 	trainingInformer, err := c.cache.GetInformer(ctx, &trainer.TrainingRuntime{})
 	if err != nil {
 		return fmt.Errorf("get TrainingRuntime informer: %w", err)
@@ -272,21 +278,14 @@ func (c *runtimeInfoCollector) Start(ctx context.Context) error {
 		return fmt.Errorf("wait for runtime metrics observers: %w", err)
 	}
 	c.ready.Store(true)
-	c.readyOnce.Do(func() { close(c.readyCh) })
 	<-ctx.Done()
 	return nil
 }
 
 func (c *runtimeInfoCollector) waitForSync(ctx context.Context) error {
-	if c.ready.Load() {
-		return nil
-	}
-	select {
-	case <-c.readyCh:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	return wait.PollUntilContextCancel(ctx, 10*time.Millisecond, true, func(context.Context) (bool, error) {
+		return c.ready.Load(), nil
+	})
 }
 
 func (c *runtimeInfoCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -408,9 +407,9 @@ func copyRuntimeSnapshot(snapshot map[string]runtimeInfo) map[string]runtimeInfo
 
 func setupTrainerMetrics(mgr ctrl.Manager) error {
 	m := newTrainerMetrics(mgr.GetCache())
-	if err := controllerMetrics.Registry.Register(m.runtimeInfo); err != nil {
-		return fmt.Errorf("register runtime metrics: %w", err)
-	}
+	// Metric vectors are registered during package initialization. Remove them
+	// until the elected replica starts the leader-owned metrics runnable.
+	unregisterLeaderMetrics(nil)
 	if err := mgr.Add(m.runtimeInfo); err != nil {
 		return fmt.Errorf("add runtime metrics observer: %w", err)
 	}
@@ -418,6 +417,36 @@ func setupTrainerMetrics(mgr ctrl.Manager) error {
 		return fmt.Errorf("add TrainJob metrics observer: %w", err)
 	}
 	return nil
+}
+
+func registerLeaderMetrics(runtimeInfo prometheus.Collector) error {
+	for _, collector := range leaderMetricCollectors(runtimeInfo) {
+		if err := controllerMetrics.Registry.Register(collector); err != nil {
+			unregisterLeaderMetrics(runtimeInfo)
+			return fmt.Errorf("register leader-owned metrics: %w", err)
+		}
+	}
+	return nil
+}
+
+func unregisterLeaderMetrics(runtimeInfo prometheus.Collector) {
+	collectors := leaderMetricCollectors(runtimeInfo)
+	for _, collector := range collectors {
+		controllerMetrics.Registry.Unregister(collector)
+	}
+}
+
+func leaderMetricCollectors(runtimeInfo prometheus.Collector) []prometheus.Collector {
+	collectors := []prometheus.Collector{
+		trainJobCreated,
+		trainJobFinished,
+		trainJobLifetime,
+		trainJobRequestedTrainingNodes,
+	}
+	if runtimeInfo != nil {
+		collectors = append(collectors, runtimeInfo)
+	}
+	return collectors
 }
 
 func runtimeRefLabel(trainJob *trainer.TrainJob) string {

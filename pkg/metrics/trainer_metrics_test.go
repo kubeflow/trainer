@@ -115,14 +115,11 @@ func TestSetupTrainerMetricsRegistersRuntimeCollector(t *testing.T) {
 		t.Fatalf("setup Trainer metrics: %v", err)
 	}
 
-	collector := mgr.added[0].(*runtimeInfoCollector)
-	collector.upsert(&trainer.TrainingRuntime{ObjectMeta: metav1.ObjectMeta{Name: "torch", Namespace: "team-a"}}, trainingRuntimeKind)
-	want := `# HELP kubeflow_trainer_runtime_info Current TrainingRuntime and ClusterTrainingRuntime resources.
-# TYPE kubeflow_trainer_runtime_info gauge
-kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRuntime",ml_policy="none",name="torch",namespace="team-a",pod_group_policy="none"} 1
-`
-	if err := testutil.GatherAndCompare(controllerMetrics.Registry, strings.NewReader(want), "kubeflow_trainer_runtime_info"); err != nil {
-		t.Fatalf("unexpected runtime metrics: %v", err)
+	if len(mgr.added) != 2 {
+		t.Fatalf("added runnables = %d, want 2", len(mgr.added))
+	}
+	if _, ok := mgr.added[0].(*runtimeInfoCollector); !ok {
+		t.Fatalf("first runnable = %T, want runtimeInfoCollector", mgr.added[0])
 	}
 }
 
@@ -132,8 +129,8 @@ func TestMetricsRunnablesUseExpectedLeadership(t *testing.T) {
 		t.Fatal("TrainJob metrics observer must require leader election")
 	}
 	collector := newRuntimeInfoCollector(nil)
-	if collector.NeedLeaderElection() {
-		t.Fatal("runtime inventory collector must run on every replica")
+	if !collector.NeedLeaderElection() {
+		t.Fatal("runtime inventory collector must require leader election")
 	}
 }
 
