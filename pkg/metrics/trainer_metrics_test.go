@@ -100,7 +100,7 @@ kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="ClusterTrai
 	}
 }
 
-func TestSetupTrainerMetricsRegistersRuntimeCollector(t *testing.T) {
+func TestSetupTrainerMetricsAddsLeaderOwnedRunnables(t *testing.T) {
 	previousRegistry := controllerMetrics.Registry
 	t.Cleanup(func() { controllerMetrics.Registry = previousRegistry })
 	controllerMetrics.Registry = prometheus.NewRegistry()
@@ -120,6 +120,33 @@ func TestSetupTrainerMetricsRegistersRuntimeCollector(t *testing.T) {
 	}
 	if _, ok := mgr.added[0].(*runtimeInfoCollector); !ok {
 		t.Fatalf("first runnable = %T, want runtimeInfoCollector", mgr.added[0])
+	}
+}
+
+func TestLeaderMetricsRegistration(t *testing.T) {
+	previousRegistry := controllerMetrics.Registry
+	t.Cleanup(func() { controllerMetrics.Registry = previousRegistry })
+	controllerMetrics.Registry = prometheus.NewRegistry()
+
+	collector := newRuntimeInfoCollector(nil)
+	collector.upsert(&trainer.TrainingRuntime{
+		ObjectMeta: metav1.ObjectMeta{Name: "torch", Namespace: "team-a"},
+	}, trainingRuntimeKind)
+
+	if err := registerLeaderMetrics(collector); err != nil {
+		t.Fatalf("register leader metrics: %v", err)
+	}
+	want := `# HELP kubeflow_trainer_runtime_info Current TrainingRuntime and ClusterTrainingRuntime resources.
+# TYPE kubeflow_trainer_runtime_info gauge
+kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRuntime",ml_policy="none",name="torch",namespace="team-a",pod_group_policy="none"} 1
+`
+	if err := testutil.GatherAndCompare(controllerMetrics.Registry, strings.NewReader(want), "kubeflow_trainer_runtime_info"); err != nil {
+		t.Fatalf("unexpected leader metrics: %v", err)
+	}
+
+	unregisterLeaderMetrics(collector)
+	if err := testutil.GatherAndCompare(controllerMetrics.Registry, strings.NewReader(""), "kubeflow_trainer_runtime_info"); err != nil {
+		t.Fatalf("metrics remain registered after leadership loss: %v", err)
 	}
 }
 

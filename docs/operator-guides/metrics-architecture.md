@@ -1,3 +1,8 @@
+# Trainer metrics architecture
+
+This document summarizes how Trainer metrics are implemented and the design
+decisions behind them.
+
 ## Scope
 
 The implementation provides five metric families:
@@ -54,7 +59,7 @@ owned and exposed by the leader to avoid duplicate series.
 ```text
 Controller replica A                         Controller replica B
 --------------------                         --------------------
-Runtime snapshot: yes                        Runtime snapshot: yes
+Runtime snapshot: no                         Runtime snapshot: yes
 TrainJob observer: no                        TrainJob observer: yes
                                              (elected leader)
 
