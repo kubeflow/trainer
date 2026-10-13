@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -30,11 +31,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
+	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	jobruntimes "github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	fwkcore "github.com/kubeflow/trainer/v2/pkg/runtime/framework/core"
+	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
@@ -2294,6 +2303,176 @@ func TestRuntimeInfo(t *testing.T) {
 
 			if !strings.Contains(err.Error(), "unsupported runtimeTemplateSpec") {
 				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+var errFakeTrainJobStatus = errors.New("fake TrainJobStatus failure")
+
+type fakeTrainJobStatusPlugin struct {
+	status      *trainer.TrainJobStatus
+	err         error
+	gotTrainJob *trainer.TrainJob
+}
+
+var _ framework.TrainJobStatusPlugin = (*fakeTrainJobStatusPlugin)(nil)
+
+func (p *fakeTrainJobStatusPlugin) Name() string { return "fake-train-job-status" }
+func (p *fakeTrainJobStatusPlugin) Status(_ context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
+	p.gotTrainJob = trainJob
+	return p.status, p.err
+}
+
+type fakeWatchExtensionPlugin struct {
+	name     string
+	builders []jobruntimes.ReconcilerBuilder
+}
+
+var _ framework.WatchExtensionPlugin = (*fakeWatchExtensionPlugin)(nil)
+
+func (p *fakeWatchExtensionPlugin) Name() string { return p.name }
+func (p *fakeWatchExtensionPlugin) ReconcilerBuilders() []jobruntimes.ReconcilerBuilder {
+	return p.builders
+}
+
+// fakePluginRegistry returns a Registry with one fakeWatchExtensionPlugin per entry in watchBuilderIDs,
+// whose ReconcilerBuilders record their ID in invokedBuilderIDs (when non-nil) when called, and optionally statusPlugin.
+func fakePluginRegistry(watchBuilderIDs map[string][]string, invokedBuilderIDs *[]string, statusPlugin framework.Plugin) fwkplugins.Registry {
+	registry := fwkplugins.Registry{}
+	for pluginName, builderIDs := range watchBuilderIDs {
+		plugin := &fakeWatchExtensionPlugin{name: pluginName}
+		for _, id := range builderIDs {
+			plugin.builders = append(plugin.builders, func(b *builder.Builder, _ client.Client, _ cache.Cache) *builder.Builder {
+				if invokedBuilderIDs != nil {
+					*invokedBuilderIDs = append(*invokedBuilderIDs, id)
+				}
+				return b
+			})
+		}
+		registry[pluginName] = func(context.Context, client.Client, client.FieldIndexer, *configapi.Configuration) (framework.Plugin, error) {
+			return plugin, nil
+		}
+	}
+	if statusPlugin != nil {
+		registry[statusPlugin.Name()] = func(context.Context, client.Client, client.FieldIndexer, *configapi.Configuration) (framework.Plugin, error) {
+			return statusPlugin, nil
+		}
+	}
+	return registry
+}
+
+func newTrainingRuntimeWithRegistry(ctx context.Context, t *testing.T, registry fwkplugins.Registry) *TrainingRuntime {
+	t.Helper()
+	clientBuilder := testingutil.NewClientBuilder()
+	c := clientBuilder.Build()
+	fwk, err := fwkcore.New(ctx, c, registry, testingutil.AsIndex(clientBuilder), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &TrainingRuntime{framework: fwk, client: c}
+}
+
+func TestTrainingRuntimeTrainJobStatus(t *testing.T) {
+	cases := map[string]struct {
+		statusPlugin *fakeTrainJobStatusPlugin
+		wantStatus   *trainer.TrainJobStatus
+		wantError    error
+	}{
+		"no TrainJobStatus plugin is registered": {},
+		"status is returned from the TrainJobStatus plugin": {
+			statusPlugin: &fakeTrainJobStatusPlugin{
+				status: &trainer.TrainJobStatus{
+					JobsStatus: []trainer.JobStatus{{Name: "node", Ready: ptr.To[int32](1)}},
+				},
+			},
+			wantStatus: &trainer.TrainJobStatus{
+				JobsStatus: []trainer.JobStatus{{Name: "node", Ready: ptr.To[int32](1)}},
+			},
+		},
+		"error is propagated from the TrainJobStatus plugin": {
+			statusPlugin: &fakeTrainJobStatusPlugin{err: errFakeTrainJobStatus},
+			wantError:    errFakeTrainJobStatus,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var statusPlugin framework.Plugin
+			if tc.statusPlugin != nil {
+				statusPlugin = tc.statusPlugin
+			}
+			rt := newTrainingRuntimeWithRegistry(ctx, t, fakePluginRegistry(nil, nil, statusPlugin))
+			trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj()
+
+			gotStatus, err := rt.TrainJobStatus(ctx, trainJob)
+			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantStatus, gotStatus); len(diff) != 0 {
+				t.Errorf("Unexpected TrainJobStatus (-want,+got):\n%s", diff)
+			}
+			if tc.statusPlugin != nil && tc.statusPlugin.gotTrainJob != trainJob {
+				t.Errorf("Expected TrainJobStatus plugin to receive TrainJob %v, got %v", trainJob, tc.statusPlugin.gotTrainJob)
+			}
+		})
+	}
+}
+
+func TestTrainingRuntimeEventHandlerRegistrars(t *testing.T) {
+	cases := map[string]struct {
+		watchBuilderIDs    map[string][]string
+		statusPlugin       framework.Plugin
+		wantNilBuilders    bool
+		wantInvokedBuilder []string
+	}{
+		"no plugins are registered": {
+			wantNilBuilders: true,
+		},
+		"plugins without WatchExtension are ignored": {
+			statusPlugin:    &fakeTrainJobStatusPlugin{},
+			wantNilBuilders: true,
+		},
+		"WatchExtension plugin without ReconcilerBuilders": {
+			watchBuilderIDs: map[string][]string{"watch-a": nil},
+			wantNilBuilders: true,
+		},
+		"ReconcilerBuilders from a single WatchExtension plugin keep their order": {
+			watchBuilderIDs:    map[string][]string{"watch-a": {"a-1", "a-2"}},
+			wantInvokedBuilder: []string{"a-1", "a-2"},
+		},
+		"ReconcilerBuilders from multiple WatchExtension plugins are collected": {
+			watchBuilderIDs: map[string][]string{
+				"watch-a": {"a-1"},
+				"watch-b": {"b-1", "b-2"},
+			},
+			statusPlugin:       &fakeTrainJobStatusPlugin{},
+			wantInvokedBuilder: []string{"a-1", "b-1", "b-2"},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var invokedBuilderIDs []string
+			rt := newTrainingRuntimeWithRegistry(ctx, t, fakePluginRegistry(tc.watchBuilderIDs, &invokedBuilderIDs, tc.statusPlugin))
+
+			builders := rt.EventHandlerRegistrars()
+			if tc.wantNilBuilders && builders != nil {
+				t.Errorf("Expected nil ReconcilerBuilders, got %d", len(builders))
+			}
+			if len(builders) != len(tc.wantInvokedBuilder) {
+				t.Fatalf("Expected %d ReconcilerBuilders, got %d", len(tc.wantInvokedBuilder), len(builders))
+			}
+			for _, b := range builders {
+				b(nil, nil, nil)
+			}
+			// Plugins are registered from a map, so only the order within a single plugin is deterministic.
+			cmpOpts := []cmp.Option{cmpopts.EquateEmpty()}
+			if len(tc.watchBuilderIDs) > 1 {
+				cmpOpts = append(cmpOpts, cmpopts.SortSlices(func(a, b string) bool { return a < b }))
+			}
+			if diff := cmp.Diff(tc.wantInvokedBuilder, invokedBuilderIDs, cmpOpts...); len(diff) != 0 {
+				t.Errorf("Unexpected ReconcilerBuilders (-want,+got):\n%s", diff)
 			}
 		})
 	}

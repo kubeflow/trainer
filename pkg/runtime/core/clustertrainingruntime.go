@@ -92,6 +92,9 @@ func (r *ClusterTrainingRuntime) TrainJobStatus(ctx context.Context, trainJob *t
 	return r.TrainingRuntime.TrainJobStatus(ctx, trainJob)
 }
 
+// EventHandlerRegistrars returns nil because the embedded TrainingRuntime's registrars are
+// already registered, and trainjob_controller.go loops over every runtime, so returning them
+// again would register the same watches twice.
 func (r *ClusterTrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {
 	return nil
 }
