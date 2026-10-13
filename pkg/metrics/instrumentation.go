@@ -78,6 +78,12 @@ func (m *trainerMetrics) Start(ctx context.Context) error {
 	if m.cache == nil {
 		return fmt.Errorf("metrics cache is required")
 	}
+	if err := m.runtimeInfo.waitForSync(ctx); err != nil {
+		if ctx.Err() != nil {
+			return nil
+		}
+		return fmt.Errorf("wait for runtime metrics snapshot: %w", err)
+	}
 	m.ready.Store(false)
 
 	informer, err := m.cache.GetInformer(ctx, &trainer.TrainJob{})
@@ -166,7 +172,7 @@ func (m *trainerMetrics) observeTerminal(trainJob *trainer.TrainJob, runtimeRef 
 
 func (m *trainerMetrics) observeRequestedWorkload(trainJob *trainer.TrainJob, runtimeRef string) {
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		if *trainJob.Spec.Trainer.NumNodes > 0 {
+		if *trainJob.Spec.Trainer.NumNodes >= 0 {
 			trainJobRequestedTrainingNodes.WithLabelValues(runtimeRef).Observe(float64(*trainJob.Spec.Trainer.NumNodes))
 		}
 		return
@@ -185,8 +191,11 @@ func (m *trainerMetrics) observeRequestedWorkload(trainJob *trainer.TrainJob, ru
 type runtimeInfoCollector struct {
 	cache cache.Cache
 
-	mu       sync.RWMutex
-	snapshot map[string]runtimeInfo
+	mu        sync.RWMutex
+	snapshot  map[string]runtimeInfo
+	ready     atomic.Bool
+	readyCh   chan struct{}
+	readyOnce sync.Once
 }
 
 type runtimeInfo struct {
@@ -203,6 +212,7 @@ func newRuntimeInfoCollector(c cache.Cache) *runtimeInfoCollector {
 	return &runtimeInfoCollector{
 		cache:    c,
 		snapshot: make(map[string]runtimeInfo),
+		readyCh:  make(chan struct{}),
 	}
 }
 
@@ -216,6 +226,8 @@ func (c *runtimeInfoCollector) Start(ctx context.Context) error {
 	if c.cache == nil {
 		return fmt.Errorf("metrics cache is required")
 	}
+	c.ready.Store(false)
+	defer c.ready.Store(false)
 	trainingInformer, err := c.cache.GetInformer(ctx, &trainer.TrainingRuntime{})
 	if err != nil {
 		return fmt.Errorf("get TrainingRuntime informer: %w", err)
@@ -259,8 +271,22 @@ func (c *runtimeInfoCollector) Start(ctx context.Context) error {
 		}
 		return fmt.Errorf("wait for runtime metrics observers: %w", err)
 	}
+	c.ready.Store(true)
+	c.readyOnce.Do(func() { close(c.readyCh) })
 	<-ctx.Done()
 	return nil
+}
+
+func (c *runtimeInfoCollector) waitForSync(ctx context.Context) error {
+	if c.ready.Load() {
+		return nil
+	}
+	select {
+	case <-c.readyCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (c *runtimeInfoCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -361,7 +387,7 @@ func runtimeInfoKey(kind, namespace, name string) string {
 
 func requestedNodesFromSpec(spec *trainer.TrainingRuntimeSpec) (int32, bool) {
 	if spec.MLPolicy == nil {
-		return 0, false
+		return 1, true
 	}
 	if spec.MLPolicy.NumNodes == nil {
 		return 1, true

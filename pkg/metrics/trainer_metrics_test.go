@@ -227,9 +227,7 @@ func TestRequestedNodesDefaultsToOneFromRuntimeSnapshot(t *testing.T) {
 	collector := newRuntimeInfoCollector(nil)
 	collector.upsert(&trainer.ClusterTrainingRuntime{
 		ObjectMeta: metav1.ObjectMeta{Name: "torch"},
-		Spec: trainer.TrainingRuntimeSpec{
-			MLPolicy: &trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{Torch: &trainer.TorchMLPolicySource{}}},
-		},
+		Spec:       trainer.TrainingRuntimeSpec{},
 	}, clusterTrainingRuntimeKind)
 	m := newTrainerMetrics(nil)
 	m.runtimeInfo = collector
@@ -245,6 +243,23 @@ func TestRequestedNodesDefaultsToOneFromRuntimeSnapshot(t *testing.T) {
 	assertHistogramObservation(t, reg, "kubeflow_trainer_trainjob_requested_training_nodes_per_job", map[string]string{
 		"runtime_ref": runtimeRefLabel(job),
 	}, 1, 1)
+}
+
+func TestRequestedNodesIncludesExplicitZero(t *testing.T) {
+	t.Cleanup(func() { resetMetrics(t) })
+	m := newTrainerMetrics(nil)
+	m.ready.Store(true)
+	job := trainJob("job-a", false)
+	job.Spec.Trainer.NumNodes = ptrInt32(0)
+	m.onAdd(job)
+
+	reg := prometheus.NewRegistry()
+	if err := registerTrainerCollectors(reg, m); err != nil {
+		t.Fatalf("register Trainer collectors: %v", err)
+	}
+	assertHistogramObservation(t, reg, "kubeflow_trainer_trainjob_requested_training_nodes_per_job", map[string]string{
+		"runtime_ref": runtimeRefLabel(job),
+	}, 1, 0)
 }
 
 func TestTrainJobAdd(t *testing.T) {
