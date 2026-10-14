@@ -177,9 +177,11 @@ func (m *trainerMetrics) observeTerminal(trainJob *trainer.TrainJob, runtimeRef 
 
 func (m *trainerMetrics) observeRequestedWorkload(trainJob *trainer.TrainJob, runtimeRef string) {
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		if *trainJob.Spec.Trainer.NumNodes >= 0 {
-			trainJobRequestedTrainingNodes.WithLabelValues(runtimeRef).Observe(float64(*trainJob.Spec.Trainer.NumNodes))
+		if *trainJob.Spec.Trainer.NumNodes < 0 {
+			m.log.Info("skipping requested training nodes metric because TrainJob numNodes is invalid", "namespace", trainJob.Namespace, "name", trainJob.Name, "runtimeRef", runtimeRef, "numNodes", *trainJob.Spec.Trainer.NumNodes)
+			return
 		}
+		trainJobRequestedTrainingNodes.WithLabelValues(runtimeRef).Observe(float64(*trainJob.Spec.Trainer.NumNodes))
 		return
 	}
 

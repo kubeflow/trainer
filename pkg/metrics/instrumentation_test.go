@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	toolscache "k8s.io/client-go/tools/cache"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/cache/informertest"
@@ -230,7 +231,7 @@ kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRun
 `, "kubeflow_trainer_runtime_info")
 
 	updatedRuntime := trainingRuntime.DeepCopy()
-	updatedRuntime.Spec.MLPolicy = &trainer.MLPolicy{NumNodes: ptrInt32(4)}
+	updatedRuntime.Spec.MLPolicy = &trainer.MLPolicy{NumNodes: ptr.To(int32(4))}
 	trainingInformer.Update(trainingRuntime, updatedRuntime)
 	trainingKind := trainingRuntimeKind
 	if nodes, ok := collector.requestedNodes(&trainer.TrainJob{
@@ -295,14 +296,14 @@ func TestRequestedNodesUsesRuntimeSnapshot(t *testing.T) {
 		"namespaced runtime": {
 			runtime: &trainer.TrainingRuntime{
 				ObjectMeta: metav1.ObjectMeta{Name: "torch", Namespace: "team-a"},
-				Spec:       trainer.TrainingRuntimeSpec{MLPolicy: &trainer.MLPolicy{NumNodes: ptrInt32(4)}},
+				Spec:       trainer.TrainingRuntimeSpec{MLPolicy: &trainer.MLPolicy{NumNodes: ptr.To(int32(4))}},
 			},
 			kind: trainingRuntimeKind,
 		},
 		"cluster runtime": {
 			runtime: &trainer.ClusterTrainingRuntime{
 				ObjectMeta: metav1.ObjectMeta{Name: "torch"},
-				Spec:       trainer.TrainingRuntimeSpec{MLPolicy: &trainer.MLPolicy{NumNodes: ptrInt32(4)}},
+				Spec:       trainer.TrainingRuntimeSpec{MLPolicy: &trainer.MLPolicy{NumNodes: ptr.To(int32(4))}},
 			},
 			kind: clusterTrainingRuntimeKind,
 		},
@@ -409,7 +410,7 @@ func TestRequestedNodesFromRuntimeValidatesValues(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			spec := trainer.TrainingRuntimeSpec{MLPolicy: &trainer.MLPolicy{NumNodes: ptrInt32(test.nodes)}}
+			spec := trainer.TrainingRuntimeSpec{MLPolicy: &trainer.MLPolicy{NumNodes: ptr.To(test.nodes)}}
 			got, ok := requestedNodesFromSpec(&spec)
 			if got != test.want || ok != test.ok {
 				t.Fatalf("requestedNodesFromSpec(%d) = (%d, %t), want (%d, %t)", test.nodes, got, ok, test.want, test.ok)
@@ -423,7 +424,7 @@ func TestRequestedNodesIncludesExplicitZero(t *testing.T) {
 	m := newTrainerMetrics(nil)
 	m.ready.Store(true)
 	job := trainJob("job-a", false)
-	job.Spec.Trainer.NumNodes = ptrInt32(0)
+	job.Spec.Trainer.NumNodes = ptr.To(int32(0))
 	m.onAdd(job)
 
 	reg := prometheus.NewRegistry()
@@ -433,6 +434,29 @@ func TestRequestedNodesIncludesExplicitZero(t *testing.T) {
 	assertHistogramObservation(t, reg, "kubeflow_trainer_trainjob_requested_training_nodes_per_job", map[string]string{
 		"runtime_ref": runtimeRefLabel(job),
 	}, 1, 0)
+}
+
+func TestRequestedNodesSkipsNegativeExplicitValue(t *testing.T) {
+	t.Cleanup(func() { resetMetrics(t) })
+	collector := newRuntimeInfoCollector(nil)
+	collector.upsert(&trainer.ClusterTrainingRuntime{
+		ObjectMeta: metav1.ObjectMeta{Name: "torch"},
+		Spec:       trainer.TrainingRuntimeSpec{MLPolicy: &trainer.MLPolicy{NumNodes: ptr.To(int32(4))}},
+	}, clusterTrainingRuntimeKind)
+	m := newTrainerMetrics(nil)
+	m.runtimeInfo = collector
+	m.ready.Store(true)
+	job := trainJob("job-a", false)
+	job.Spec.Trainer.NumNodes = ptr.To(int32(-1))
+	m.onAdd(job)
+
+	reg := prometheus.NewRegistry()
+	if err := registerTrainerCollectors(reg, m); err != nil {
+		t.Fatalf("register Trainer collectors: %v", err)
+	}
+	if err := testutil.GatherAndCompare(reg, strings.NewReader(""), "kubeflow_trainer_trainjob_requested_training_nodes_per_job"); err != nil {
+		t.Fatalf("negative TrainJob numNodes produced an observation: %v", err)
+	}
 }
 
 func TestTrainJobAdd(t *testing.T) {
@@ -808,7 +832,7 @@ func templateRuntimeSpec(parallelism int32) trainer.TrainingRuntimeSpec {
 					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
 						constants.LabelTrainJobAncestor: constants.AncestorTrainer,
 					}},
-					Spec: batchv1.JobSpec{Parallelism: ptrInt32(parallelism)},
+					Spec: batchv1.JobSpec{Parallelism: ptr.To(parallelism)},
 				},
 			}}},
 		},
@@ -974,7 +998,7 @@ func trainJob(name string, terminal bool) *trainer.TrainJob {
 		},
 		Spec: trainer.TrainJobSpec{
 			RuntimeRef: trainer.RuntimeRef{Name: "torch"},
-			Trainer:    &trainer.Trainer{NumNodes: ptrInt32(2)},
+			Trainer:    &trainer.Trainer{NumNodes: ptr.To(int32(2))},
 		},
 	}
 	if terminal {
@@ -982,5 +1006,3 @@ func trainJob(name string, terminal bool) *trainer.TrainJob {
 	}
 	return job
 }
-
-func ptrInt32(value int32) *int32 { return &value }
