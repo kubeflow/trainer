@@ -51,7 +51,7 @@ sum by (runtime_ref) (
 
 Count failed TrainJobs by reason and runtime:
 
-```promql
+```text
 sum by (reason, runtime_ref) (
   increase(kubeflow_trainer_trainjob_failed_total[$__range])
 )
@@ -59,7 +59,7 @@ sum by (reason, runtime_ref) (
 
 Calculate the observed failure percentage:
 
-```promql
+```text
 100 *
 sum(increase(kubeflow_trainer_trainjob_failed_total[$__range]))
 /
