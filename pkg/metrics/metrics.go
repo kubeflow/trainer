@@ -35,11 +35,16 @@ var (
 		Name:      "trainjob_created_total",
 		Help:      "Number of TrainJobs observed after the initial cache listing.",
 	}, []string{"namespace", "runtime_ref"})
-	trainJobFinished = prometheus.NewCounterVec(prometheus.CounterOpts{
+	trainJobComplete = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metricNamespace,
-		Name:      "trainjob_finished_total",
-		Help:      "Number of TrainJobs that reached a terminal outcome.",
-	}, []string{"result", "reason", "runtime_ref"})
+		Name:      "trainjob_complete_total",
+		Help:      "Number of TrainJobs that completed successfully.",
+	}, []string{"runtime_ref"})
+	trainJobFailed = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: metricNamespace,
+		Name:      "trainjob_failed_total",
+		Help:      "Number of TrainJobs that failed.",
+	}, []string{"reason", "runtime_ref"})
 	trainJobLifetime = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: metricNamespace,
 		Name:      "trainjob_lifetime_seconds",
@@ -57,7 +62,8 @@ var (
 func init() {
 	controllerMetrics.Registry.MustRegister(
 		trainJobCreated,
-		trainJobFinished,
+		trainJobComplete,
+		trainJobFailed,
 		trainJobLifetime,
 		trainJobRequestedTrainingNodes,
 	)

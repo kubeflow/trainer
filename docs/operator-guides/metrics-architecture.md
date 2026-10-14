@@ -5,7 +5,7 @@ decisions behind them.
 
 ## Scope
 
-The implementation provides five metric families:
+The implementation provides six metric families:
 
 1. `kubeflow_trainer_runtime_info`
    - Gauge
@@ -16,15 +16,19 @@ The implementation provides five metric families:
    - Counter
    - Counts TrainJobs observed after the controller cache is ready.
 
-3. `kubeflow_trainer_trainjob_finished_total`
+3. `kubeflow_trainer_trainjob_complete_total`
    - Counter
-   - Counts terminal TrainJob outcomes by result, reason, and runtime.
+   - Counts successfully completed TrainJobs by runtime.
 
-4. `kubeflow_trainer_trainjob_lifetime_seconds`
+4. `kubeflow_trainer_trainjob_failed_total`
+   - Counter
+   - Counts failed TrainJobs by normalized reason and runtime.
+
+5. `kubeflow_trainer_trainjob_lifetime_seconds`
    - Histogram
    - Measures the time from TrainJob creation to its terminal outcome.
 
-5. `kubeflow_trainer_trainjob_requested_training_nodes_per_job`
+6. `kubeflow_trainer_trainjob_requested_training_nodes_per_job`
    - Histogram
    - Measures the requested training-node size of each TrainJob.
 
@@ -81,8 +85,8 @@ TrainJob observer: no                        TrainJob observer: yes
 3. The runtime snapshot is synchronized before it is used for TrainJob metrics.
 4. The elected leader registers the TrainJob observer.
 5. New TrainJobs increment the creation counter.
-6. The first terminal transition increments the finished counter and records
-   the lifetime. Repeated terminal updates are ignored.
+6. The first terminal transition increments either the complete or failed
+   counter and records the lifetime. Repeated terminal updates are ignored.
 
 ### TrainJob event flow
 
@@ -101,7 +105,7 @@ TrainJob status update
              |
              +-- no --> ignore
              |
-             +-- yes -> finished counter + lifetime histogram
+             +-- yes -> complete/failed counter + lifetime histogram
 ```
 
 TrainJobs already present during the initial cache listing are not counted as
@@ -129,8 +133,8 @@ aggregation:
 - runtime reference;
 - namespace;
 - runtime kind;
-- result;
-- normalized reason;
+- result for lifetime observations;
+- normalized failure reason; and
 - ML policy; and
 - PodGroupPolicy.
 

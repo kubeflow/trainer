@@ -588,8 +588,11 @@ func TestTrainJobMetricsStartSkipsInitialObjects(t *testing.T) {
 		nonTerminal := created.DeepCopy()
 		nonTerminal.Generation = 2
 		informer.Update(created, nonTerminal)
-		if got := testutil.ToFloat64(trainJobFinished.WithLabelValues("succeeded", "none", runtimeRef)); got != 0 {
-			return fmt.Errorf("non-terminal update changed finished counter to %v", got)
+		if got := testutil.ToFloat64(trainJobComplete.WithLabelValues(runtimeRef)); got != 0 {
+			return fmt.Errorf("non-terminal update changed complete counter to %v", got)
+		}
+		if got := testutil.ToFloat64(trainJobFailed.WithLabelValues("other", runtimeRef)); got != 0 {
+			return fmt.Errorf("non-terminal update changed failed counter to %v", got)
 		}
 
 		terminal := nonTerminal.DeepCopy()
@@ -599,11 +602,11 @@ func TestTrainJobMetricsStartSkipsInitialObjects(t *testing.T) {
 			LastTransitionTime: metav1.Now(),
 		}}
 		informer.Update(nonTerminal, terminal)
-		if got := testutil.ToFloat64(trainJobFinished.WithLabelValues("succeeded", "none", runtimeRef)); got != 1 {
-			return fmt.Errorf("finished counter = %v, want 1", got)
+		if got := testutil.ToFloat64(trainJobComplete.WithLabelValues(runtimeRef)); got != 1 {
+			return fmt.Errorf("complete counter = %v, want 1", got)
 		}
 		informer.Update(terminal, terminal.DeepCopy())
-		if got := testutil.ToFloat64(trainJobFinished.WithLabelValues("succeeded", "none", runtimeRef)); got != 1 {
+		if got := testutil.ToFloat64(trainJobComplete.WithLabelValues(runtimeRef)); got != 1 {
 			return fmt.Errorf("repeated terminal update changed counter to %v, want 1", got)
 		}
 
@@ -673,15 +676,16 @@ func TestTrainJobUpdate(t *testing.T) {
 		repeatUpdate   bool
 		failed         bool
 		failureReason  string
-		wantFinished   float64
+		wantComplete   float64
+		wantFailed     float64
 		wantLifetime   float64
 		wantReason     string
 	}{
-		"nonterminal update":             {wantFinished: 0},
-		"successful terminal transition": {terminalUpdate: true, wantFinished: 1, wantLifetime: 60, wantReason: "none"},
-		"failed terminal transition":     {terminalUpdate: true, failed: true, wantFinished: 1, wantLifetime: 60, wantReason: jobsetconsts.FailedJobsReason},
-		"unknown failure reason":         {terminalUpdate: true, failed: true, failureReason: "UnexpectedFailure", wantFinished: 1, wantLifetime: 60, wantReason: "other"},
-		"repeated terminal update":       {terminalUpdate: true, repeatUpdate: true, wantFinished: 1, wantLifetime: 60, wantReason: "none"},
+		"nonterminal update":             {},
+		"successful terminal transition": {terminalUpdate: true, wantComplete: 1, wantLifetime: 60},
+		"failed terminal transition":     {terminalUpdate: true, failed: true, wantFailed: 1, wantLifetime: 60, wantReason: jobsetconsts.FailedJobsReason},
+		"unknown failure reason":         {terminalUpdate: true, failed: true, failureReason: "UnexpectedFailure", wantFailed: 1, wantLifetime: 60, wantReason: "other"},
+		"repeated terminal update":       {terminalUpdate: true, repeatUpdate: true, wantComplete: 1, wantLifetime: 60},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -694,10 +698,8 @@ func TestTrainJobUpdate(t *testing.T) {
 			updated := job.DeepCopy()
 			if test.terminalUpdate {
 				conditionType := trainer.TrainJobComplete
-				result := "succeeded"
 				if test.failed {
 					conditionType = trainer.TrainJobFailed
-					result = "failed"
 				}
 				reason := "Completed"
 				if test.failed {
@@ -715,13 +717,23 @@ func TestTrainJobUpdate(t *testing.T) {
 					m.onUpdate(updated, updated.DeepCopy())
 				}
 				runtimeRef := runtimeRefLabel(job)
+				if got := testutil.ToFloat64(trainJobComplete.WithLabelValues(runtimeRef)); got != test.wantComplete {
+					t.Fatalf("complete counter = %v, want %v", got, test.wantComplete)
+				}
 				expectedReason := test.wantReason
-				if got := testutil.ToFloat64(trainJobFinished.WithLabelValues(result, expectedReason, runtimeRef)); got != test.wantFinished {
-					t.Fatalf("finished counter = %v, want %v", got, test.wantFinished)
+				if expectedReason == "" {
+					expectedReason = jobsetconsts.FailedJobsReason
+				}
+				if got := testutil.ToFloat64(trainJobFailed.WithLabelValues(expectedReason, runtimeRef)); got != test.wantFailed {
+					t.Fatalf("failed counter = %v, want %v", got, test.wantFailed)
 				}
 				reg := prometheus.NewRegistry()
 				if err := registerTrainerCollectors(reg, m); err != nil {
 					t.Fatalf("register Trainer metrics: %v", err)
+				}
+				result := "succeeded"
+				if test.failed {
+					result = "failed"
 				}
 				assertHistogramObservation(t, reg, "kubeflow_trainer_trainjob_lifetime_seconds", map[string]string{
 					"result": result, "runtime_ref": runtimeRef,
@@ -730,8 +742,11 @@ func TestTrainJobUpdate(t *testing.T) {
 			}
 			m.onUpdate(job, updated)
 			runtimeRef := runtimeRefLabel(job)
-			if got := testutil.ToFloat64(trainJobFinished.WithLabelValues("succeeded", "none", runtimeRef)); got != test.wantFinished {
-				t.Fatalf("finished counter = %v, want %v", got, test.wantFinished)
+			if got := testutil.ToFloat64(trainJobComplete.WithLabelValues(runtimeRef)); got != test.wantComplete {
+				t.Fatalf("complete counter = %v, want %v", got, test.wantComplete)
+			}
+			if got := testutil.ToFloat64(trainJobFailed.WithLabelValues("other", runtimeRef)); got != test.wantFailed {
+				t.Fatalf("failed counter = %v, want %v", got, test.wantFailed)
 			}
 		})
 	}
@@ -766,8 +781,8 @@ func TestTrainJobLifetimeSkipsInvalidTimestamps(t *testing.T) {
 			}}
 			m.observeTerminal(job, runtimeRefLabel(job))
 
-			if got := testutil.ToFloat64(trainJobFinished.WithLabelValues("succeeded", "none", runtimeRefLabel(job))); got != 1 {
-				t.Fatalf("finished counter = %v, want 1", got)
+			if got := testutil.ToFloat64(trainJobComplete.WithLabelValues(runtimeRefLabel(job))); got != 1 {
+				t.Fatalf("complete counter = %v, want 1", got)
 			}
 			reg := prometheus.NewRegistry()
 			if err := registerTrainerCollectors(reg, m); err != nil {
@@ -780,10 +795,28 @@ func TestTrainJobLifetimeSkipsInvalidTimestamps(t *testing.T) {
 	}
 }
 
+func TestTrainJobFinishedMetricIsRemoved(t *testing.T) {
+	t.Cleanup(func() { resetMetrics(t) })
+	reg := prometheus.NewRegistry()
+	if err := registerTrainerCollectors(reg, newTrainerMetrics(nil)); err != nil {
+		t.Fatalf("register Trainer metrics: %v", err)
+	}
+	families, err := reg.Gather()
+	if err != nil {
+		t.Fatalf("gather Trainer metrics: %v", err)
+	}
+	for _, family := range families {
+		if family.GetName() == "kubeflow_trainer_trainjob_finished_total" {
+			t.Fatal("legacy trainjob_finished_total metric must not be registered")
+		}
+	}
+}
+
 func resetMetrics(t *testing.T) {
 	t.Helper()
 	trainJobCreated.Reset()
-	trainJobFinished.Reset()
+	trainJobComplete.Reset()
+	trainJobFailed.Reset()
 	trainJobLifetime.Reset()
 	trainJobRequestedTrainingNodes.Reset()
 }
@@ -808,7 +841,8 @@ func registerTrainerCollectors(reg prometheus.Registerer, m *trainerMetrics) err
 	for _, collector := range []prometheus.Collector{
 		m.runtimeInfo,
 		trainJobCreated,
-		trainJobFinished,
+		trainJobComplete,
+		trainJobFailed,
 		trainJobLifetime,
 		trainJobRequestedTrainingNodes,
 	} {

@@ -5,7 +5,7 @@ administrators. The metrics describe installed runtimes, TrainJob activity,
 and the workload capacity requested by TrainJobs.
 
 Metrics are exposed by the controller metrics endpoint. This document covers
-the five metric families implemented by PR #4190. TLS, authentication,
+the six metric families implemented by PR #4190. TLS, authentication,
 ServiceMonitor resources, and scrape configuration are provided by PR #4102
 or by the platform deployment; PR #4190 does not create a Prometheus scrape
 target by itself.
@@ -16,7 +16,8 @@ target by itself.
 | --- | --- | --- | --- |
 | `kubeflow_trainer_runtime_info` | Gauge, value `1` | `namespace`, `name`, `api_group`, `kind`, `ml_policy`, `pod_group_policy` | Current `TrainingRuntime` and `ClusterTrainingRuntime` inventory. The namespace is empty for cluster-scoped runtimes. |
 | `kubeflow_trainer_trainjob_created_total` | Counter | `namespace`, `runtime_ref` | TrainJobs observed after the controller's initial informer listing. |
-| `kubeflow_trainer_trainjob_finished_total` | Counter | `result`, `reason`, `runtime_ref` | TrainJobs observed transitioning to a terminal condition. `result` is `succeeded` or `failed`; successful jobs use reason `none`. |
+| `kubeflow_trainer_trainjob_complete_total` | Counter | `runtime_ref` | TrainJobs observed completing successfully. |
+| `kubeflow_trainer_trainjob_failed_total` | Counter | `reason`, `runtime_ref` | TrainJobs observed failing. Known failure reasons are preserved; unknown reasons are reported as `other`. |
 | `kubeflow_trainer_trainjob_lifetime_seconds` | Histogram | `result`, `runtime_ref` | Time from TrainJob creation to its terminal condition. |
 | `kubeflow_trainer_trainjob_requested_training_nodes_per_job` | Histogram | `runtime_ref` | Logical training nodes requested by each TrainJob after runtime defaults are applied. |
 
@@ -40,11 +41,32 @@ target by itself.
 
 ## Example PromQL
 
-Count completed TrainJobs by runtime and result:
+Count successfully completed TrainJobs by runtime:
 
 ```promql
-sum by (runtime_ref, result) (
-  rate(kubeflow_trainer_trainjob_finished_total[15m])
+sum by (runtime_ref) (
+  rate(kubeflow_trainer_trainjob_complete_total[15m])
+)
+```
+
+Count failed TrainJobs by reason and runtime:
+
+```promql
+sum by (reason, runtime_ref) (
+  increase(kubeflow_trainer_trainjob_failed_total[$__range])
+)
+```
+
+Calculate the observed failure percentage:
+
+```promql
+100 *
+sum(increase(kubeflow_trainer_trainjob_failed_total[$__range]))
+/
+(
+  sum(increase(kubeflow_trainer_trainjob_complete_total[$__range]))
+  +
+  sum(increase(kubeflow_trainer_trainjob_failed_total[$__range]))
 )
 ```
 

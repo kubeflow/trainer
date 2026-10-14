@@ -158,12 +158,16 @@ func (m *trainerMetrics) onUpdate(oldObj, newObj any) {
 
 func (m *trainerMetrics) observeTerminal(trainJob *trainer.TrainJob, runtimeRef string) {
 	condition := terminalCondition(trainJob)
-	result := "succeeded"
 	if condition.Type == trainer.TrainJobFailed {
-		result = "failed"
+		trainJobFailed.WithLabelValues(terminalReason(condition), runtimeRef).Inc()
+		m.observeLifetime(trainJob, condition, "failed", runtimeRef)
+		return
 	}
-	reason := terminalReason(condition, result)
-	trainJobFinished.WithLabelValues(result, reason, runtimeRef).Inc()
+	trainJobComplete.WithLabelValues(runtimeRef).Inc()
+	m.observeLifetime(trainJob, condition, "succeeded", runtimeRef)
+}
+
+func (m *trainerMetrics) observeLifetime(trainJob *trainer.TrainJob, condition metav1.Condition, result, runtimeRef string) {
 	if trainJob.CreationTimestamp.IsZero() || condition.LastTransitionTime.IsZero() {
 		return
 	}
@@ -457,7 +461,8 @@ func unregisterLeaderMetrics(runtimeInfo prometheus.Collector) {
 func leaderMetricCollectors(runtimeInfo prometheus.Collector) []prometheus.Collector {
 	collectors := []prometheus.Collector{
 		trainJobCreated,
-		trainJobFinished,
+		trainJobComplete,
+		trainJobFailed,
 		trainJobLifetime,
 		trainJobRequestedTrainingNodes,
 	}
@@ -477,10 +482,7 @@ func runtimeRefLabel(trainJob *trainer.TrainJob) string {
 	return fmt.Sprintf("%s/%s/%s/%s", group, kind, namespace, trainJob.Spec.RuntimeRef.Name)
 }
 
-func terminalReason(condition metav1.Condition, result string) string {
-	if result == "succeeded" {
-		return "none"
-	}
+func terminalReason(condition metav1.Condition) string {
 	switch condition.Reason {
 	case trainer.TrainJobRuntimeNotSupportedReason, trainer.TrainJobDeadlineExceededReason, jobsetconsts.FailedJobsReason:
 		return condition.Reason
