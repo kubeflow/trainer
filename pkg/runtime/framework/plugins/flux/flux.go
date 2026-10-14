@@ -129,20 +129,19 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 	curveSecretName := fmt.Sprintf("%s-flux-curve", trainJob.Name)
 	sharedVolumes := getViewVolumes(configMapName)
 
-	// Capture and set the values as annotations
-	// This effectively "saves" the state onto the Kubernetes resource itself
-	// We provide the original command to the entrypoint
+	// Capture the original command before the Trainer is mutated below.
 	originalCmd := getOriginalCommand(trainJob, info)
 
-	// Update the command here so we wrap the original command saved earlier
-	// Also clear existing args so only the Flux entrypoint controls execution.
+	// Wrap the original command with the Flux entrypoint, keeping each argv element
+	// separate so the entrypoint receives it unchanged as "$@".
+	// Args are intentionally left as-is: Kubernetes appends them to the command, so
+	// TrainJob args still override runtime args through the JobSet builder.
 	// The JobSet builder only propagates a command from a non-nil Trainer, so one has to
 	// exist to carry the Flux entrypoint even when the TrainJob did not set it.
 	if trainJob.Spec.Trainer == nil {
 		trainJob.Spec.Trainer = &trainer.Trainer{}
 	}
-	trainJob.Spec.Trainer.Command = []string{"/bin/bash", "/etc/flux-config/entrypoint.sh", originalCmd}
-	trainJob.Spec.Trainer.Args = nil
+	trainJob.Spec.Trainer.Command = append([]string{"/bin/bash", "/etc/flux-config/entrypoint.sh"}, originalCmd...)
 
 	// Define the Init Container. This has a spack view with flux pre-built, and we add to an emptyDir
 	// with configuration that is then accessible to the application. The OS/version should match.
@@ -369,30 +368,19 @@ func generateBrokerConfig(
 	)
 }
 
-// getOriginalCommand derives the original Kubeflow command we need to wrap / handoff to Flux
-func getOriginalCommand(trainJob *trainer.TrainJob, info *runtime.Info) string {
-	var command []string
-	var args []string
-
-	// check PodSets first
-	trainerContainer := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node)
-	if trainerContainer != nil {
-		command = trainerContainer.Command
+// getOriginalCommand derives the original Kubeflow command we need to wrap / handoff to Flux.
+// Args are not included since they are appended to the command by Kubernetes.
+func getOriginalCommand(trainJob *trainer.TrainJob, info *runtime.Info) []string {
+	// Override if user defined it in the top-level Trainer spec
+	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.Command != nil {
+		return trainJob.Spec.Trainer.Command
 	}
 
-	// Override if user defined them in the top-level Trainer spec
-	if trainJob.Spec.Trainer != nil {
-		if trainJob.Spec.Trainer.Command != nil {
-			command = trainJob.Spec.Trainer.Command
-		}
-		if trainJob.Spec.Trainer.Args != nil {
-			args = trainJob.Spec.Trainer.Args
-		}
+	// Otherwise fall back to the runtime PodSets
+	if trainerContainer := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
+		return trainerContainer.Command
 	}
-
-	// Combine into a single string for the shell script
-	fullCommand := strings.Join(append(command, args...), " ")
-	return strings.TrimSpace(fullCommand)
+	return nil
 }
 
 // getNumNodes returns the node count for the Flux job. The trainer PodSet already carries
