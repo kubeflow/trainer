@@ -28,6 +28,10 @@ The implementation provides five metric families:
    - Histogram
    - Measures the requested training-node size of each TrainJob.
 
+The metric names, labels, and query examples are defined in
+[Trainer Controller Metrics](metrics.md). This document focuses on lifecycle,
+ownership, and implementation decisions.
+
 The proposed accelerator metric is not included yet. Accelerator requests can
 come from runtime defaults, plugins, or TrainJob overrides. We should add this
 metric once the effective-resource rules are clearly defined.
@@ -47,8 +51,9 @@ Kubernetes API
 ```
 
 The implementation uses informer data already held by the controller. Metric
-collection does not call the Kubernetes API. This keeps scrapes local and
-prevents a slow API server from blocking Prometheus.
+collection does not call the Kubernetes API. This prevents a slow or
+unavailable API server from blocking a scrape, although collection still
+copies and iterates the local snapshot.
 
 The runtime snapshot and TrainJob event metrics run only on the elected leader.
 The metrics server remains available on every replica, but Trainer metrics are
@@ -109,14 +114,17 @@ The requested-node value is resolved in this order:
 
 1. Explicit TrainJob `numNodes`, including zero.
 2. Runtime ML policy `numNodes`.
-3. One node when the runtime has no policy or node count.
+3. The trainer replicated-job template `parallelism` when the runtime has no
+   ML policy.
+4. One node when no runtime value is configured.
 
 If the runtime cannot be found or its value is invalid, the workload-size
 observation is skipped instead of recording a guessed value.
 
 ## Labels and cardinality
 
-Labels are limited to bounded values needed for aggregation:
+Labels contain normalized values and bounded categories needed for
+aggregation:
 
 - runtime reference;
 - namespace;
@@ -127,10 +135,12 @@ Labels are limited to bounded values needed for aggregation:
 - PodGroupPolicy.
 
 TrainJob names, UIDs, child-job names, and raw error messages are not exported.
-This avoids creating a new time series for every individual job.
+This avoids creating a new time series for every individual job. Runtime and
+namespace labels are still user- or administrator-controlled dimensions, so
+the total number of series grows with the number of configured runtimes.
 
-The lifetime histogram covers one minute through four days. The requested-node
-histogram covers one through 128 nodes, plus `+Inf`.
+The lifetime histogram covers ten minutes through 28 days. The
+requested-node histogram covers one through 128 nodes, plus `+Inf`.
 
 ## Questions these metrics can answer
 
@@ -173,15 +183,18 @@ Metric samples
 ## Restarts and leadership changes
 
 Counters and histograms are held in the controller process. Their in-memory
-values reset when the controller restarts. Prometheus queries should therefore
-use `rate()` or `increase()` instead of treating them as permanent totals.
+values reset when the controller restarts or leadership changes. Prometheus
+queries should therefore use `rate()` or `increase()` instead of treating
+them as permanent totals. A follower's metrics endpoint may remain healthy
+while the leader-owned Trainer metric families are absent.
 
 The runtime inventory is rebuilt from informer state after a restart. Events
 that occur before the new leader is ready, or during a leadership transition,
 may not be counted.
 
-Metric collection remains local and non-blocking. If runtime metadata is not
-available, only the dependent workload-size observation is skipped.
+Metric collection remains local and does not make Kubernetes API calls. If
+runtime metadata is not available, only the dependent workload-size
+observation is skipped.
 
 ## Validation
 

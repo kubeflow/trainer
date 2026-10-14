@@ -38,6 +38,7 @@ import (
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
 	trainjobutil "github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
@@ -72,8 +73,8 @@ func (m *trainerMetrics) NeedLeaderElection() bool {
 }
 
 // Start registers the TrainJob observer for the lifetime of this leadership
-// term. The handler is registered before waiting for initial synchronization;
-// its bootstrap gate prevents initial-list objects from being counted.
+// term. ready becomes true after handler synchronization so initial-list
+// objects are not counted as newly created TrainJobs.
 func (m *trainerMetrics) Start(ctx context.Context) error {
 	if m.cache == nil {
 		return fmt.Errorf("metrics cache is required")
@@ -385,16 +386,31 @@ func runtimeInfoKey(kind, namespace, name string) string {
 }
 
 func requestedNodesFromSpec(spec *trainer.TrainingRuntimeSpec) (int32, bool) {
-	if spec.MLPolicy == nil {
-		return 1, true
+	if spec.MLPolicy != nil {
+		if spec.MLPolicy.NumNodes == nil {
+			return 1, true
+		}
+		return validRequestedNodes(*spec.MLPolicy.NumNodes)
 	}
-	if spec.MLPolicy.NumNodes == nil {
-		return 1, true
+
+	for _, replicatedJob := range spec.Template.Spec.ReplicatedJobs {
+		if replicatedJob.Template.Labels[constants.LabelTrainJobAncestor] != constants.AncestorTrainer {
+			continue
+		}
+		if replicatedJob.Template.Spec.Parallelism == nil {
+			return 1, true
+		}
+		return validRequestedNodes(*replicatedJob.Template.Spec.Parallelism)
 	}
-	if *spec.MLPolicy.NumNodes <= 0 {
+
+	return 1, true
+}
+
+func validRequestedNodes(nodes int32) (int32, bool) {
+	if nodes < 0 {
 		return 0, false
 	}
-	return *spec.MLPolicy.NumNodes, true
+	return nodes, true
 }
 
 func copyRuntimeSnapshot(snapshot map[string]runtimeInfo) map[string]runtimeInfo {

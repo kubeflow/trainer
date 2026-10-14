@@ -4,9 +4,11 @@ Kubeflow Trainer exposes controller-level Prometheus metrics for platform
 administrators. The metrics describe installed runtimes, TrainJob activity,
 and the workload capacity requested by TrainJobs.
 
-Metrics are exposed by the controller metrics endpoint. Scraping and endpoint
-security are configured by the deployment's metrics-server settings and
-Prometheus integration.
+Metrics are exposed by the controller metrics endpoint. This document covers
+the five metric families implemented by PR #4190. TLS, authentication,
+ServiceMonitor resources, and scrape configuration are provided by PR #4102
+or by the platform deployment; PR #4190 does not create a Prometheus scrape
+target by itself.
 
 ## Metrics
 
@@ -25,15 +27,16 @@ Prometheus integration.
 ## Important limitations
 
 - Creation, completion, and workload metrics are event-based and reset when
-  the controller process restarts. Existing objects found during the initial
-  informer listing are not counted as newly created.
+  the controller process restarts or leadership changes. Existing objects
+  found during the initial informer listing are not counted as newly created.
 - Runtime inventory is evaluated at scrape time, so it reflects the current
   runtime resources.
-- The metrics do not currently provide checkpoint, progress, suspend/resume,
-  or per-replicated-job runtime instrumentation.
-- Labels intentionally use bounded identifiers such as runtime references and
-  resource classes. Avoid adding unbounded values such as arbitrary names or
-  user-provided text to downstream aggregations.
+- The metrics do not currently provide durable history, checkpoint usage,
+  progress, suspend/resume, accelerator utilization, or per-replicated-job
+  runtime instrumentation.
+- Labels use normalized identifiers and bounded categories, but total
+  cardinality still grows with the number of runtimes and namespaces. Avoid
+  adding job names, UIDs, raw errors, or other unbounded values.
 
 ## Example PromQL
 
@@ -58,10 +61,10 @@ histogram_quantile(
 
 The controller metrics are intended for cluster-local observability. Any
 export, retention, filtering, or aggregation into an external telemetry
-system should be reviewed and configured downstream.
+system should be reviewed and configured by the platform deployment.
 
 ## Metric stability
 
 Metric names, labels, and semantics are part of the public observability
 contract. Changes will follow the [Kubernetes metrics deprecation
-policy](https://kubernetes.io/docs/concepts/extend-kubernetes/metrics/#metrics-deprecation-policy).
+policy](https://kubernetes.io/docs/reference/deprecation-policy/).

@@ -17,25 +17,34 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
+	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	toolscache "k8s.io/client-go/tools/cache"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/cache/informertest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllertest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	controllerMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
 )
 
 type metricValue struct {
@@ -178,8 +187,87 @@ kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRun
 		t.Fatalf("unexpected runtime snapshot: %v", err)
 	}
 
-	collector.delete(runtime, trainingRuntimeKind)
+	collector.delete(toolscache.DeletedFinalStateUnknown{Obj: runtime}, trainingRuntimeKind)
 	assertMetric(t, reg, "", "kubeflow_trainer_runtime_info")
+}
+
+func TestRuntimeInfoCollectorStartTracksInformerLifecycle(t *testing.T) {
+	scheme := newMetricsScheme(t)
+	fakeCache := &informertest.FakeInformers{Scheme: scheme}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	trainingRuntime := &trainer.TrainingRuntime{ObjectMeta: metav1.ObjectMeta{Name: "torch", Namespace: "team-a"}}
+	clusterRuntime := &trainer.ClusterTrainingRuntime{ObjectMeta: metav1.ObjectMeta{Name: "mpi"}}
+	trainingInformer := newReplayableInformer(trainingRuntime)
+	clusterInformer := newReplayableInformer(clusterRuntime)
+	metricsCache := &replayableMetricsCache{
+		Cache:                   fakeCache,
+		trainingRuntimeInformer: trainingInformer,
+		clusterRuntimeInformer:  clusterInformer,
+	}
+
+	started := make(chan error, 1)
+	collector := newRuntimeInfoCollector(metricsCache)
+	go func() { started <- collector.Start(ctx) }()
+
+	deadline := time.Now().Add(time.Second)
+	for !collector.ready.Load() && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if !collector.ready.Load() {
+		t.Fatal("runtime metrics collector did not become ready")
+	}
+
+	reg := prometheus.NewRegistry()
+	if err := reg.Register(collector); err != nil {
+		t.Fatalf("register runtime collector: %v", err)
+	}
+	assertMetric(t, reg, `# HELP kubeflow_trainer_runtime_info Current TrainingRuntime and ClusterTrainingRuntime resources.
+# TYPE kubeflow_trainer_runtime_info gauge
+kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="ClusterTrainingRuntime",ml_policy="none",name="mpi",namespace="",pod_group_policy="none"} 1
+kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRuntime",ml_policy="none",name="torch",namespace="team-a",pod_group_policy="none"} 1
+`, "kubeflow_trainer_runtime_info")
+
+	updatedRuntime := trainingRuntime.DeepCopy()
+	updatedRuntime.Spec.MLPolicy = &trainer.MLPolicy{NumNodes: ptrInt32(4)}
+	trainingInformer.Update(trainingRuntime, updatedRuntime)
+	trainingKind := trainingRuntimeKind
+	if nodes, ok := collector.requestedNodes(&trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
+		Spec:       trainer.TrainJobSpec{RuntimeRef: trainer.RuntimeRef{Name: "torch", Kind: &trainingKind}},
+	}); !ok || nodes != 4 {
+		t.Fatalf("requested runtime nodes = (%d, %t), want (4, true)", nodes, ok)
+	}
+
+	clusterInformer.Delete(clusterRuntime)
+	assertMetric(t, reg, `# HELP kubeflow_trainer_runtime_info Current TrainingRuntime and ClusterTrainingRuntime resources.
+# TYPE kubeflow_trainer_runtime_info gauge
+kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRuntime",ml_policy="unknown",name="torch",namespace="team-a",pod_group_policy="none"} 1
+`, "kubeflow_trainer_runtime_info")
+
+	cancel()
+	select {
+	case err := <-started:
+		if err != nil {
+			t.Fatalf("runtime metrics collector stopped with error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("runtime metrics collector did not stop after context cancellation")
+	}
+	collector.mu.RLock()
+	snapshotSize := len(collector.snapshot)
+	collector.mu.RUnlock()
+	if snapshotSize != 0 {
+		t.Fatalf("runtime snapshot after stop = %d entries, want 0", snapshotSize)
+	}
+	trainingInformer.Add(&trainer.TrainingRuntime{ObjectMeta: metav1.ObjectMeta{Name: "after-stop", Namespace: "team-a"}})
+	collector.mu.RLock()
+	snapshotSize = len(collector.snapshot)
+	collector.mu.RUnlock()
+	if snapshotSize != 0 {
+		t.Fatalf("runtime event was processed after stop: snapshot size = %d, want 0", snapshotSize)
+	}
 }
 
 func TestRequestedNodesLookupFailureSkipsObservation(t *testing.T) {
@@ -267,6 +355,67 @@ func TestRequestedNodesDefaultsToOneFromRuntimeSnapshot(t *testing.T) {
 	assertHistogramObservation(t, reg, "kubeflow_trainer_trainjob_requested_training_nodes_per_job", map[string]string{
 		"runtime_ref": runtimeRefLabel(job),
 	}, 1, 1)
+}
+
+func TestRequestedNodesUsesRuntimeTemplateParallelism(t *testing.T) {
+	for name, test := range map[string]struct {
+		object client.Object
+		kind   string
+	}{
+		"namespaced runtime": {
+			object: &trainer.TrainingRuntime{ObjectMeta: metav1.ObjectMeta{Name: "torch", Namespace: "team-a"}, Spec: templateRuntimeSpec(8)},
+			kind:   trainingRuntimeKind,
+		},
+		"cluster runtime": {
+			object: &trainer.ClusterTrainingRuntime{ObjectMeta: metav1.ObjectMeta{Name: "torch"}, Spec: templateRuntimeSpec(8)},
+			kind:   clusterTrainingRuntimeKind,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Cleanup(func() { resetMetrics(t) })
+			collector := newRuntimeInfoCollector(nil)
+			collector.upsert(test.object, test.kind)
+			m := newTrainerMetrics(nil)
+			m.runtimeInfo = collector
+			m.ready.Store(true)
+			job := trainJob("job-a", false)
+			job.Spec.Trainer = nil
+			if test.kind == trainingRuntimeKind {
+				kind := trainingRuntimeKind
+				job.Spec.RuntimeRef.Kind = &kind
+			}
+			m.onAdd(job)
+
+			reg := prometheus.NewRegistry()
+			if err := registerTrainerCollectors(reg, m); err != nil {
+				t.Fatalf("register Trainer collectors: %v", err)
+			}
+			assertHistogramObservation(t, reg, "kubeflow_trainer_trainjob_requested_training_nodes_per_job", map[string]string{
+				"runtime_ref": runtimeRefLabel(job),
+			}, 1, 8)
+		})
+	}
+}
+
+func TestRequestedNodesFromRuntimeValidatesValues(t *testing.T) {
+	tests := map[string]struct {
+		nodes int32
+		want  int32
+		ok    bool
+	}{
+		"zero is preserved":     {nodes: 0, want: 0, ok: true},
+		"negative is skipped":   {nodes: -1, ok: false},
+		"positive is preserved": {nodes: 4, want: 4, ok: true},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			spec := trainer.TrainingRuntimeSpec{MLPolicy: &trainer.MLPolicy{NumNodes: ptrInt32(test.nodes)}}
+			got, ok := requestedNodesFromSpec(&spec)
+			if got != test.want || ok != test.ok {
+				t.Fatalf("requestedNodesFromSpec(%d) = (%d, %t), want (%d, %t)", test.nodes, got, ok, test.want, test.ok)
+			}
+		})
+	}
 }
 
 func TestRequestedNodesIncludesExplicitZero(t *testing.T) {
@@ -366,18 +515,149 @@ func TestTrainJobAdd(t *testing.T) {
 	}
 }
 
+func TestTrainJobMetricsStartSkipsInitialObjects(t *testing.T) {
+	previousRegistry := controllerMetrics.Registry
+	t.Cleanup(func() { controllerMetrics.Registry = previousRegistry })
+	controllerMetrics.Registry = prometheus.NewRegistry()
+	resetMetrics(t)
+	t.Cleanup(func() { resetMetrics(t) })
+
+	scheme := newMetricsScheme(t)
+	baseCache := &informertest.FakeInformers{Scheme: scheme}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	informer := newReplayableInformer(trainJob("initial", false))
+	fakeCache := &replayableMetricsCache{Cache: baseCache, trainJobInformer: informer}
+	if _, err := fakeCache.GetInformer(ctx, &trainer.TrainJob{}); err != nil {
+		t.Fatalf("get TrainJob informer: %v", err)
+	}
+	if _, err := baseCache.FakeInformerFor(ctx, &trainer.TrainingRuntime{}); err != nil {
+		t.Fatalf("get TrainingRuntime informer: %v", err)
+	}
+	if _, err := baseCache.FakeInformerFor(ctx, &trainer.ClusterTrainingRuntime{}); err != nil {
+		t.Fatalf("get ClusterTrainingRuntime informer: %v", err)
+	}
+	if err := func() error {
+		m := newTrainerMetrics(fakeCache)
+		m.runtimeInfo.ready.Store(true)
+		started := make(chan error, 1)
+		go func() { started <- m.Start(ctx) }()
+		deadline := time.Now().Add(time.Second)
+		for !m.ready.Load() && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+		if !m.ready.Load() {
+			return fmt.Errorf("TrainJob metrics observer did not become ready")
+		}
+
+		if got := testutil.ToFloat64(trainJobCreated.WithLabelValues("team-a", runtimeRefLabel(trainJob("initial", false)))); got != 0 {
+			return fmt.Errorf("initial TrainJob was counted as created: %v", got)
+		}
+
+		created := trainJob("created", false)
+		informer.Add(created)
+		runtimeRef := runtimeRefLabel(created)
+		if got := testutil.ToFloat64(trainJobCreated.WithLabelValues("team-a", runtimeRef)); got != 1 {
+			return fmt.Errorf("created counter = %v, want 1", got)
+		}
+
+		nonTerminal := created.DeepCopy()
+		nonTerminal.Generation = 2
+		informer.Update(created, nonTerminal)
+		if got := testutil.ToFloat64(trainJobFinished.WithLabelValues("succeeded", "none", runtimeRef)); got != 0 {
+			return fmt.Errorf("non-terminal update changed finished counter to %v", got)
+		}
+
+		terminal := nonTerminal.DeepCopy()
+		terminal.Status.Conditions = []metav1.Condition{{
+			Type:               trainer.TrainJobComplete,
+			Status:             metav1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+		}}
+		informer.Update(nonTerminal, terminal)
+		if got := testutil.ToFloat64(trainJobFinished.WithLabelValues("succeeded", "none", runtimeRef)); got != 1 {
+			return fmt.Errorf("finished counter = %v, want 1", got)
+		}
+		informer.Update(terminal, terminal.DeepCopy())
+		if got := testutil.ToFloat64(trainJobFinished.WithLabelValues("succeeded", "none", runtimeRef)); got != 1 {
+			return fmt.Errorf("repeated terminal update changed counter to %v, want 1", got)
+		}
+
+		cancel()
+		select {
+		case err := <-started:
+			return err
+		case <-time.After(time.Second):
+			return fmt.Errorf("metrics observer did not stop after context cancellation")
+		}
+	}(); err != nil {
+		t.Fatal(err)
+	}
+
+	createdBeforeStop := testutil.ToFloat64(trainJobCreated.WithLabelValues("team-a", runtimeRefLabel(trainJob("created", false))))
+	informer.Add(trainJob("after-stop", false))
+	if got := testutil.ToFloat64(trainJobCreated.WithLabelValues("team-a", runtimeRefLabel(trainJob("created", false)))); got != createdBeforeStop {
+		t.Fatalf("TrainJob was counted after observer stop: %v, want %v", got, createdBeforeStop)
+	}
+}
+
+func TestTrainJobMetricsCanRestartLeadership(t *testing.T) {
+	previousRegistry := controllerMetrics.Registry
+	t.Cleanup(func() { controllerMetrics.Registry = previousRegistry })
+	controllerMetrics.Registry = prometheus.NewRegistry()
+	resetMetrics(t)
+
+	scheme := newMetricsScheme(t)
+	baseCache := &informertest.FakeInformers{Scheme: scheme}
+	informer := newReplayableInformer()
+	fakeCache := &replayableMetricsCache{Cache: baseCache, trainJobInformer: informer}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	startTerm := func() <-chan error {
+		m := newTrainerMetrics(fakeCache)
+		m.runtimeInfo.ready.Store(true)
+		result := make(chan error, 1)
+		go func() { result <- m.Start(ctx) }()
+		deadline := time.Now().Add(time.Second)
+		for !m.ready.Load() && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+		if !m.ready.Load() {
+			t.Fatal("TrainJob metrics observer did not become ready")
+		}
+		return result
+	}
+
+	first := startTerm()
+	cancel()
+	if err := <-first; err != nil {
+		t.Fatalf("first leadership term stopped with error: %v", err)
+	}
+
+	ctx, cancel = context.WithCancel(context.Background())
+	second := startTerm()
+	cancel()
+	if err := <-second; err != nil {
+		t.Fatalf("second leadership term stopped with error: %v", err)
+	}
+}
+
 func TestTrainJobUpdate(t *testing.T) {
 	tests := map[string]struct {
 		terminalUpdate bool
 		repeatUpdate   bool
 		failed         bool
+		failureReason  string
 		wantFinished   float64
 		wantLifetime   float64
+		wantReason     string
 	}{
 		"nonterminal update":             {wantFinished: 0},
-		"successful terminal transition": {terminalUpdate: true, wantFinished: 1, wantLifetime: 60},
-		"failed terminal transition":     {terminalUpdate: true, failed: true, wantFinished: 1, wantLifetime: 60},
-		"repeated terminal update":       {terminalUpdate: true, repeatUpdate: true, wantFinished: 1, wantLifetime: 60},
+		"successful terminal transition": {terminalUpdate: true, wantFinished: 1, wantLifetime: 60, wantReason: "none"},
+		"failed terminal transition":     {terminalUpdate: true, failed: true, wantFinished: 1, wantLifetime: 60, wantReason: jobsetconsts.FailedJobsReason},
+		"unknown failure reason":         {terminalUpdate: true, failed: true, failureReason: "UnexpectedFailure", wantFinished: 1, wantLifetime: 60, wantReason: "other"},
+		"repeated terminal update":       {terminalUpdate: true, repeatUpdate: true, wantFinished: 1, wantLifetime: 60, wantReason: "none"},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -399,6 +679,9 @@ func TestTrainJobUpdate(t *testing.T) {
 				if test.failed {
 					reason = jobsetconsts.FailedJobsReason
 				}
+				if test.failureReason != "" {
+					reason = test.failureReason
+				}
 				updated.Status.Conditions = []metav1.Condition{{
 					Type: conditionType, Status: metav1.ConditionTrue, Reason: reason,
 					LastTransitionTime: metav1.NewTime(time.Unix(1060, 0)),
@@ -408,7 +691,8 @@ func TestTrainJobUpdate(t *testing.T) {
 					m.onUpdate(updated, updated.DeepCopy())
 				}
 				runtimeRef := runtimeRefLabel(job)
-				if got := testutil.ToFloat64(trainJobFinished.WithLabelValues(result, terminalReason(updated.Status.Conditions[0], result), runtimeRef)); got != test.wantFinished {
+				expectedReason := test.wantReason
+				if got := testutil.ToFloat64(trainJobFinished.WithLabelValues(result, expectedReason, runtimeRef)); got != test.wantFinished {
 					t.Fatalf("finished counter = %v, want %v", got, test.wantFinished)
 				}
 				reg := prometheus.NewRegistry()
@@ -422,8 +706,51 @@ func TestTrainJobUpdate(t *testing.T) {
 			}
 			m.onUpdate(job, updated)
 			runtimeRef := runtimeRefLabel(job)
-			if got := testutil.ToFloat64(trainJobFinished.WithLabelValues("succeeded", "Completed", runtimeRef)); got != test.wantFinished {
+			if got := testutil.ToFloat64(trainJobFinished.WithLabelValues("succeeded", "none", runtimeRef)); got != test.wantFinished {
 				t.Fatalf("finished counter = %v, want %v", got, test.wantFinished)
+			}
+		})
+	}
+}
+
+func TestTrainJobLifetimeSkipsInvalidTimestamps(t *testing.T) {
+	tests := map[string]struct {
+		creationTimestamp metav1.Time
+		transitionTime    metav1.Time
+	}{
+		"missing creation timestamp": {
+			transitionTime: metav1.NewTime(time.Unix(1060, 0)),
+		},
+		"missing terminal timestamp": {
+			creationTimestamp: metav1.NewTime(time.Unix(1000, 0)),
+		},
+		"negative lifetime": {
+			creationTimestamp: metav1.NewTime(time.Unix(1060, 0)),
+			transitionTime:    metav1.NewTime(time.Unix(1000, 0)),
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Cleanup(func() { resetMetrics(t) })
+			m := newTrainerMetrics(nil)
+			job := trainJob("job-a", false)
+			job.CreationTimestamp = test.creationTimestamp
+			job.Status.Conditions = []metav1.Condition{{
+				Type:               trainer.TrainJobComplete,
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: test.transitionTime,
+			}}
+			m.observeTerminal(job, runtimeRefLabel(job))
+
+			if got := testutil.ToFloat64(trainJobFinished.WithLabelValues("succeeded", "none", runtimeRefLabel(job))); got != 1 {
+				t.Fatalf("finished counter = %v, want 1", got)
+			}
+			reg := prometheus.NewRegistry()
+			if err := registerTrainerCollectors(reg, m); err != nil {
+				t.Fatalf("register Trainer metrics: %v", err)
+			}
+			if err := testutil.GatherAndCompare(reg, strings.NewReader(""), "kubeflow_trainer_trainjob_lifetime_seconds"); err != nil {
+				t.Fatalf("unexpected lifetime metric: %v", err)
 			}
 		})
 	}
@@ -471,6 +798,21 @@ func registerTrainerCollectors(reg prometheus.Registerer, m *trainerMetrics) err
 func withRuntime(job *trainer.TrainJob, name string) *trainer.TrainJob {
 	job.Spec.RuntimeRef.Name = name
 	return job
+}
+
+func templateRuntimeSpec(parallelism int32) trainer.TrainingRuntimeSpec {
+	return trainer.TrainingRuntimeSpec{
+		Template: trainer.JobSetTemplateSpec{
+			Spec: jobsetv1alpha2.JobSetSpec{ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{{
+				Template: batchv1.JobTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
+						constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+					}},
+					Spec: batchv1.JobSpec{Parallelism: ptrInt32(parallelism)},
+				},
+			}}},
+		},
+	}
 }
 
 func assertMetric(t *testing.T, reg *prometheus.Registry, want, name string) {
@@ -537,6 +879,92 @@ func newMetricsScheme(t *testing.T) *runtime.Scheme {
 	}
 	return scheme
 }
+
+type replayableMetricsCache struct {
+	cache.Cache
+	trainJobInformer        cache.Informer
+	trainingRuntimeInformer cache.Informer
+	clusterRuntimeInformer  cache.Informer
+}
+
+func (c *replayableMetricsCache) GetInformer(ctx context.Context, obj client.Object, opts ...cache.InformerGetOption) (cache.Informer, error) {
+	switch obj.(type) {
+	case *trainer.TrainJob:
+		return c.trainJobInformer, nil
+	case *trainer.TrainingRuntime:
+		return c.trainingRuntimeInformer, nil
+	case *trainer.ClusterTrainingRuntime:
+		return c.clusterRuntimeInformer, nil
+	}
+	return c.Cache.GetInformer(ctx, obj, opts...)
+}
+
+type replayableInformer struct {
+	*controllertest.FakeInformer
+	mu       sync.Mutex
+	initial  []metav1.Object
+	handlers map[toolscache.ResourceEventHandlerRegistration]*replayableHandler
+}
+
+type replayableHandler struct {
+	delegate toolscache.ResourceEventHandler
+	active   atomic.Bool
+}
+
+func newReplayableInformer(initial ...metav1.Object) *replayableInformer {
+	return &replayableInformer{
+		FakeInformer: controllertest.NewFakeInformer(controllertest.Synced),
+		initial:      initial,
+		handlers:     make(map[toolscache.ResourceEventHandlerRegistration]*replayableHandler),
+	}
+}
+
+func (h *replayableHandler) OnAdd(obj any, isInInitialList bool) {
+	if h.active.Load() {
+		h.delegate.OnAdd(obj, isInInitialList)
+	}
+}
+
+func (h *replayableHandler) OnUpdate(oldObj, newObj any) {
+	if h.active.Load() {
+		h.delegate.OnUpdate(oldObj, newObj)
+	}
+}
+
+func (h *replayableHandler) OnDelete(obj any) {
+	if h.active.Load() {
+		h.delegate.OnDelete(obj)
+	}
+}
+
+func (i *replayableInformer) AddEventHandler(handler toolscache.ResourceEventHandler) (toolscache.ResourceEventHandlerRegistration, error) {
+	wrapped := &replayableHandler{delegate: handler}
+	wrapped.active.Store(true)
+	registration, err := i.FakeInformer.AddEventHandler(wrapped)
+	if err != nil {
+		return nil, err
+	}
+	i.mu.Lock()
+	i.handlers[registration] = wrapped
+	i.mu.Unlock()
+	for _, object := range i.initial {
+		wrapped.OnAdd(object, true)
+	}
+	return registration, nil
+}
+
+func (i *replayableInformer) RemoveEventHandler(registration toolscache.ResourceEventHandlerRegistration) error {
+	i.mu.Lock()
+	if handler, ok := i.handlers[registration]; ok {
+		handler.active.Store(false)
+		delete(i.handlers, registration)
+	}
+	i.mu.Unlock()
+	return i.FakeInformer.RemoveEventHandler(registration)
+}
+
+var _ cache.Informer = (*replayableInformer)(nil)
+var _ cache.Cache = (*replayableMetricsCache)(nil)
 
 func trainJob(name string, terminal bool) *trainer.TrainJob {
 	job := &trainer.TrainJob{

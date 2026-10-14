@@ -44,7 +44,7 @@ var (
 		Namespace: metricNamespace,
 		Name:      "trainjob_lifetime_seconds",
 		Help:      "Time from TrainJob creation to its terminal outcome.",
-		Buckets:   []float64{60, 300, 900, 3600, 21600, 43200, 86400, 345600},
+		Buckets:   []float64{600, 3600, 21600, 43200, 86400, 345600, 604800, 2419200},
 	}, []string{"result", "runtime_ref"})
 	trainJobRequestedTrainingNodes = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: metricNamespace,
