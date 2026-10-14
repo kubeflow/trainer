@@ -23,6 +23,7 @@ import (
 	"slices"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -98,15 +99,33 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 
 	// TODO (andreyvelich): Refactor this test to verify the ancestor label in PodTemplate.
 	rJobContainerNames := make(map[string]sets.Set[string])
+	rJobVolumeNames := make(map[string]sets.Set[string])
 	for _, rJob := range jobSetSpec.ReplicatedJobs {
-		rJobContainerNames[*rJob.Name] = sets.New[string]()
-
-		// Names of initContainer and containers are unique.
-		for _, c := range rJob.Template.Spec.Template.Spec.InitContainers {
-			rJobContainerNames[*rJob.Name].Insert(*c.Name)
+		rJobName := ""
+		if rJob.Name != nil {
+			rJobName = *rJob.Name
 		}
-		for _, c := range rJob.Template.Spec.Template.Spec.Containers {
-			rJobContainerNames[*rJob.Name].Insert(*c.Name)
+		rJobContainerNames[rJobName] = sets.New[string]()
+		rJobVolumeNames[rJobName] = sets.New[string]()
+
+		if rJob.Template != nil && rJob.Template.Spec != nil &&
+			rJob.Template.Spec.Template != nil && rJob.Template.Spec.Template.Spec != nil {
+			// Names of initContainer and containers are unique.
+			for _, c := range rJob.Template.Spec.Template.Spec.InitContainers {
+				if c.Name != nil {
+					rJobContainerNames[rJobName].Insert(*c.Name)
+				}
+			}
+			for _, c := range rJob.Template.Spec.Template.Spec.Containers {
+				if c.Name != nil {
+					rJobContainerNames[rJobName].Insert(*c.Name)
+				}
+			}
+			for _, v := range rJob.Template.Spec.Template.Spec.Volumes {
+				if v.Name != nil {
+					rJobVolumeNames[rJobName].Insert(*v.Name)
+				}
+			}
 		}
 	}
 
@@ -172,7 +191,6 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 
 	allErrs = append(allErrs, j.checkRuntimePatchesImmutability(ctx, oldObj, newObj)...)
 
-	// TODO (andreyvelich): Validate Volumes, VolumeMounts, and Tolerations.
 	for _, runtimePatch := range newObj.Spec.RuntimePatches {
 		allErrs = append(allErrs, validation.IsDomainPrefixedPath(runtimePatchesPath.Child("manager"), runtimePatch.Manager)...)
 		if runtimePatch.TrainingRuntimeSpec == nil || runtimePatch.TrainingRuntimeSpec.Template == nil ||
@@ -191,11 +209,17 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 				continue
 			}
 			podSpecPatch := rJobPatch.Template.Spec.Template.Spec
+
+			availableVolumes := rJobVolumeNames[rJobPatch.Name].Clone()
+			allErrs = append(allErrs, validateVolumes(podSpecPatch.Volumes, availableVolumes, runtimePatchesPath, newObj.Spec.RuntimePatches)...)
+			allErrs = append(allErrs, validateTolerations(podSpecPatch.Tolerations, runtimePatchesPath, newObj.Spec.RuntimePatches)...)
+
 			for _, c := range podSpecPatch.InitContainers {
 				if !containers.Has(c.Name) {
 					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 						fmt.Sprintf("must not have initContainer that doesn't exist in the runtime job %s", rJobPatch.Name)))
 				}
+				allErrs = append(allErrs, validateVolumeMounts(c.VolumeMounts, availableVolumes, c.Name, rJobPatch.Name, runtimePatchesPath, newObj.Spec.RuntimePatches)...)
 			}
 			for _, c := range podSpecPatch.Containers {
 				if !containers.Has(c.Name) {
@@ -205,6 +229,7 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 						fmt.Sprintf("must not have envs for the %s, %s, %s containers", constants.DatasetInitializer, constants.ModelInitializer, constants.Node)))
 				}
+				allErrs = append(allErrs, validateVolumeMounts(c.VolumeMounts, availableVolumes, c.Name, rJobPatch.Name, runtimePatchesPath, newObj.Spec.RuntimePatches)...)
 			}
 		}
 	}
@@ -275,6 +300,67 @@ func (j *JobSet) checkRuntimePatchesImmutability(ctx context.Context, oldObj, ne
 		}
 	}
 
+	return allErrs
+}
+
+func validateVolumes(volumes []corev1.Volume, availableVolumes sets.Set[string], fldPath *field.Path, val any) field.ErrorList {
+	var allErrs field.ErrorList
+	seen := sets.New[string]()
+	for _, v := range volumes {
+		if v.Name == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath, val, "volume name must not be empty"))
+			continue
+		}
+		if errs := validation.IsDNS1123Label(v.Name); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath, val, fmt.Sprintf("invalid volume name %q: %s", v.Name, errs[0])))
+		}
+		if seen.Has(v.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath, val, fmt.Sprintf("must have unique volume name: %s", v.Name)))
+		} else {
+			seen.Insert(v.Name)
+			availableVolumes.Insert(v.Name)
+		}
+	}
+	return allErrs
+}
+
+func validateVolumeMounts(mounts []corev1.VolumeMount, availableVolumes sets.Set[string], containerName, rJobName string, fldPath *field.Path, val any) field.ErrorList {
+	var allErrs field.ErrorList
+	seenMountPaths := sets.New[string]()
+	for _, vm := range mounts {
+		if !availableVolumes.Has(vm.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath, val,
+				fmt.Sprintf("volumeMount %s references volume that does not exist in runtime job %s", vm.Name, rJobName)))
+		}
+		if vm.MountPath == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath, val,
+				fmt.Sprintf("volumeMount %s must have a non-empty mountPath in container %s", vm.Name, containerName)))
+		} else if seenMountPaths.Has(vm.MountPath) {
+			allErrs = append(allErrs, field.Invalid(fldPath, val,
+				fmt.Sprintf("volumeMount %s has duplicate mountPath %s in container %s", vm.Name, vm.MountPath, containerName)))
+		} else {
+			seenMountPaths.Insert(vm.MountPath)
+		}
+	}
+	return allErrs
+}
+
+func validateTolerations(tolerations []corev1.Toleration, fldPath *field.Path, val any) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, t := range tolerations {
+		if t.Operator != "" && t.Operator != corev1.TolerationOpEqual && t.Operator != corev1.TolerationOpExists {
+			allErrs = append(allErrs, field.Invalid(fldPath, val, fmt.Sprintf("invalid toleration operator: %s", t.Operator)))
+		}
+		if t.Operator == corev1.TolerationOpExists && t.Value != "" {
+			allErrs = append(allErrs, field.Invalid(fldPath, val, "toleration value must be empty when operator is Exists"))
+		}
+		if t.Effect != "" && t.Effect != corev1.TaintEffectNoSchedule && t.Effect != corev1.TaintEffectPreferNoSchedule && t.Effect != corev1.TaintEffectNoExecute {
+			allErrs = append(allErrs, field.Invalid(fldPath, val, fmt.Sprintf("invalid toleration effect: %s", t.Effect)))
+		}
+		if t.TolerationSeconds != nil && t.Effect != corev1.TaintEffectNoExecute {
+			allErrs = append(allErrs, field.Invalid(fldPath, val, "tolerationSeconds can only be specified when effect is NoExecute"))
+		}
+	}
 	return allErrs
 }
 
