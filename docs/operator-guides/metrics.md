@@ -4,11 +4,10 @@ Kubeflow Trainer exposes controller-level Prometheus metrics for platform
 administrators. The metrics describe installed runtimes, TrainJob activity,
 and the workload capacity requested by TrainJobs.
 
-Metrics are exposed by the controller metrics endpoint. This document covers
-the six metric families implemented by PR #4190. TLS, authentication,
-ServiceMonitor resources, and scrape configuration are provided by PR #4102
-or by the platform deployment; PR #4190 does not create a Prometheus scrape
-target by itself.
+Metrics are exposed by the controller metrics endpoint. TLS, authentication,
+ServiceMonitor resources, and scrape configuration are provided by the platform
+deployment; the controller does not create a Prometheus scrape target by
+itself.
 
 ## Metrics
 
@@ -32,6 +31,8 @@ target by itself.
   found during the initial informer listing are not counted as newly created.
 - Runtime inventory is evaluated at scrape time, so it reflects the current
   runtime resources.
+- All Trainer metric families are exposed only by the elected leader replica;
+  follower replicas expose none of them.
 - The metrics do not currently provide durable history, checkpoint usage,
   progress, suspend/resume, accelerator utilization, or per-replicated-job
   runtime instrumentation.

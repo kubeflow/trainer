@@ -5,33 +5,6 @@ decisions behind them.
 
 ## Scope
 
-The implementation provides six metric families:
-
-1. `kubeflow_trainer_runtime_info`
-   - Gauge
-   - Shows the current TrainingRuntime and ClusterTrainingRuntime inventory.
-   - Includes runtime, namespace, ML policy, and PodGroupPolicy information.
-
-2. `kubeflow_trainer_trainjob_created_total`
-   - Counter
-   - Counts TrainJobs observed after the controller cache is ready.
-
-3. `kubeflow_trainer_trainjob_complete_total`
-   - Counter
-   - Counts successfully completed TrainJobs by runtime.
-
-4. `kubeflow_trainer_trainjob_failed_total`
-   - Counter
-   - Counts failed TrainJobs by normalized reason and runtime.
-
-5. `kubeflow_trainer_trainjob_lifetime_seconds`
-   - Histogram
-   - Measures the time from TrainJob creation to its terminal outcome.
-
-6. `kubeflow_trainer_trainjob_requested_training_nodes_per_job`
-   - Histogram
-   - Measures the requested training-node size of each TrainJob.
-
 The metric names, labels, and query examples are defined in
 [Trainer Controller Metrics](metrics.md). This document focuses on lifecycle,
 ownership, and implementation decisions.
@@ -134,7 +107,7 @@ aggregation:
 - namespace;
 - runtime kind;
 - result for lifetime observations;
-- normalized failure reason; and
+- normalized failure reason;
 - ML policy; and
 - PodGroupPolicy.
 
@@ -199,26 +172,6 @@ may not be counted.
 Metric collection remains local and does not make Kubernetes API calls. If
 runtime metadata is not available, only the dependent workload-size
 observation is skipped.
-
-## Validation
-
-Unit and race tests cover:
-
-- runtime snapshot updates and deletion;
-- namespaced and cluster-scoped runtime lookup;
-- default and explicit node counts;
-- TrainJob creation and terminal transitions;
-- duplicate terminal updates;
-- lifetime observations; and
-- leader ownership.
-
-Cluster validation should also confirm:
-
-- authenticated TLS access to `/metrics`;
-- ServiceMonitor selection;
-- Prometheus target health;
-- runtime inventory metrics; and
-- TrainJob counter and histogram queries.
 
 ## Out of scope
 

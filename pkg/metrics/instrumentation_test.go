@@ -71,6 +71,18 @@ func TestRuntimeInfoCollector(t *testing.T) {
 kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRuntime",ml_policy="torch",name="torch",namespace="team-a",pod_group_policy="none"} 1
 `,
 		},
+		"runtime with only numNodes": {
+			objects: []runtime.Object{&trainer.TrainingRuntime{
+				ObjectMeta: metav1.ObjectMeta{Name: "torch", Namespace: "team-a"},
+				Spec: trainer.TrainingRuntimeSpec{
+					MLPolicy: &trainer.MLPolicy{NumNodes: ptr.To(int32(4))},
+				},
+			}},
+			want: `# HELP kubeflow_trainer_runtime_info Current TrainingRuntime and ClusterTrainingRuntime resources.
+# TYPE kubeflow_trainer_runtime_info gauge
+kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRuntime",ml_policy="none",name="torch",namespace="team-a",pod_group_policy="none"} 1
+`,
+		},
 		"cluster runtime": {
 			objects: []runtime.Object{&trainer.ClusterTrainingRuntime{
 				ObjectMeta: metav1.ObjectMeta{Name: "mpi"},
@@ -142,6 +154,9 @@ func TestLeaderMetricsRegistration(t *testing.T) {
 	collector.upsert(&trainer.TrainingRuntime{
 		ObjectMeta: metav1.ObjectMeta{Name: "torch", Namespace: "team-a"},
 	}, trainingRuntimeKind)
+	if err := testutil.GatherAndCompare(controllerMetrics.Registry, strings.NewReader(""), "kubeflow_trainer_runtime_info"); err != nil {
+		t.Fatalf("metrics are registered before leadership: %v", err)
+	}
 
 	if err := registerLeaderMetrics(collector); err != nil {
 		t.Fatalf("register leader metrics: %v", err)
@@ -158,6 +173,10 @@ kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRun
 	if err := testutil.GatherAndCompare(controllerMetrics.Registry, strings.NewReader(""), "kubeflow_trainer_runtime_info"); err != nil {
 		t.Fatalf("metrics remain registered after leadership loss: %v", err)
 	}
+	if err := registerLeaderMetrics(collector); err != nil {
+		t.Fatalf("re-register leader metrics: %v", err)
+	}
+	unregisterLeaderMetrics(collector)
 }
 
 func TestMetricsRunnablesUseExpectedLeadership(t *testing.T) {
@@ -244,7 +263,7 @@ kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRun
 	clusterInformer.Delete(clusterRuntime)
 	assertMetric(t, reg, `# HELP kubeflow_trainer_runtime_info Current TrainingRuntime and ClusterTrainingRuntime resources.
 # TYPE kubeflow_trainer_runtime_info gauge
-kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRuntime",ml_policy="unknown",name="torch",namespace="team-a",pod_group_policy="none"} 1
+kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRuntime",ml_policy="none",name="torch",namespace="team-a",pod_group_policy="none"} 1
 `, "kubeflow_trainer_runtime_info")
 
 	cancel()

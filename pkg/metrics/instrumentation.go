@@ -336,9 +336,7 @@ func (c *runtimeInfoCollector) upsert(obj any, kind string) {
 		return
 	}
 	c.mu.Lock()
-	next := copyRuntimeSnapshot(c.snapshot)
-	next[key] = info
-	c.snapshot = next
+	c.snapshot[key] = info
 	c.mu.Unlock()
 }
 
@@ -348,9 +346,7 @@ func (c *runtimeInfoCollector) delete(obj any, kind string) {
 		return
 	}
 	c.mu.Lock()
-	next := copyRuntimeSnapshot(c.snapshot)
-	delete(next, key)
-	c.snapshot = next
+	delete(c.snapshot, key)
 	c.mu.Unlock()
 }
 
@@ -419,19 +415,8 @@ func validRequestedNodes(nodes int32) (int32, bool) {
 	return nodes, true
 }
 
-func copyRuntimeSnapshot(snapshot map[string]runtimeInfo) map[string]runtimeInfo {
-	next := make(map[string]runtimeInfo, len(snapshot)+1)
-	for key, value := range snapshot {
-		next[key] = value
-	}
-	return next
-}
-
 func setupTrainerMetrics(mgr ctrl.Manager) error {
 	m := newTrainerMetrics(mgr.GetCache())
-	// Metric vectors are registered during package initialization. Remove them
-	// until the elected replica starts the leader-owned metrics runnable.
-	unregisterLeaderMetrics(nil)
 	if err := mgr.Add(m.runtimeInfo); err != nil {
 		return fmt.Errorf("add runtime metrics observer: %w", err)
 	}
@@ -516,6 +501,9 @@ func mlPolicyName(policy *trainer.MLPolicy) string {
 		return "jax"
 	case policy.XGBoost != nil:
 		return "xgboost"
+	case policy.NumNodes != nil:
+		// MLPolicy with only numNodes set has no runtime-specific source.
+		return "none"
 	default:
 		return unknownValue
 	}

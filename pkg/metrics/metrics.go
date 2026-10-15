@@ -18,7 +18,6 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	controllerMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 const (
@@ -58,16 +57,6 @@ var (
 		Buckets:   []float64{1, 2, 4, 8, 16, 32, 64, 128},
 	}, []string{"runtime_ref"})
 )
-
-func init() {
-	controllerMetrics.Registry.MustRegister(
-		trainJobCreated,
-		trainJobComplete,
-		trainJobFailed,
-		trainJobLifetime,
-		trainJobRequestedTrainingNodes,
-	)
-}
 
 var runtimeInfoDesc = prometheus.NewDesc(
 	prometheus.BuildFQName(metricNamespace, "", "runtime_info"),
