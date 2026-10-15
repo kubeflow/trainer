@@ -212,9 +212,181 @@ You can use the `get_job_logs()` API to see your TrainJob logs:
 print("\n".join(TrainerClient().get_job_logs(name=job_id)))
 ```
 
+## FSDP Configuration
+
+Kubeflow Trainer supports [Fully Sharded Data Parallel (FSDP)](https://docs.pytorch.org/docs/fsdp.html)
+through the Torch plugin, which uses the [`torchrun` utility](https://docs.pytorch.org/docs/elastic/run.html)
+to launch distributed PyTorch processes. FSDP splits the model across GPUs, enabling training
+of models that do not fit on a single GPU.
+
+### TrainingRuntime Configuration
+
+The following example shows a `TrainingRuntime` with the Torch policy configured to inject
+the `PET_*` environment variables required by `torchrun`. The actual FSDP configuration is
+provided through the `TrainJob`'s `spec.trainer` fields.
+
+```yaml
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Example: FSDP configuration through the Torch plugin.
+#
+# This TrainingRuntime configures the Torch plugin to inject PET_* environment variables.
+# FSDP settings are supplied via the TrainJob's spec.trainer.command and spec.trainer.args.
+#
+# Apply: kubectl apply -f fsdp-trainingruntime.yaml
+# Check: kubectl get trainingruntime fsdp-runtime
+# Logs:  kubectl logs -l jobset.sigs.k8s.io/jobset-name=fsdp-example
+# Clean: kubectl delete trainingruntime fsdp-runtime
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainingRuntime
+metadata:
+  name: fsdp-runtime
+spec:
+  mlPolicy:
+    torch:
+      envInjection:
+        targets:
+          - jobName: node
+            containerNames:
+              - node
+```
+
+### TrainJob with FSDP
+
+The following `TrainJob` demonstrates how to configure FSDP through the Torch plugin.
+The `torchrun` launcher is used, and FSDP-related arguments are passed through `spec.trainer.args`.
+
+```yaml
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Example: FSDP training with the Torch plugin.
+#
+# This TrainJob uses the `torchdistributed` runtime and configures FSDP via the
+# `torchrun` command arguments. The `PET_*` environment variables (e.g.
+# `PET_NNODES`, `PET_NPROC_PER_NODE`, `PET_NODE_RANK`, `PET_MASTER_ADDR`,
+# `PET_MASTER_PORT`) are automatically injected by the Torch plugin into the
+# trainer container.
+#
+# Apply: kubectl apply -f fsdp-trainjob.yaml
+# Check: kubectl get trainjob fsdp-example
+# Logs:  kubectl logs -l jobset.sigs.k8s.io/jobset-name=fsdp-example
+# Clean: kubectl delete trainjob fsdp-example
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: fsdp-example
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: TrainingRuntime
+    name: fsdp-runtime
+  trainer:
+    numNodes: 1
+    numProcPerNode: 1
+    resourcesPerNode:
+      gpu: 4
+    command:
+      - torchrun
+    args:
+      - --fsdp
+      - --fsdp-sharding=auto
+      - --fsdp-backward-prefetch=allow
+      - --fsdp-limit-all-gathers=""
+    env:
+      # The Torch plugin automatically injects PET_* environment variables.
+      # No manual configuration is required for basic FSDP operation.
+    image: docker.io/pytorch/pytorch:2.3.0-cuda12.1-runtime
+    commandOverwrite: false
+```
+
+#### How FSDP configuration is supplied
+
+- **Launcher**: The `torchrun` utility is used as the entrypoint (configured via `spec.trainer.command`).
+- **FSDP strategy**: Set via `--fsdp-sharding=<strategy>` (e.g., `auto`, `FULL_SHARD`, `SHARD_WIDTH`).
+- **Backward prefetch**: Set via `--fsdp-backward-prefetch=<policy>` (e.g., `allow`, `require`).
+- **Limit all-gathers**: Set via `--fsdp-limit-all-gathers=<policy>` (e.g., `", "`).
+
+These arguments are passed directly to the `torchrun` process. The `PET_NNODES`,
+`PET_NPROC_PER_NODE`, `PET_NODE_RANK`, `PET_MASTER_ADDR`, and `PET_MASTER_PORT`
+environment variables are automatically injected by the Torch plugin's `EnforceMLPolicy`
+function, enabling `torchrun` to discover the distributed environment.
+
+#### Training script interface
+
+The user's training script receives the FSDP configuration through the `torchrun`
+arguments. The script should:
+
+1. Import `torch.distributed` and initialize the process group:
+   ```python
+   import torch
+   import torch.distributed as dist
+   from torch.nn import functional as F
+
+   dist.init_process_group(backend="nccl")
+   ```
+
+2. Use `torch.nn.FullyShardedDataParallel` (or `torch.nn.parallel.DistributedDataParallel`)
+   for the model:
+   ```python
+   model = torch.nn.Linear(10, 10).to("cuda")
+   model = torch.nn.parallel.FullyShardedDataParallel(model)
+   ```
+
+3. The `--fsdp` flag enables FSDP mode. The other `--fsdp-*` arguments control
+   the sharding strategy, backward prefetch behavior, and all-gather limits.
+   These are PyTorch FSDP-specific flags; the training script does not need to
+   explicitly pass `--fsdp` or `SHARDED_DATA_PARALLEL` beyond what `torchrun`
+   provides.
+
+**Important**: The FSDP configuration (`--fsdp`, `--fsdp-sharding`, etc.) is handled
+by the `torchrun` launcher and the PyTorch runtime. The user's training script must
+be written to use FSDP (e.g., `FullyShardedDataParallel`), but does not need to
+parse these arguments directly.
+
+## FSDP vs. DeepSpeed Comparison
+
+| Aspect | FSDP (via Torch Plugin) | DeepSpeed (via Torch Plugin) |
+|---|---|---|
+| **Launcher** | `torchrun` utility | `torchrun` with `--deepspeed` arg |
+| **Configuration mechanism** | FSDP flags passed as `torchrun` args: `--fsdp`, `--fsdp-sharding`, `--fsdp-backward-prefetch`, `--fsdp-limit-all-gathers` | DeepSpeed JSON config file mounted as ConfigMap/volume; passed via `--deepspeed <path>` arg |
+| **Distributed settings supply** | PET_* env vars automatically injected by Torch plugin (`PET_NNODES`, `PET_NPROC_PER_NODE`, `PET_NODE_RANK`, `PET_MASTER_ADDR`, `PET_MASTER_PORT`) | Same PET_* env vars automatically injected; DeepSpeed config supplied separately |
+| **Hardware/topology considerations** | Designed for GPU clusters; sharding strategy depends on GPU count and model size; works with standard Kubernetes GPU nodes | Designed for GPU clusters; ZeRO stages optimize memory across nodes; requires NCCL/Gloo backend |
+| **Prerequisites** | PyTorch runtime (`torch-distributed`), `torchrun` available, GPU nodes with appropriate drivers | DeepSpeed runtime or ConfigMap with `deepspeed` package, `torchrun` available, GPU nodes with appropriate drivers |
+| **Limitations** | FSDP state dict format differs from DDP; model wrapping requires `FullyShardedDataParallel`; backward prefetch and limit-all-gathers have tradeoffs | DeepSpeed config JSON must be valid; `--deepspeed` arg requires mounted config file; some advanced ZeRO features may require specific runtime setup |
+
+**Important**: The FSDP configuration (`--fsdp`, `--fsdp-sharding`, etc.) is handled
+by the `torchrun` launcher and the PyTorch runtime. The user's training script must
+be written to use FSDP (e.g., `FullyShardedDataParallel`), but does not need to
+parse these arguments directly.
+
 ## Next Steps
 
 - Check out [the PyTorch MNIST example](https://github.com/kubeflow/trainer/blob/master/examples/pytorch/image-classification/mnist.ipynb).
 - Follow [the PyTorch fine-tuning example](https://github.com/kubeflow/trainer/blob/master/examples/pytorch/question-answering/fine-tune-distilbert.ipynb)
  using the pre-trained DistilBERT model.
 - Learn more about `TrainerClient()` APIs [in the Kubeflow SDK](https://github.com/kubeflow/sdk/blob/main/kubeflow/trainer/api/trainer_client.py).
+- Learn more about [FSDP documentation](https://docs.pytorch.org/docs/fsdp.html).
