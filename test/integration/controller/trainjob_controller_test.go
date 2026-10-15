@@ -2457,7 +2457,7 @@ alpha-node-0-1.alpha slots=8
 						corev1.VolumeMount{Name: constants.FluxSpackViewVolumeName, MountPath: constants.FluxSpackViewVolumePath},
 						corev1.VolumeMount{Name: configMapKey.Name, MountPath: constants.FluxConfigVolumeName, ReadOnly: true},
 						corev1.VolumeMount{Name: constants.FluxCurveVolumeName, MountPath: constants.FluxCurveVolumePath, ReadOnly: true},
-						corev1.VolumeMount{Name: constants.FluxMemoryVolumeName, MountPath: constants.FluxMemoryVolumePath, ReadOnly: true},
+						corev1.VolumeMount{Name: constants.FluxMemoryVolumeName, MountPath: constants.FluxMemoryVolumePath},
 					))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
