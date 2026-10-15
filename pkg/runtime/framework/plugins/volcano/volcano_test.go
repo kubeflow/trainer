@@ -43,9 +43,11 @@ import (
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
+	volcanov1beta1ac "volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
@@ -613,6 +615,116 @@ func TestValidate(t *testing.T) {
 
 			if diff := gocmp.Diff(tc.wantWarnings, warnings); diff != "" {
 				t.Errorf("Unexpected Validate warnings (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestBuildPriorityClassNamePropagation covers the deepspeed and mlx shape, where the trainer
+// ancestor is not the last ReplicatedJob in slice order. Before the fix, the PodGroup took its
+// priority from whichever job happened to be last.
+func TestBuildPriorityClassNamePropagation(t *testing.T) {
+	cases := map[string]struct {
+		trainerAncestorJob    string
+		priorityClassNames    map[string]string
+		wantPodGroupPriority  string
+		wantPodTemplatePriors map[string]string
+	}{
+		"trainer node is not last in slice order": {
+			trainerAncestorJob:    "launcher",
+			priorityClassNames:    map[string]string{"launcher": "high-priority"},
+			wantPodGroupPriority:  "high-priority",
+			wantPodTemplatePriors: map[string]string{"launcher": "high-priority", "node": "high-priority"},
+		},
+		"no priority class anywhere leaves every template untouched": {
+			trainerAncestorJob:    "launcher",
+			priorityClassNames:    map[string]string{},
+			wantPodGroupPriority:  "",
+			wantPodTemplatePriors: map[string]string{"launcher": "", "node": ""},
+		},
+		"trainer node sets nothing while another job does": {
+			trainerAncestorJob:    "launcher",
+			priorityClassNames:    map[string]string{"node": "low-priority"},
+			wantPodGroupPriority:  "",
+			wantPodTemplatePriors: map[string]string{"launcher": "", "node": "low-priority"},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			jobSet := &jobsetv1alpha2.JobSet{
+				TypeMeta: metav1.TypeMeta{APIVersion: jobsetv1alpha2.GroupVersion.String(), Kind: "JobSet"},
+				Spec: jobsetv1alpha2.JobSetSpec{
+					ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+						{Name: "launcher", Template: batchv1.JobTemplateSpec{Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{PriorityClassName: tc.priorityClassNames["launcher"]},
+						}}}},
+						{Name: "node", Template: batchv1.JobTemplateSpec{Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{PriorityClassName: tc.priorityClassNames["node"]},
+						}}}},
+					},
+				},
+			}
+			jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](jobSet, "spec")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			info := &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{Volcano: &trainer.VolcanoPodGroupPolicySource{}},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobSetSpecApply,
+					PodSets: []runtime.PodSet{
+						{Name: "launcher", Count: ptr.To[int32](1), Ancestor: ptr.To(tc.trainerAncestorJob)},
+						{Name: "node", Count: ptr.To[int32](1)},
+					},
+				},
+			}
+			// Only the trainer ancestor PodSet carries the label.
+			for i := range info.TemplateSpec.PodSets {
+				if info.TemplateSpec.PodSets[i].Name != tc.trainerAncestorJob {
+					info.TemplateSpec.PodSets[i].Ancestor = nil
+				} else {
+					info.TemplateSpec.PodSets[i].Ancestor = ptr.To(constants.AncestorTrainer)
+				}
+			}
+
+			trainJob := &trainer.TrainJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "job", Namespace: "ns", UID: "1"},
+				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(true)},
+			}
+
+			clientBuilder := utiltesting.NewClientBuilder()
+			p, err := New(context.Background(), clientBuilder.Build(), nil, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			objs, err := p.(framework.ComponentBuilderPlugin).Build(context.Background(), info, trainJob)
+			if err != nil {
+				t.Fatalf("unexpected Build error: %v", err)
+			}
+
+			var gotPodGroupPriority string
+			for _, obj := range objs {
+				if pg, ok := obj.(*volcanov1beta1ac.PodGroupApplyConfiguration); ok && pg.Spec != nil {
+					gotPodGroupPriority = ptr.Deref(pg.Spec.PriorityClassName, "")
+				}
+			}
+			if gotPodGroupPriority != tc.wantPodGroupPriority {
+				t.Errorf("PodGroup priorityClassName = %q, want %q", gotPodGroupPriority, tc.wantPodGroupPriority)
+			}
+
+			specApply, _ := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
+			for _, rj := range specApply.ReplicatedJobs {
+				got := ptr.Deref(rj.Template.Spec.Template.Spec.PriorityClassName, "")
+				if want := tc.wantPodTemplatePriors[*rj.Name]; got != want {
+					t.Errorf("replicatedJob %q pod priorityClassName = %q, want %q", *rj.Name, got, want)
+				}
 			}
 		})
 	}
