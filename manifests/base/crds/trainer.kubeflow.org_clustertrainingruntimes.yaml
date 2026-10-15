@@ -213,6 +213,301 @@ spec:
                 - message: at most one of the fields in [coscheduling volcano] may
                     be set
                   rule: (has(self.coscheduling)?1:0)+(has(self.volcano)?1:0) <= 1
+              scheduling:
+                description: |-
+                  scheduling defines the Workload-Aware Scheduling configuration for TrainJobs which
+                  reference this runtime.
+                properties:
+                  disruptionMode:
+                    description: disruptionMode defines how the Pods of the entire
+                      TrainJob (level 1) can be disrupted.
+                    properties:
+                      all:
+                        description: all specifies that all child groups must be disrupted
+                          together.
+                        type: object
+                      single:
+                        description: |-
+                          single specifies that child groups can be disrupted independently from
+                          each other.
+                        type: object
+                    type: object
+                    x-kubernetes-validations:
+                    - message: exactly one of single or all must be set
+                      rule: has(self.single) != has(self.all)
+                  replicatedJobs:
+                    description: replicatedJobs specifies per-ReplicatedJob (level
+                      2) scheduling configuration.
+                    items:
+                      description: |-
+                        ReplicatedJobScheduling targets one or more ReplicatedJobs of the runtime template with
+                        level 2 scheduling configuration.
+                      properties:
+                        disruptionMode:
+                          description: |-
+                            disruptionMode defines how the Pods created by the targeted ReplicatedJobs can be
+                            disrupted.
+                          properties:
+                            all:
+                              description: all specifies that all child groups must
+                                be disrupted together.
+                              type: object
+                            single:
+                              description: |-
+                                single specifies that child groups can be disrupted independently from
+                                each other.
+                              type: object
+                          type: object
+                          x-kubernetes-validations:
+                          - message: exactly one of single or all must be set
+                            rule: has(self.single) != has(self.all)
+                        job:
+                          description: |-
+                            job defines Job-level (level 3) scheduling configuration, where every replica of the
+                            targeted ReplicatedJob forms its own...
+                          properties:
+                            disruptionMode:
+                              description: disruptionMode defines how the Pods within
+                                a single replica can be disrupted.
+                              properties:
+                                all:
+                                  description: all specifies that all pods in the
+                                    group must be disrupted together.
+                                  type: object
+                                single:
+                                  description: single specifies that pods can be disrupted
+                                    independently from each other.
+                                  type: object
+                              type: object
+                              x-kubernetes-validations:
+                              - message: exactly one of single or all must be set
+                                rule: has(self.single) != has(self.all)
+                            resourceClaims:
+                              description: resourceClaims defines the DRA ResourceClaims
+                                shared by all Pods in each Job's PodGroup.
+                              items:
+                                description: |
+                                  WorkloadPodGroupResourceClaim references a dynamic resource claim
+                                  that is shared across pods in the group.
+                                properties:
+                                  name:
+                                    description: |-
+                                      name uniquely identifies this resource claim inside the group.
+                                      This field is required. It must be a DNS_LABEL.
+                                    type: string
+                                  resourceClaimName:
+                                    description: |-
+                                      resourceClaimName is the name of a ResourceClaim object in the same
+                                      namespace.
+                                      This field is optional.
+                                    type: string
+                                  resourceClaimTemplateName:
+                                    description: |-
+                                      resourceClaimTemplateName is the name of a ResourceClaimTemplate
+                                      object in the same namespace.
+                                      This field is optional.
+                                    type: string
+                                required:
+                                - name
+                                type: object
+                              maxItems: 4
+                              type: array
+                              x-kubernetes-list-type: atomic
+                              x-kubernetes-validations:
+                              - message: exactly one of resourceClaimName or resourceClaimTemplateName
+                                  must be set
+                                rule: self.all(c, has(c.resourceClaimName) != has(c.resourceClaimTemplateName))
+                            schedulingConstraints:
+                              description: |-
+                                schedulingConstraints defines topology constraints applied to each replica of the
+                                targeted ReplicatedJob.
+                              properties:
+                                topology:
+                                  description: |-
+                                    topology specifies desired topological placements for all pods
+                                    within the pod group.
+                                  items:
+                                    description: TopologyConstraint defines a topology
+                                      constraint for a PodGroup.
+                                    properties:
+                                      key:
+                                        description: key specifies the key of the
+                                          node label representing the topology domain.
+                                        type: string
+                                    required:
+                                    - key
+                                    type: object
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                              type: object
+                            schedulingPolicy:
+                              description: |-
+                                schedulingPolicy defines the scheduling policy applied to each replica of the targeted
+                                ReplicatedJob.
+                              properties:
+                                basic:
+                                  description: |-
+                                    basic specifies that standard, pod-by-pod Kubernetes scheduling
+                                    behavior should be used.
+                                  type: object
+                                gang:
+                                  description: gang specifies all-or-nothing scheduling
+                                    semantics.
+                                  properties:
+                                    minCount:
+                                      description: |-
+                                        minCount is the minimum number of pods that must be scheduled
+                                        at the same time for the scheduler to admit the entire group.
+                                      format: int32
+                                      type: integer
+                                  type: object
+                              type: object
+                              x-kubernetes-validations:
+                              - message: exactly one of basic or gang must be set
+                                rule: has(self.basic) != has(self.gang)
+                              - message: gang.minCount is computed from numNodes and
+                                  must not be set
+                                rule: '!has(self.gang) || !has(self.gang.minCount)'
+                          type: object
+                        schedulingConstraints:
+                          description: |-
+                            schedulingConstraints defines level 2 topology constraints for the Pods created by the
+                            targeted ReplicatedJobs.
+                          properties:
+                            topology:
+                              description: |-
+                                topology specifies desired topological placements for all child groups
+                                within the composite group.
+                              items:
+                                description: TopologyConstraint defines a topology
+                                  constraint for a PodGroup.
+                                properties:
+                                  key:
+                                    description: key specifies the key of the node
+                                      label representing the topology domain.
+                                    type: string
+                                required:
+                                - key
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          type: object
+                        schedulingPolicy:
+                          description: |-
+                            schedulingPolicy defines the level 2 scheduling policy for the Pods created by the
+                            targeted ReplicatedJobs.
+                          properties:
+                            basic:
+                              description: |-
+                                basic specifies that the child groups of this composite group should be
+                                scheduled independently.
+                              type: object
+                            gang:
+                              description: |-
+                                gang specifies that the child groups of this composite group should be
+                                scheduled using all-or-nothing semantics.
+                              properties:
+                                minGroupCount:
+                                  description: |-
+                                    minGroupCount is the minimum number of child groups that must be
+                                    schedulable at the same time for the scheduler to admit the...
+                                  format: int32
+                                  type: integer
+                              type: object
+                          type: object
+                          x-kubernetes-validations:
+                          - message: exactly one of basic or gang must be set
+                            rule: has(self.basic) != has(self.gang)
+                          - message: gang.minGroupCount must not be set until CompositePodGroup
+                              is supported
+                            rule: '!has(self.gang) || !has(self.gang.minGroupCount)'
+                        targetReplicatedJobs:
+                          description: targetReplicatedJobs is the list of ReplicatedJob
+                            names this policy applies to.
+                          items:
+                            maxLength: 253
+                            type: string
+                          maxItems: 8
+                          minItems: 1
+                          type: array
+                          x-kubernetes-list-type: set
+                      required:
+                      - targetReplicatedJobs
+                      type: object
+                      x-kubernetes-validations:
+                      - message: when job is set, targetReplicatedJobs must contain
+                          exactly one name and schedulingPolicy, schedulingConstraints,
+                          and disruptionMode must not be set
+                        rule: '!has(self.job) || (size(self.targetReplicatedJobs)
+                          == 1 && !has(self.schedulingPolicy) && !has(self.schedulingConstraints)
+                          && !has(self.disruptionMode))'
+                    maxItems: 8
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  schedulingConstraints:
+                    description: |-
+                      schedulingConstraints defines TrainJob-level (level 1) topology constraints for every
+                      Pod created by the TrainJob.
+                    properties:
+                      topology:
+                        description: |-
+                          topology specifies desired topological placements for all child groups
+                          within the composite group.
+                        items:
+                          description: TopologyConstraint defines a topology constraint
+                            for a PodGroup.
+                          properties:
+                            key:
+                              description: key specifies the key of the node label
+                                representing the topology domain.
+                              type: string
+                          required:
+                          - key
+                          type: object
+                        type: array
+                        x-kubernetes-list-type: atomic
+                    type: object
+                  schedulingPolicy:
+                    description: |-
+                      schedulingPolicy defines the TrainJob-level (level 1) scheduling policy for every Pod
+                      created by the TrainJob.
+                    properties:
+                      basic:
+                        description: |-
+                          basic specifies that the child groups of this composite group should be
+                          scheduled independently.
+                        type: object
+                      gang:
+                        description: |-
+                          gang specifies that the child groups of this composite group should be
+                          scheduled using all-or-nothing semantics.
+                        properties:
+                          minGroupCount:
+                            description: |-
+                              minGroupCount is the minimum number of child groups that must be
+                              schedulable at the same time for the scheduler to admit the...
+                            format: int32
+                            type: integer
+                        type: object
+                    type: object
+                    x-kubernetes-validations:
+                    - message: exactly one of basic or gang must be set
+                      rule: has(self.basic) != has(self.gang)
+                    - message: gang.minGroupCount must not be set until CompositePodGroup
+                        is supported
+                      rule: '!has(self.gang) || !has(self.gang.minGroupCount)'
+                type: object
+                x-kubernetes-validations:
+                - message: schedulingPolicy, schedulingConstraints, and disruptionMode
+                    cannot be set together with replicatedJobs
+                  rule: '!has(self.replicatedJobs) || size(self.replicatedJobs) ==
+                    0 || (!has(self.schedulingPolicy) && !has(self.schedulingConstraints)
+                    && !has(self.disruptionMode))'
+                - message: a ReplicatedJob must not be targeted by more than one replicatedJobs
+                    entry
+                  rule: '!has(self.replicatedJobs) || self.replicatedJobs.all(e, self.replicatedJobs.filter(o,
+                    o.targetReplicatedJobs.exists(n, n in e.targetReplicatedJobs)).size()
+                    == 1)'
               template:
                 description: template for the JobSet which will be used by TrainJob.
                 minProperties: 1
@@ -9483,6 +9778,33 @@ spec:
                         !has(rj.dependsOn) || size(rj.dependsOn) == 0)))'
                 type: object
             type: object
+            x-kubernetes-validations:
+            - message: scheduling and podGroupPolicy are mutually exclusive
+              rule: '!(has(self.scheduling) && has(self.podGroupPolicy))'
+            - message: JobSet scheduling must not be set, it is owned by the TrainJob
+                controller
+              rule: '!(has(self.scheduling) && has(self.template) && has(self.template.spec)
+                && has(self.template.spec.scheduling))'
+            - message: Job scheduling must not be set, it is owned by the TrainJob
+                controller
+              rule: '!(has(self.scheduling) && has(self.template) && has(self.template.spec)
+                && has(self.template.spec.replicatedJobs) && self.template.spec.replicatedJobs.exists(r,
+                has(r.template.spec) && has(r.template.spec.scheduling)))'
+            - message: Pod schedulingGroup must not be set, it is owned by the TrainJob
+                controller
+              rule: '!(has(self.scheduling) && has(self.template) && has(self.template.spec)
+                && has(self.template.spec.replicatedJobs) && self.template.spec.replicatedJobs.exists(r,
+                has(r.template.spec) && has(r.template.spec.template.spec) && has(r.template.spec.template.spec.schedulingGroup)))'
+            - message: TrainJob-level gang scheduling cannot be used with dependsOn
+                or InOrder startupPolicy; target the ReplicatedJobs with separate
+                scheduling.replicatedJobs entries instead
+              rule: '!has(self.scheduling) || !(has(self.scheduling.schedulingPolicy)
+                ? has(self.scheduling.schedulingPolicy.gang) : (!has(self.scheduling.replicatedJobs)
+                || size(self.scheduling.replicatedJobs) == 0)) || !has(self.template)
+                || !has(self.template.spec) || ((!has(self.template.spec.replicatedJobs)
+                || self.template.spec.replicatedJobs.all(rj, !has(rj.dependsOn) ||
+                size(rj.dependsOn) == 0)) && (!has(self.template.spec.startupPolicy)
+                || self.template.spec.startupPolicy.startupPolicyOrder != ''InOrder''))'
         type: object
     served: true
     storage: true
