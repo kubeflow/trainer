@@ -162,3 +162,69 @@ class TestS3Storage:
                             assert (
                                 actual_content == expected_content
                             ), f"Content mismatch for {relative_path}"
+
+    @pytest.mark.parametrize("prefix", ["models/llama", "models/llama/"])
+    def test_download_only_objects_under_prefix(self, prefix):
+        """Objects that merely share the prefix as a string are not downloaded."""
+        files = {
+            "models/llama/config.json": b"config",
+            "models/llama/weights/model.safetensors": b"weights",
+            "models/llama-2/config.json": b"sibling",
+            "models/llama2-7b/config.json": b"sibling",
+        }
+        with patch("pkg.initializers.utils.opendal.opendal") as mock_opendal:
+            mock_operator = MagicMock()
+            mock_opendal.Operator.return_value = mock_operator
+            mock_operator.layer.return_value = mock_operator
+
+            # OpenDAL, like S3 ListObjects, matches the prefix as a plain string.
+            mock_operator.list.return_value = [
+                self._create_mock_entry(path)
+                for path in files
+                if path.startswith(prefix)
+            ]
+            mock_operator.read.side_effect = lambda key: files[key]
+
+            storage = S3Storage(bucket="test-bucket", region="us-east-1")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(prefix=prefix, destination_path=tmpdir)
+
+                downloaded = sorted(
+                    os.path.relpath(os.path.join(root, name), tmpdir).replace(
+                        os.sep, "/"
+                    )
+                    for root, _, names in os.walk(tmpdir)
+                    for name in names
+                )
+
+            assert downloaded == ["config.json", "weights/model.safetensors"]
+            assert sorted(
+                call.args[0] for call in mock_operator.read.call_args_list
+            ) == [
+                "models/llama/config.json",
+                "models/llama/weights/model.safetensors",
+            ]
+
+    def test_download_single_object(self):
+        """A prefix that names one object downloads that object under its file name."""
+        with patch("pkg.initializers.utils.opendal.opendal") as mock_opendal:
+            mock_operator = MagicMock()
+            mock_opendal.Operator.return_value = mock_operator
+            mock_operator.layer.return_value = mock_operator
+
+            mock_operator.list.return_value = [
+                self._create_mock_entry("datasets/train.parquet")
+            ]
+            mock_operator.read.return_value = b"rows"
+
+            storage = S3Storage(bucket="test-bucket", region="us-east-1")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(
+                    prefix="datasets/train.parquet", destination_path=tmpdir
+                )
+
+                assert os.listdir(tmpdir) == ["train.parquet"]
+                with open(os.path.join(tmpdir, "train.parquet"), "rb") as f:
+                    assert f.read() == b"rows"
