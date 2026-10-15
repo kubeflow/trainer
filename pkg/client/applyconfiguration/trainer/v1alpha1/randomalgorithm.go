@@ -24,6 +24,7 @@ package v1alpha1
 // RandomAlgorithm is the random search algorithm.
 type RandomAlgorithmApplyConfiguration struct {
 	// seed is the seed for the random search algorithm.
+	// It must be between 0 and 4294967295, the range accepted by the Optuna random sampler.
 	Seed *int64 `json:"seed,omitempty"`
 }
 
