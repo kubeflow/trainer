@@ -27,6 +27,10 @@ load_image_to_kind() {
   echo "Loading image ${image_name} into KinD cluster${cluster_name:+ ${cluster_name}}"
   if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
     ${KIND} load docker-image "${image_name}" ${cluster_arg}
+    # The image now lives in the KinD node's containerd, so the host docker copy
+    # is redundant. Remove it to free disk on the runner, which shares the same
+    # filesystem as the KinD node (GPU runners are tight on space).
+    docker rmi "${image_name}" > /dev/null 2>&1 || true
   else
     ${CONTAINER_RUNTIME} save "${image_name}" -o /dev/stdout | ${KIND} load image-archive /dev/stdin ${cluster_arg}
   fi
