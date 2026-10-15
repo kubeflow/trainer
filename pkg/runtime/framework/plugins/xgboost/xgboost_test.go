@@ -27,11 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
-	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -319,28 +317,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 				runtime.WithTemplateSpecObjApply(
-					jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().
-														WithName(constants.Node).
-														WithResources(corev1ac.ResourceRequirements().
-															WithRequests(corev1.ResourceList{
-																"example.com/gpu": resource.MustParse("2"),
-															}),
-														),
-												),
-											),
-										),
-									),
-								),
-						),
+					utiltesting.MakeJobSetSpecApplyWithNodeResources(corev1.ResourceList{"example.com/gpu": resource.MustParse("2")}),
 				),
 			),
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
@@ -387,28 +364,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 							},
 						}},
 					}},
-					ObjApply: jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().
-														WithName(constants.Node).
-														WithResources(corev1ac.ResourceRequirements().
-															WithRequests(corev1.ResourceList{
-																"example.com/gpu": resource.MustParse("2"),
-															}),
-														),
-												),
-											),
-										),
-									),
-								),
-						),
+					ObjApply: utiltesting.MakeJobSetSpecApplyWithNodeResources(corev1.ResourceList{"example.com/gpu": resource.MustParse("2")}),
 				},
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
@@ -560,6 +516,11 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
+				runtime.WithTemplateSpecObjApply(utiltesting.MakeJobSetSpecApplyWithNodeResources(corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("32Gi"),
+					"example.com/gpu":     resource.MustParse("4"),
+				})),
 			),
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "gpu-job").
 				Trainer(
@@ -582,6 +543,11 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: utiltesting.MakeJobSetSpecApplyWithNodeResources(corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("8"),
+						corev1.ResourceMemory: resource.MustParse("32Gi"),
+						"example.com/gpu":     resource.MustParse("4"),
+					}),
 					PodSets: []runtime.PodSet{{
 						Name:              constants.Node,
 						Ancestor:          ptr.To(constants.AncestorTrainer),
@@ -767,30 +733,9 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
-				runtime.WithTemplateSpecObjApply(
-					jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().
-														WithName(constants.Node).
-														WithResources(corev1ac.ResourceRequirements().
-															WithRequests(corev1.ResourceList{
-																"example.com/gpu": resource.MustParse("2"),
-															}),
-														),
-												),
-											),
-										),
-									),
-								),
-						),
-				),
+				runtime.WithTemplateSpecObjApply(utiltesting.MakeJobSetSpecApplyWithNodeResources(corev1.ResourceList{
+					"example.com/gpu": resource.MustParse("2"),
+				})),
 			),
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "runtime-res-job").
 				Trainer(
@@ -841,28 +786,9 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 							},
 						}},
 					}},
-					ObjApply: jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().
-														WithName(constants.Node).
-														WithResources(corev1ac.ResourceRequirements().
-															WithRequests(corev1.ResourceList{
-																"example.com/gpu": resource.MustParse("2"),
-															}),
-														),
-												),
-											),
-										),
-									),
-								),
-						),
+					ObjApply: utiltesting.MakeJobSetSpecApplyWithNodeResources(corev1.ResourceList{
+						"example.com/gpu": resource.MustParse("2"),
+					}),
 				},
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
@@ -880,6 +806,9 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
+				runtime.WithTemplateSpecObjApply(utiltesting.MakeJobSetSpecApplyWithNodeResources(corev1.ResourceList{
+					"example.com/gpu": resource.MustParse("4"),
+				})),
 			),
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainjob-res").
 				Trainer(
@@ -900,6 +829,9 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: utiltesting.MakeJobSetSpecApplyWithNodeResources(corev1.ResourceList{
+						"example.com/gpu": resource.MustParse("4"),
+					}),
 					PodSets: []runtime.PodSet{{
 						Name:              constants.Node,
 						Ancestor:          ptr.To(constants.AncestorTrainer),
@@ -938,7 +870,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
-		"resources set in both Runtime and TrainJob": {
+		"GPUs from the Runtime are honored when TrainJob overrides other resources": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
@@ -951,37 +883,16 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
-				runtime.WithTemplateSpecObjApply(
-					jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().
-														WithName(constants.Node).
-														WithResources(corev1ac.ResourceRequirements().
-															WithRequests(corev1.ResourceList{
-																"example.com/gpu": resource.MustParse("1"),
-															}),
-														),
-												),
-											),
-										),
-									),
-								),
-						),
-				),
+				runtime.WithTemplateSpecObjApply(utiltesting.MakeJobSetSpecApplyWithNodeResources(corev1.ResourceList{
+					"example.com/gpu": resource.MustParse("3"),
+				})),
 			),
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "both-res-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumNodes(2).
 						Container("xgboost/xgboost:latest", nil, nil, corev1.ResourceList{
-							"example.com/gpu": resource.MustParse("3"),
+							corev1.ResourceMemory: resource.MustParse("32Gi"),
 						}).
 						Obj(),
 				).
@@ -1029,28 +940,9 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 							},
 						}},
 					}},
-					ObjApply: jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().
-														WithName(constants.Node).
-														WithResources(corev1ac.ResourceRequirements().
-															WithRequests(corev1.ResourceList{
-																"example.com/gpu": resource.MustParse("1"),
-															}),
-														),
-												),
-											),
-										),
-									),
-								),
-						),
+					ObjApply: utiltesting.MakeJobSetSpecApplyWithNodeResources(corev1.ResourceList{
+						"example.com/gpu": resource.MustParse("3"),
+					}),
 				},
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},

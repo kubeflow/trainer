@@ -97,9 +97,6 @@ func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, oldObj, n
 	if oldObj == nil {
 		runtimeRes := runtime.ExtractResourcePerNodeFromRuntime(runtimeInfo)
 		resourcesPerNode := ptr.Deref(runtimeRes, corev1.ResourceRequirements{})
-		if jobTrainer := newObj.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
-			resourcesPerNode = *jobTrainer.ResourcesPerNode
-		}
 		numProcPerNodeSet := newObj.Spec.Trainer != nil && newObj.Spec.Trainer.NumProcPerNode != nil
 		if runtimeRes != nil && len(runtimeRes.Claims) > 0 && !numProcPerNodeSet && runtime.GetNumGPUPerNode(&resourcesPerNode) == 0 {
 			warnings = append(warnings, draNumProcPerNodeWarning)
@@ -147,9 +144,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 
 	// Determine numProcPerNode based on the resourcesPerNode.
 	resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
-	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
-		resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
-	}
 	gpuQ := runtime.GetNumGPUPerNode(&resourcesPerNode)
 	// If no GPU is set in resource, calculate numProcPerNode based on CPU.
 	if numProcPerNode.String() == "auto" && gpuQ == 0 {
