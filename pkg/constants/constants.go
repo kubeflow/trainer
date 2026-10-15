@@ -200,6 +200,28 @@ const (
 	// OpenMPIEnvDefaultSlots is the OpenMPI default number of slots env key.
 	OpenMPIEnvDefaultSlots string = "OMPI_MCA_orte_set_default_slots"
 
+	// Values for Intel MPI implementation.
+
+	// IntelMPIEnvHostFile is the Intel MPI env key for the hostfile location.
+	IntelMPIEnvHostFile string = "I_MPI_HYDRA_HOST_FILE"
+
+	// IntelMPIEnvBootstrapExecExtraArgs is the Intel MPI env key for additional bootstrap (SSH) arguments.
+	IntelMPIEnvBootstrapExecExtraArgs string = "I_MPI_HYDRA_BOOTSTRAP_EXEC_EXTRA_ARGS"
+
+	// IntelMPIEnvDefaultValueBootstrapExecExtraArgs is the default SSH connection arguments for Intel MPI.
+	IntelMPIEnvDefaultValueBootstrapExecExtraArgs string = "-o ConnectionAttempts=10"
+
+	// Values for MPICH implementation.
+
+	// MPICHEnvHostFile is the MPICH Hydra env key for the hostfile location.
+	MPICHEnvHostFile string = "HYDRA_HOST_FILE"
+
+	// MPICHEnvLauncherExtraArgs is the MPICH Hydra env key for additional launcher (SSH) arguments.
+	MPICHEnvLauncherExtraArgs string = "HYDRA_LAUNCHER_EXTRA_ARGS"
+
+	// MPICHEnvDefaultValueLauncherExtraArgs is the default SSH connection arguments for MPICH.
+	MPICHEnvDefaultValueLauncherExtraArgs string = "-o ConnectionAttempts=10"
+
 	// Values for the PRTE runtime used by Open MPI >= 5.0.
 	// Open MPI 5.0 removed ORTE and replaced it with PRTE, so the OMPI_MCA_orte_*
 	// keys above are silently ignored by those releases. The MPI plugin emits both
@@ -355,6 +377,17 @@ var (
 	// XGBoostReservedEnvNames is XGBoost reserved env names that should not be set by users.
 	XGBoostReservedEnvNames = sets.New(XGBoostEnvTrackerURI, XGBoostEnvTrackerPort, XGBoostEnvTaskID, XGBoostEnvNumWorker)
 
+	// OpenMPIReservedEnvNames is reserved env names for OpenMPI implementation.
+	OpenMPIReservedEnvNames = sets.New(OpenMPIEnvHostFileLocation, OpenMPIEnvKeyRSHArgs, OpenMPIEnvKeepFQDNHostNames, OpenMPIEnvDefaultSlots)
+
+	// IntelMPIReservedEnvNames is reserved env names for Intel MPI implementation.
+	IntelMPIReservedEnvNames = sets.New(IntelMPIEnvHostFile, IntelMPIEnvBootstrapExecExtraArgs)
+
+	// MPICHReservedEnvNames is reserved env names for MPICH implementation.
+	MPICHReservedEnvNames = sets.New(MPICHEnvHostFile, MPICHEnvLauncherExtraArgs)
+
+	// MPIReservedEnvNames is MPI reserved env names across all implementations that users must not set manually.
+	MPIReservedEnvNames = OpenMPIReservedEnvNames.Union(IntelMPIReservedEnvNames).Union(MPICHReservedEnvNames)
 	// MPIReservedEnvNames is MPI reserved env names that users must not set manually.
 	MPIReservedEnvNames = sets.New(
 		OpenMPIEnvHostFileLocation, OpenMPIEnvKeyRSHArgs, OpenMPIEnvKeepFQDNHostNames, OpenMPIEnvDefaultSlots,

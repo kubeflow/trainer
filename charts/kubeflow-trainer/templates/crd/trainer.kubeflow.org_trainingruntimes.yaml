@@ -85,6 +85,8 @@ spec:
                           Defaults to OpenMPI.
                         enum:
                         - OpenMPI
+                        - Intel
+                        - MPICH
                         - ""
                         type: string
                       numProcPerNode:
