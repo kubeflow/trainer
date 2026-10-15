@@ -19,10 +19,13 @@ package webhooks
 import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -306,6 +309,387 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 						Obj()
 				},
 				gomega.MatchError(gomega.ContainSubstring("references resourceClaim \"gpu\" which is not defined in the Pod's resourceClaims")),
+			),
+			ginkgo.Entry("Should succeed to create trainingRuntime with TrainJob-level gang scheduling",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+									Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{},
+								},
+								SchedulingConstraints: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints{
+									Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/rack"}},
+								},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed(),
+			),
+			ginkgo.Entry("Should succeed to create trainingRuntime with empty scheduling",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{}).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed(),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with both scheduling and podGroupPolicy",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{}).
+							PodGroupPolicyCoschedulingSchedulingTimeout(60).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("scheduling and podGroupPolicy are mutually exclusive")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with scheduling and JobSet scheduling",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					runtime := baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{}).
+							Obj()).
+						Obj()
+					runtime.Spec.Template.Spec.Scheduling = &jobsetv1alpha2.JobSetScheduling{}
+					return runtime
+				},
+				gomega.MatchError(gomega.ContainSubstring("JobSet scheduling must not be set, it is owned by the TrainJob controller")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with scheduling and Job scheduling",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					runtime := baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{}).
+							Obj()).
+						Obj()
+					runtime.Spec.Template.Spec.ReplicatedJobs[2].Template.Spec.Scheduling = &batchv1.JobSchedulingConfiguration{}
+					return runtime
+				},
+				gomega.MatchError(gomega.ContainSubstring("Job scheduling must not be set, it is owned by the TrainJob controller")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with scheduling and Pod schedulingGroup",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					runtime := baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{}).
+							Obj()).
+						Obj()
+					runtime.Spec.Template.Spec.ReplicatedJobs[2].Template.Spec.Template.Spec.SchedulingGroup = &corev1.PodSchedulingGroup{
+						PodGroupName: ptr.To("pod-group"),
+					}
+					return runtime
+				},
+				gomega.MatchError(gomega.ContainSubstring("Pod schedulingGroup must not be set, it is owned by the TrainJob controller")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with defaulted TrainJob-level gang scheduling and dependsOn",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{}).
+							DependsOn(constants.Node, jobsetv1alpha2.DependsOn{
+								Name:   constants.DatasetInitializer,
+								Status: jobsetv1alpha2.DependencyComplete,
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("TrainJob-level gang scheduling cannot be used with dependsOn or InOrder startupPolicy")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with TrainJob-level gang scheduling and InOrder startupPolicy",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					runtime := baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+									Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{},
+								},
+							}).
+							Obj()).
+						Obj()
+					runtime.Spec.Template.Spec.StartupPolicy = &jobsetv1alpha2.StartupPolicy{
+						StartupPolicyOrder: jobsetv1alpha2.InOrder,
+					}
+					return runtime
+				},
+				gomega.MatchError(gomega.ContainSubstring("TrainJob-level gang scheduling cannot be used with dependsOn or InOrder startupPolicy")),
+			),
+			ginkgo.Entry("Should succeed to create trainingRuntime with TrainJob-level basic scheduling and dependsOn",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+									Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+								},
+							}).
+							DependsOn(constants.Node, jobsetv1alpha2.DependsOn{
+								Name:   constants.DatasetInitializer,
+								Status: jobsetv1alpha2.DependencyComplete,
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed(),
+			),
+			ginkgo.Entry("Should succeed to create trainingRuntime with per-ReplicatedJob scheduling and dependsOn",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+									{
+										TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer},
+										SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+											Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+										},
+									},
+									{
+										TargetReplicatedJobs: []string{constants.Node},
+										DisruptionMode: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{
+											All: &schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{},
+										},
+									},
+								},
+							}).
+							DependsOn(constants.Node, jobsetv1alpha2.DependsOn{
+								Name:   constants.DatasetInitializer,
+								Status: jobsetv1alpha2.DependencyComplete,
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed(),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with both TrainJob-level and per-ReplicatedJob scheduling",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+									Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{},
+								},
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{
+									TargetReplicatedJobs: []string{constants.Node},
+								}},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("schedulingPolicy, schedulingConstraints, and disruptionMode cannot be set together with replicatedJobs")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with a ReplicatedJob targeted by more than one entry",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+									{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.Node}},
+									{TargetReplicatedJobs: []string{constants.Node}},
+								},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("a ReplicatedJob must not be targeted by more than one replicatedJobs entry")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with empty targetReplicatedJobs",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{}},
+							}).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeInvalidError(),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with both basic and gang scheduling policy",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+									Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+									Gang:  &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{},
+								},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("exactly one of basic or gang must be set")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with TrainJob-level gang.minGroupCount",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+									Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{MinGroupCount: ptr.To[int32](2)},
+								},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("gang.minGroupCount must not be set until CompositePodGroup is supported")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with per-ReplicatedJob gang.minGroupCount",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{
+									TargetReplicatedJobs: []string{constants.Node},
+									SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+										Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{MinGroupCount: ptr.To[int32](1)},
+									},
+								}},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("gang.minGroupCount must not be set until CompositePodGroup is supported")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with both single and all disruptionMode",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								DisruptionMode: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{
+									Single: &schedulingv1alpha3.WorkloadCompositePodGroupSingleDisruptionMode{},
+									All:    &schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{},
+								},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("exactly one of single or all must be set")),
+			),
+			ginkgo.Entry("Should succeed to create trainingRuntime with Job-level scheduling",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+									{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+									{
+										TargetReplicatedJobs: []string{constants.Node},
+										Job: &trainer.JobScheduling{
+											SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+												Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{},
+											},
+											ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
+												Name:                      "tpu-slice",
+												ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+											}},
+										},
+									},
+								},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed(),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with Job-level scheduling targeting more than one ReplicatedJob",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{
+									TargetReplicatedJobs: []string{constants.ModelInitializer, constants.Node},
+									Job:                  &trainer.JobScheduling{},
+								}},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("when job is set, targetReplicatedJobs must contain exactly one name")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with Job-level and per-ReplicatedJob scheduling on the same entry",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{
+									TargetReplicatedJobs: []string{constants.Node},
+									SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+										Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{},
+									},
+									Job: &trainer.JobScheduling{},
+								}},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("when job is set, targetReplicatedJobs must contain exactly one name")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with Job-level gang.minCount",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{
+									TargetReplicatedJobs: []string{constants.Node},
+									Job: &trainer.JobScheduling{
+										SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+											Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
+										},
+									},
+								}},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("gang.minCount is computed from numNodes and must not be set")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with Job-level resourceClaims setting both claim name and template name",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainJobScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{
+									TargetReplicatedJobs: []string{constants.Node},
+									Job: &trainer.JobScheduling{
+										ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
+											Name:                      "tpu-slice",
+											ResourceClaimName:         ptr.To("tpu-slice"),
+											ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+										}},
+									},
+								}},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("exactly one of resourceClaimName or resourceClaimTemplateName must be set")),
 			),
 		)
 		ginkgo.DescribeTable("Defaulting TrainingRuntime on creation", func(trainingRuntime func() *trainer.TrainingRuntime, wantTrainingRuntime func() *trainer.TrainingRuntime) {

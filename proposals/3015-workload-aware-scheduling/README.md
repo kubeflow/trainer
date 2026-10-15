@@ -762,7 +762,7 @@ type TrainingRuntimeSpec struct {
     // behavior is unchanged.
     // Requires the TrainJobWorkloadAwareScheduling feature gate.
     // +optional
-    Scheduling *Scheduling `json:"scheduling,omitempty"`
+    Scheduling *TrainJobScheduling `json:"scheduling,omitempty"`
 
     // podGroupPolicy defines the configuration for the PodGroup to enable gang-scheduling via
     // supported plugins.
@@ -774,11 +774,11 @@ type TrainingRuntimeSpec struct {
     Template JobSetTemplateSpec `json:"template,omitzero"`
 }
 
-// Scheduling defines the Workload-Aware Scheduling configuration for a TrainJob.
+// TrainJobScheduling defines the Workload-Aware Scheduling configuration for a TrainJob.
 // Unless the TrainJobCompositePodGroup feature gate is enabled, a runtime must configure
-// scheduling using exactly one of two mutually exclusive models, since composite
-// Gang-of-Gangs PodGroup hierarchies linking a parent PodGroup to leaf PodGroups
-// are not created without that gate:
+// scheduling using one of the following models, and each ReplicatedJob can be configured
+// by exactly one of them, since composite Gang-of-Gangs PodGroup hierarchies linking a
+// parent PodGroup to leaf PodGroups are not created without that gate:
 //   - the TrainJob-level (level 1) model: set schedulingPolicy, schedulingConstraints,
 //     and/or disruptionMode to configure a single PodGroup covering the whole
 //     TrainJob, and leave replicatedJobs unset.
@@ -787,8 +787,13 @@ type TrainingRuntimeSpec struct {
 //     Every ReplicatedJob in the runtime template must then be targeted by exactly one
 //     replicatedJobs entry, since there is no top-level policy for an untargeted
 //     ReplicatedJob to fall back to.
+//   - the per-Job (level 3) model: set job on a replicatedJobs entry, so every replica
+//     (Job) of the targeted ReplicatedJob gets its own PodGroup. The entry must target
+//     exactly one ReplicatedJob and leave its schedulingPolicy, schedulingConstraints, and
+//     disruptionMode unset. Level 2 and level 3 entries can be combined for different
+//     ReplicatedJobs of the same runtime.
 // +kubebuilder:validation:XValidation:rule="!has(self.replicatedJobs) || self.replicatedJobs.all(e, self.replicatedJobs.filter(o, sets.intersects(o.targetReplicatedJobs, e.targetReplicatedJobs)).size() == 1)",message="a ReplicatedJob must not be targeted by more than one replicatedJobs entry"
-type Scheduling struct {
+type TrainJobScheduling struct {
     // schedulingPolicy defines the TrainJob-level (level 1) scheduling policy for every Pod
     // created by the TrainJob. Defaults to Gang when spec.scheduling is set but
     // schedulingPolicy is nil and replicatedJobs is not set.
