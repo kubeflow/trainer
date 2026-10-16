@@ -20,8 +20,8 @@ import (
 	"slices"
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
@@ -30,33 +30,39 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
-// buildWorkload compiles the Workload of the TrainJob, or returns nil when the runtime has no
-// ReplicatedJobs to schedule. Every PodGroupTemplate is compiled by its own Builder, since a Builder
-// compiles a single PodGroupTemplate, and the PodGroupTemplates are merged into a single Workload.
-func buildWorkload(info *runtime.Info, trainJob *trainer.TrainJob) (*schedulingv1beta1.Workload, error) {
+// newWorkloadBuilders returns one Builder per PodGroupTemplate of the TrainJob Workload, or nil when
+// the runtime has no ReplicatedJobs to schedule. Every PodGroupTemplate has its own Builder, since a
+// Builder compiles a single PodGroupTemplate. The WorkloadItem paths point to the runtime
+// spec.scheduling fields, which the validation errors are reported for.
+func newWorkloadBuilders(info *runtime.Info, trainJob *trainer.TrainJob) []*workloadbuilder.Builder {
 	scheduling := info.RuntimePolicy.Scheduling
 	podSets := info.TemplateSpec.PodSets
 	if len(podSets) == 0 {
-		return nil, nil
+		return nil
 	}
 	jobSetSpec, _ := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
+	opts := buildOptions(trainJob)
+	schedulingPath := field.NewPath("spec", "scheduling")
 
-	var items []*workloadbuilder.WorkloadItem
 	if len(scheduling.ReplicatedJobs) == 0 {
 		// The TrainJob-level (level 1) model builds a single PodGroupTemplate for every ReplicatedJob.
 		rJobNames := make([]string, 0, len(podSets))
 		for _, ps := range podSets {
 			rJobNames = append(rJobNames, ps.Name)
 		}
-		items = append(items, newItem(trainJob.Name, minCount(podSets, jobSetSpec, rJobNames), priorityClassName(jobSetSpec, rJobNames[0]),
+		item := newItem(trainJob.Name, schedulingPath, minCount(podSets, jobSetSpec, rJobNames), priorityClassName(jobSetSpec, rJobNames[0]),
 			workloadbuilder.WorkloadInput{
 				Policy:         compositePolicyInput(scheduling.SchedulingPolicy),
 				Constraints:    compositeConstraintsInput(scheduling.SchedulingConstraints),
 				DisruptionMode: compositeDisruptionModeInput(scheduling.DisruptionMode),
-			}))
+			})
+		return []*workloadbuilder.Builder{workloadbuilder.NewBuilder(item, opts)}
 	}
-	for _, entry := range scheduling.ReplicatedJobs {
+
+	builders := make([]*workloadbuilder.Builder, 0, len(scheduling.ReplicatedJobs))
+	for i, entry := range scheduling.ReplicatedJobs {
 		templateName, _ := podGroupTemplateName(trainJob, scheduling, entry.TargetReplicatedJobs[0])
+		entryPath := schedulingPath.Child("replicatedJobs").Index(i)
 		if entry.Job != nil {
 			// The Job-level (level 3) gang size is the number of Pods of a single Job.
 			target := entry.TargetReplicatedJobs[0]
@@ -64,43 +70,32 @@ func buildWorkload(info *runtime.Info, trainJob *trainer.TrainJob) (*schedulingv
 			if ps := podSets.FindByName(target); ps != nil {
 				jobPodCount = ptr.Deref(ps.Count, 1)
 			}
-			items = append(items, newItem(templateName, jobPodCount, priorityClassName(jobSetSpec, target), workloadbuilder.WorkloadInput{
-				Policy:         workloadbuilder.PolicyInput{PodGroupData: entry.Job.SchedulingPolicy},
-				Constraints:    workloadbuilder.ConstraintsInput{PodGroupData: entry.Job.SchedulingConstraints},
-				DisruptionMode: workloadbuilder.DisruptionModeInput{PodGroupData: entry.Job.DisruptionMode},
-				ResourceClaims: workloadbuilder.ResourceClaimsInput{PodGroupData: entry.Job.ResourceClaims},
-			}))
+			builders = append(builders, workloadbuilder.NewBuilder(newItem(templateName, entryPath.Child("job"), jobPodCount, priorityClassName(jobSetSpec, target),
+				workloadbuilder.WorkloadInput{
+					Policy:         workloadbuilder.PolicyInput{PodGroupData: entry.Job.SchedulingPolicy, PathElements: []string{"schedulingPolicy"}},
+					Constraints:    workloadbuilder.ConstraintsInput{PodGroupData: entry.Job.SchedulingConstraints, PathElements: []string{"schedulingConstraints"}},
+					DisruptionMode: workloadbuilder.DisruptionModeInput{PodGroupData: entry.Job.DisruptionMode, PathElements: []string{"disruptionMode"}},
+					ResourceClaims: workloadbuilder.ResourceClaimsInput{PodGroupData: entry.Job.ResourceClaims, PathElements: []string{"resourceClaims"}},
+				}), opts))
 			continue
 		}
 		// The runtime webhook ensures that the targets sharing the PodGroup use the same priorityClassName.
-		items = append(items, newItem(templateName, minCount(podSets, jobSetSpec, entry.TargetReplicatedJobs),
+		builders = append(builders, workloadbuilder.NewBuilder(newItem(templateName, entryPath, minCount(podSets, jobSetSpec, entry.TargetReplicatedJobs),
 			priorityClassName(jobSetSpec, entry.TargetReplicatedJobs[0]), workloadbuilder.WorkloadInput{
 				Policy:         compositePolicyInput(entry.SchedulingPolicy),
 				Constraints:    compositeConstraintsInput(entry.SchedulingConstraints),
 				DisruptionMode: compositeDisruptionModeInput(entry.DisruptionMode),
-			}))
+			}), opts))
 	}
-
-	var workload *schedulingv1beta1.Workload
-	for _, item := range items {
-		wl, err := workloadbuilder.NewBuilder(item, buildOptions(trainJob)).BuildWorkload()
-		if err != nil {
-			return nil, err
-		}
-		if workload == nil {
-			workload = wl
-			continue
-		}
-		workload.Spec.PodGroupTemplates = append(workload.Spec.PodGroupTemplates, wl.Spec.PodGroupTemplates...)
-	}
-	return workload, nil
+	return builders
 }
 
 // newItem returns the WorkloadItem of a PodGroupTemplate, which defaults to the Gang scheduling
 // policy with the given minCount.
-func newItem(name string, minCount int32, priorityClassName string, input workloadbuilder.WorkloadInput) *workloadbuilder.WorkloadItem {
+func newItem(name string, path *field.Path, minCount int32, priorityClassName string, input workloadbuilder.WorkloadInput) *workloadbuilder.WorkloadItem {
 	return &workloadbuilder.WorkloadItem{
 		Name: name,
+		Path: path,
 		DefaultConfig: &workloadbuilder.SchedulingConfig{
 			Policy:            &workloadbuilder.SchedulingPolicy{Gang: &workloadbuilder.GangSchedulingPolicy{}},
 			PriorityClassName: priorityClassName,
@@ -181,7 +176,7 @@ func buildOptions(trainJob *trainer.TrainJob) workloadbuilder.BuildOptions {
 
 // compositePolicyInput maps the composite scheduling policy to the PodGroup scheduling policy,
 // since CompositePodGroups are not created yet. The gang size is computed from the Pod count.
-// TODO (andreyvelich): This needs to be refactored once we support CPG.
+// TODO (andreyvelich): Refactor these function once we support CPG.
 func compositePolicyInput(policy *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy) workloadbuilder.PolicyInput {
 	if policy == nil {
 		return workloadbuilder.PolicyInput{}
@@ -193,7 +188,7 @@ func compositePolicyInput(policy *schedulingv1alpha3.WorkloadCompositePodGroupSc
 	if policy.Gang != nil {
 		podGroupPolicy.Gang = &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{}
 	}
-	return workloadbuilder.PolicyInput{PodGroupData: podGroupPolicy}
+	return workloadbuilder.PolicyInput{PodGroupData: podGroupPolicy, PathElements: []string{"schedulingPolicy"}}
 }
 
 // compositeConstraintsInput maps the composite scheduling constraints to the PodGroup scheduling
@@ -206,6 +201,7 @@ func compositeConstraintsInput(constraints *schedulingv1alpha3.WorkloadComposite
 		PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
 			Topology: constraints.Topology,
 		},
+		PathElements: []string{"schedulingConstraints"},
 	}
 }
 
@@ -222,5 +218,5 @@ func compositeDisruptionModeInput(disruptionMode *schedulingv1alpha3.WorkloadCom
 	if disruptionMode.All != nil {
 		podGroupDisruptionMode.All = &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}
 	}
-	return workloadbuilder.DisruptionModeInput{PodGroupData: podGroupDisruptionMode}
+	return workloadbuilder.DisruptionModeInput{PodGroupData: podGroupDisruptionMode, PathElements: []string{"disruptionMode"}}
 }

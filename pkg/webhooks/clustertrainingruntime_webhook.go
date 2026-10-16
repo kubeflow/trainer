@@ -54,7 +54,7 @@ func (w *ClusterTrainingRuntimeValidator) ValidateCreate(ctx context.Context, ob
 		))
 	}
 	allErrs := validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs)
-	allErrs = append(allErrs, validateScheduling(&obj.Spec, nil)...)
+	allErrs = append(allErrs, validateScheduling(ctx, &obj.Spec, nil)...)
 	return warnings, allErrs.ToAggregate()
 }
 
@@ -62,7 +62,7 @@ func (w *ClusterTrainingRuntimeValidator) ValidateUpdate(ctx context.Context, ol
 	log := ctrl.LoggerFrom(ctx).WithName("clustertrainingruntime-webhook")
 	log.V(5).Info("Validating update", "clusterTrainingRuntime", klog.KObj(newObj))
 	allErrs := validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs)
-	allErrs = append(allErrs, validateScheduling(&newObj.Spec, &oldObj.Spec)...)
+	allErrs = append(allErrs, validateScheduling(ctx, &newObj.Spec, &oldObj.Spec)...)
 	return nil, allErrs.ToAggregate()
 }
 

@@ -32,6 +32,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/features"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/workload"
 	trainingruntime "github.com/kubeflow/trainer/v2/pkg/util/trainingruntime"
 )
 
@@ -81,7 +82,7 @@ func (w *TrainingRuntimeValidator) ValidateCreate(ctx context.Context, obj *trai
 		))
 	}
 	allErrs := validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs)
-	allErrs = append(allErrs, validateScheduling(&obj.Spec, nil)...)
+	allErrs = append(allErrs, validateScheduling(ctx, &obj.Spec, nil)...)
 	return warnings, allErrs.ToAggregate()
 }
 
@@ -148,7 +149,7 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 	return allErrs
 }
 
-func validateScheduling(newSpec, oldSpec *trainer.TrainingRuntimeSpec) field.ErrorList {
+func validateScheduling(ctx context.Context, newSpec, oldSpec *trainer.TrainingRuntimeSpec) field.ErrorList {
 	scheduling := newSpec.Scheduling
 	if scheduling == nil {
 		return nil
@@ -165,6 +166,9 @@ func validateScheduling(newSpec, oldSpec *trainer.TrainingRuntimeSpec) field.Err
 		}
 		return allErrs
 	}
+
+	// Run the validation from the workload builder library.
+	allErrs = append(allErrs, workload.ValidateScheduling(ctx, newSpec)...)
 
 	rJobs := newSpec.Template.Spec.ReplicatedJobs
 	if len(scheduling.ReplicatedJobs) == 0 {
@@ -227,7 +231,7 @@ func (w *TrainingRuntimeValidator) ValidateUpdate(ctx context.Context, oldObj, n
 	log := ctrl.LoggerFrom(ctx).WithName("trainingruntime-webhook")
 	log.V(5).Info("Validating update", "trainingRuntime", klog.KObj(newObj))
 	allErrs := validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs)
-	allErrs = append(allErrs, validateScheduling(&newObj.Spec, &oldObj.Spec)...)
+	allErrs = append(allErrs, validateScheduling(ctx, &newObj.Spec, &oldObj.Spec)...)
 	return nil, allErrs.ToAggregate()
 }
 

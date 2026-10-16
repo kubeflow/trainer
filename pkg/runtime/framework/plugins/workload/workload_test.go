@@ -1182,3 +1182,96 @@ func TestPriorityClassName(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateScheduling(t *testing.T) {
+	cases := map[string]struct {
+		scheduling *trainer.TrainingRuntimeScheduling
+		wantError  field.ErrorList
+	}{
+		"no validation when the runtime does not set scheduling": {},
+		"valid TrainJob-level scheduling": {
+			scheduling: &trainer.TrainingRuntimeScheduling{
+				SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+					Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{},
+				},
+				DisruptionMode: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{
+					All: &schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{},
+				},
+			},
+		},
+		"TrainJob-level basic scheduling with the all disruptionMode": {
+			scheduling: &trainer.TrainingRuntimeScheduling{
+				SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+					Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+				},
+				DisruptionMode: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{
+					All: &schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{},
+				},
+			},
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "scheduling", "disruptionMode"), "", ""),
+			},
+		},
+		"TrainJob-level scheduling with an invalid topology key": {
+			scheduling: &trainer.TrainingRuntimeScheduling{
+				SchedulingConstraints: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints{
+					Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "invalid key"}},
+				},
+			},
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "scheduling", "schedulingConstraints", "topology").Index(0).Child("key"), "", ""),
+			},
+		},
+		"per-ReplicatedJob basic scheduling with the all disruptionMode": {
+			scheduling: &trainer.TrainingRuntimeScheduling{
+				ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+					{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+					{
+						TargetReplicatedJobs: []string{constants.Node},
+						SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+							Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+						},
+						DisruptionMode: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{
+							All: &schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{},
+						},
+					},
+				},
+			},
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "scheduling", "replicatedJobs").Index(1).Child("disruptionMode"), "", ""),
+			},
+		},
+		"Job-level basic scheduling with the all disruptionMode": {
+			scheduling: &trainer.TrainingRuntimeScheduling{
+				ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+					{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+					{
+						TargetReplicatedJobs: []string{constants.Node},
+						Job: &trainer.JobScheduling{
+							SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+								Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+							},
+							DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
+								All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+							},
+						},
+					},
+				},
+			},
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "scheduling", "replicatedJobs").Index(1).Child("job", "disruptionMode"), "", ""),
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			spec := utiltesting.MakeTrainingRuntimeSpecWrapper(utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj().Spec).
+				Scheduling(tc.scheduling).
+				Obj()
+			gotError := ValidateScheduling(context.Background(), &spec)
+			if diff := cmp.Diff(tc.wantError, gotError, cmpopts.IgnoreFields(field.Error{}, "Type", "Detail", "BadValue", "Origin")); len(diff) != 0 {
+				t.Errorf("Unexpected errors from ValidateScheduling (-want, +got): %s", diff)
+			}
+		})
+	}
+}

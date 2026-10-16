@@ -354,6 +354,20 @@ func TestValidateScheduling(t *testing.T) {
 				field.Invalid(schedulingPath.Child("replicatedJobs").Index(1).Child("job"), "", ""),
 			},
 		},
+		"scheduling is rejected by the workloadbuilder validation": {
+			enableWAS: true,
+			newSpec: runtimeSpec(&trainer.TrainingRuntimeScheduling{
+				SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+					Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+				},
+				DisruptionMode: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{
+					All: &schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{},
+				},
+			}),
+			wantError: field.ErrorList{
+				field.Invalid(schedulingPath.Child("disruptionMode"), "", ""),
+			},
+		},
 		"TrainJob-level scheduling with the same priorityClassName for every ReplicatedJob": {
 			enableWAS: true,
 			newSpec: func() *trainer.TrainingRuntimeSpec {
@@ -409,7 +423,7 @@ func TestValidateScheduling(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, tc.enableWAS)
-			gotErr := validateScheduling(tc.newSpec, tc.oldSpec)
+			gotErr := validateScheduling(context.Background(), tc.newSpec, tc.oldSpec)
 			if diff := cmp.Diff(tc.wantError, gotErr, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); len(diff) != 0 {
 				t.Errorf("validateScheduling() mismatch (-want,+got):\n%s", diff)
 			}

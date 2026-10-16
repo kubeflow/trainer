@@ -24,7 +24,9 @@ import (
 	"slices"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -195,6 +197,46 @@ func (w *Workload) Build(ctx context.Context, info *runtime.Info, trainJob *trai
 		}
 	}
 	return objects, nil
+}
+
+// buildWorkload compiles the Workload of the TrainJob, or returns nil when the runtime has no
+// ReplicatedJobs to schedule. The PodGroupTemplates compiled by every Builder are merged into a
+// single Workload.
+func buildWorkload(info *runtime.Info, trainJob *trainer.TrainJob) (*schedulingv1beta1.Workload, error) {
+	var workload *schedulingv1beta1.Workload
+	for _, b := range newWorkloadBuilders(info, trainJob) {
+		wl, err := b.BuildWorkload()
+		if err != nil {
+			return nil, err
+		}
+		if workload == nil {
+			workload = wl
+			continue
+		}
+		workload.Spec.PodGroupTemplates = append(workload.Spec.PodGroupTemplates, wl.Spec.PodGroupTemplates...)
+	}
+	return workload, nil
+}
+
+// ValidateScheduling validates the runtime spec.scheduling with the workloadbuilder library, which
+// runs the upstream declarative validation and the scheduling policy checks of the PodGroupTemplates.
+// The PodGroupTemplates are built for a TrainJob without spec, since their validation doesn't depend
+// on the TrainJob.
+// TODO (andreyvelich): Refactor this validation once users can override .scheduling via TrainJob.
+func ValidateScheduling(ctx context.Context, spec *trainer.TrainingRuntimeSpec) field.ErrorList {
+	if spec.Scheduling == nil {
+		return nil
+	}
+	trainJob := &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "trainjob"}}
+	opts := []runtime.InfoOption{runtime.WithScheduling(spec.Scheduling)}
+	for _, rJob := range spec.Template.Spec.ReplicatedJobs {
+		opts = append(opts, runtime.WithPodSet(rJob.Name, nil, 1, corev1.PodSpec{}, corev1ac.PodSpec()))
+	}
+	var allErrs field.ErrorList
+	for _, b := range newWorkloadBuilders(runtime.NewInfo(opts...), trainJob) {
+		allErrs = append(allErrs, b.Validate(ctx, workloadbuilder.ValidationInput{})...)
+	}
+	return allErrs
 }
 
 // workloadName returns the name of the Workload owned by the TrainJob.
