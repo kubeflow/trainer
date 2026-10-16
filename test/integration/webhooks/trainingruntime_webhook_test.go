@@ -735,6 +735,24 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 				},
 				gomega.MatchError(gomega.ContainSubstring("of the other ReplicatedJobs sharing the TrainJob-level PodGroup")),
 			),
+			ginkgo.Entry("Should fail to create trainingRuntime with basic scheduling and the all disruptionMode",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainingRuntimeScheduling{
+								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+									Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+								},
+								DisruptionMode: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{
+									All: &schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{},
+								},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("the disruptionMode `all` is not supported with the Basic scheduling policy")),
+			),
 		)
 		ginkgo.DescribeTable("Defaulting TrainingRuntime on creation", func(trainingRuntime func() *trainer.TrainingRuntime, wantTrainingRuntime func() *trainer.TrainingRuntime) {
 			created := trainingRuntime()
