@@ -32,6 +32,7 @@ import (
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	schedulingv1beta1ac "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
+	"k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -142,9 +143,8 @@ func (w *Workload) Build(ctx context.Context, info *runtime.Info, trainJob *trai
 	if info == nil || trainJob == nil || info.RuntimePolicy.Scheduling == nil {
 		return nil, nil
 	}
-	builders := newBuilders(info, trainJob)
-	workload, err := buildWorkload(builders)
-	if err != nil {
+	workload, err := buildWorkload(info, trainJob)
+	if err != nil || workload == nil {
 		return nil, err
 	}
 
@@ -168,13 +168,10 @@ func (w *Workload) Build(ctx context.Context, info *runtime.Info, trainJob *trai
 			WithSpec(spec))
 	}
 
-	for _, b := range builders {
-		wl, err := b.BuildWorkload()
-		if err != nil {
-			return nil, err
-		}
-		templateName := wl.Spec.PodGroupTemplates[0].Name
-		podGroup, err := b.NewPodGroup(podGroupName(trainJob, templateName), templateName)
+	// Materialize the PodGroups from the PodGroupTemplates of the compiled Workload.
+	podGroupBuilder := workloadbuilder.NewBuilderFromExistingWorkload(workload, buildOptions(trainJob))
+	for _, template := range workload.Spec.PodGroupTemplates {
+		podGroup, err := podGroupBuilder.NewPodGroup(podGroupName(trainJob, template.Name), template.Name)
 		if err != nil {
 			return nil, err
 		}
