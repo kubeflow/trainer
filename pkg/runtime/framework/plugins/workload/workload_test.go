@@ -888,7 +888,7 @@ func TestValidate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			p, err := New(context.Background(), nil, nil, nil)
+			p, err := New(context.Background(), utiltesting.NewClientBuilder().Build(), nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize Workload plugin: %v", err)
 			}

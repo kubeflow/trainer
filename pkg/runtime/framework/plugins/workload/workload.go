@@ -24,10 +24,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -35,7 +38,11 @@ import (
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	schedulingv1beta1ac "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
 	"k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
@@ -60,17 +67,24 @@ const (
 
 // Workload plugin integrates TrainJob with the Kubernetes Workload-Aware Scheduling APIs.
 type Workload struct {
-	client client.Client
+	client     client.Client
+	restMapper meta.RESTMapper
+	logger     logr.Logger
 }
 
 var _ framework.CustomValidationPlugin = (*Workload)(nil)
 var _ framework.EnforceSchedulingPlugin = (*Workload)(nil)
 var _ framework.ComponentBuilderPlugin = (*Workload)(nil)
+var _ framework.WatchExtensionPlugin = (*Workload)(nil)
 
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=workloads;podgroups,verbs=create;get;list;watch;patch
 
-func New(_ context.Context, c client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
-	return &Workload{client: c}, nil
+func New(ctx context.Context, c client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
+	return &Workload{
+		client:     c,
+		restMapper: c.RESTMapper(),
+		logger:     ctrl.LoggerFrom(ctx).WithValues("pluginName", Name),
+	}, nil
 }
 
 func (w *Workload) Name() string {
@@ -197,6 +211,36 @@ func (w *Workload) Build(ctx context.Context, info *runtime.Info, trainJob *trai
 		}
 	}
 	return objects, nil
+}
+
+func (w *Workload) ReconcilerBuilders() []runtime.ReconcilerBuilder {
+	for _, kind := range []string{"Workload", "PodGroup"} {
+		if _, err := w.restMapper.RESTMapping(
+			schema.GroupKind{Group: schedulingv1beta1.SchemeGroupVersion.Group, Kind: kind},
+			schedulingv1beta1.SchemeGroupVersion.Version,
+		); err != nil {
+			w.logger.Error(err, "The scheduling.k8s.io/v1beta1 API must be enabled in advance")
+			return nil
+		}
+	}
+	return []runtime.ReconcilerBuilder{
+		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
+			return b.Watches(
+				&schedulingv1beta1.Workload{},
+				handler.EnqueueRequestForOwner(
+					w.client.Scheme(), w.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner(),
+				),
+			)
+		},
+		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
+			return b.Watches(
+				&schedulingv1beta1.PodGroup{},
+				handler.EnqueueRequestForOwner(
+					w.client.Scheme(), w.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner(),
+				),
+			)
+		},
+	}
 }
 
 // buildWorkload compiles the Workload of the TrainJob, or returns nil when the runtime has no
