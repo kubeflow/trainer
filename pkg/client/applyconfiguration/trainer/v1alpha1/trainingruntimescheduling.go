@@ -22,10 +22,10 @@ import (
 	v1alpha3 "k8s.io/api/scheduling/v1alpha3"
 )
 
-// TrainJobSchedulingApplyConfiguration represents a declarative configuration of the TrainJobScheduling type for use
+// TrainingRuntimeSchedulingApplyConfiguration represents a declarative configuration of the TrainingRuntimeScheduling type for use
 // with apply.
 //
-// TrainJobScheduling defines the Workload-Aware Scheduling configuration for a TrainJob.
+// TrainingRuntimeScheduling defines the Workload-Aware Scheduling configuration for a TrainJob.
 // Unless the TrainJobCompositePodGroup feature gate is enabled, a runtime must configure
 // scheduling using one of the following models, and each ReplicatedJob can be configured
 // by exactly one of them, since composite Gang-of-Gangs PodGroup hierarchies linking a
@@ -47,7 +47,7 @@ import (
 // Sequenced startup (dependsOn or an InOrder startupPolicy) creates Jobs sequentially, so a
 // single TrainJob-level gang could never reach its minCount. A runtime using sequenced startup
 // must therefore use the per-ReplicatedJob model.
-type TrainJobSchedulingApplyConfiguration struct {
+type TrainingRuntimeSchedulingApplyConfiguration struct {
 	// schedulingPolicy defines the TrainJob-level (level 1) scheduling policy for every Pod
 	// created by the TrainJob. Defaults to Gang when scheduling is set but schedulingPolicy is
 	// nil and replicatedJobs is not set.
@@ -69,16 +69,16 @@ type TrainJobSchedulingApplyConfiguration struct {
 	ReplicatedJobs []ReplicatedJobSchedulingApplyConfiguration `json:"replicatedJobs,omitempty"`
 }
 
-// TrainJobSchedulingApplyConfiguration constructs a declarative configuration of the TrainJobScheduling type for use with
+// TrainingRuntimeSchedulingApplyConfiguration constructs a declarative configuration of the TrainingRuntimeScheduling type for use with
 // apply.
-func TrainJobScheduling() *TrainJobSchedulingApplyConfiguration {
-	return &TrainJobSchedulingApplyConfiguration{}
+func TrainingRuntimeScheduling() *TrainingRuntimeSchedulingApplyConfiguration {
+	return &TrainingRuntimeSchedulingApplyConfiguration{}
 }
 
 // WithSchedulingPolicy sets the SchedulingPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SchedulingPolicy field is set to the value of the last call.
-func (b *TrainJobSchedulingApplyConfiguration) WithSchedulingPolicy(value v1alpha3.WorkloadCompositePodGroupSchedulingPolicy) *TrainJobSchedulingApplyConfiguration {
+func (b *TrainingRuntimeSchedulingApplyConfiguration) WithSchedulingPolicy(value v1alpha3.WorkloadCompositePodGroupSchedulingPolicy) *TrainingRuntimeSchedulingApplyConfiguration {
 	b.SchedulingPolicy = &value
 	return b
 }
@@ -86,7 +86,7 @@ func (b *TrainJobSchedulingApplyConfiguration) WithSchedulingPolicy(value v1alph
 // WithSchedulingConstraints sets the SchedulingConstraints field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SchedulingConstraints field is set to the value of the last call.
-func (b *TrainJobSchedulingApplyConfiguration) WithSchedulingConstraints(value v1alpha3.WorkloadCompositePodGroupSchedulingConstraints) *TrainJobSchedulingApplyConfiguration {
+func (b *TrainingRuntimeSchedulingApplyConfiguration) WithSchedulingConstraints(value v1alpha3.WorkloadCompositePodGroupSchedulingConstraints) *TrainingRuntimeSchedulingApplyConfiguration {
 	b.SchedulingConstraints = &value
 	return b
 }
@@ -94,7 +94,7 @@ func (b *TrainJobSchedulingApplyConfiguration) WithSchedulingConstraints(value v
 // WithDisruptionMode sets the DisruptionMode field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DisruptionMode field is set to the value of the last call.
-func (b *TrainJobSchedulingApplyConfiguration) WithDisruptionMode(value v1alpha3.WorkloadCompositePodGroupDisruptionMode) *TrainJobSchedulingApplyConfiguration {
+func (b *TrainingRuntimeSchedulingApplyConfiguration) WithDisruptionMode(value v1alpha3.WorkloadCompositePodGroupDisruptionMode) *TrainingRuntimeSchedulingApplyConfiguration {
 	b.DisruptionMode = &value
 	return b
 }
@@ -102,7 +102,7 @@ func (b *TrainJobSchedulingApplyConfiguration) WithDisruptionMode(value v1alpha3
 // WithReplicatedJobs adds the given value to the ReplicatedJobs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ReplicatedJobs field.
-func (b *TrainJobSchedulingApplyConfiguration) WithReplicatedJobs(values ...*ReplicatedJobSchedulingApplyConfiguration) *TrainJobSchedulingApplyConfiguration {
+func (b *TrainingRuntimeSchedulingApplyConfiguration) WithReplicatedJobs(values ...*ReplicatedJobSchedulingApplyConfiguration) *TrainingRuntimeSchedulingApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithReplicatedJobs")

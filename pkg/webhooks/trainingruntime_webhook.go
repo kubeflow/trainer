@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
@@ -30,6 +32,7 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	trainingruntime "github.com/kubeflow/trainer/v2/pkg/util/trainingruntime"
 )
 
@@ -37,6 +40,11 @@ const (
 	rJobReplicasErrorMsg       = "always must be 1"
 	rJobContainerNamesErrorMsg = "must contain the required container for the ancestor: %s"
 	rJobContainerClaimErrorMsg = "references resourceClaim %q which is not defined in the Pod's resourceClaims"
+
+	schedulingFeatureGateErrorMsg              = "TrainJobWorkloadAwareScheduling feature gate is disabled"
+	schedulingTargetNotFoundErrorMsg           = "must reference a replicatedJob in spec.template.spec.replicatedJobs"
+	schedulingUntargetedErrorMsg               = "must be targeted by a spec.scheduling.replicatedJobs entry when spec.scheduling.replicatedJobs is set"
+	schedulingTooManyPodGroupTemplatesErrorMsg = "must not resolve to more than %d PodGroupTemplates; a job entry resolves to one PodGroupTemplate per replica of its ReplicatedJob"
 )
 
 var (
@@ -71,7 +79,9 @@ func (w *TrainingRuntimeValidator) ValidateCreate(ctx context.Context, obj *trai
 			constants.RuntimeDeprecationPolicyURL,
 		))
 	}
-	return warnings, validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+	allErrs := validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs)
+	allErrs = append(allErrs, validateScheduling(&obj.Spec, nil)...)
+	return warnings, allErrs.ToAggregate()
 }
 
 func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorList {
@@ -137,10 +147,72 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 	return allErrs
 }
 
+func validateScheduling(newSpec, oldSpec *trainer.TrainingRuntimeSpec) field.ErrorList {
+	scheduling := newSpec.Scheduling
+	if scheduling == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+	schedulingPath := field.NewPath("spec", "scheduling")
+	rJobsPath := field.NewPath("spec", "template", "spec", "replicatedJobs")
+
+	// A runtime stored while the feature gate was enabled stays updatable after the gate is
+	// disabled, as long as its scheduling configuration doesn't change.
+	if !features.Enabled(features.TrainJobWorkloadAwareScheduling) {
+		if oldSpec == nil || !equality.Semantic.DeepEqual(oldSpec.Scheduling, scheduling) {
+			allErrs = append(allErrs, field.Forbidden(schedulingPath, schedulingFeatureGateErrorMsg))
+		}
+		return allErrs
+	}
+
+	if len(scheduling.ReplicatedJobs) == 0 {
+		return allErrs
+	}
+
+	rJobs := newSpec.Template.Spec.ReplicatedJobs
+	replicas := make(map[string]int32, len(rJobs))
+	for _, rJob := range rJobs {
+		replicas[rJob.Name] = rJob.Replicas
+	}
+	targeted := sets.New[string]()
+	// Every level 2 entry resolves to one PodGroupTemplate, while every level 3 entry resolves to
+	// one PodGroupTemplate per replica (Job) of the targeted ReplicatedJob.
+	var podGroupTemplates int32
+	for i, entry := range scheduling.ReplicatedJobs {
+		targetsPath := schedulingPath.Child("replicatedJobs").Index(i).Child("targetReplicatedJobs")
+		for j, name := range entry.TargetReplicatedJobs {
+			if _, ok := replicas[name]; !ok {
+				allErrs = append(allErrs, field.Invalid(targetsPath.Index(j), name, schedulingTargetNotFoundErrorMsg))
+			}
+			targeted.Insert(name)
+		}
+		if entry.Job != nil && len(entry.TargetReplicatedJobs) == 1 {
+			podGroupTemplates += replicas[entry.TargetReplicatedJobs[0]]
+		} else {
+			podGroupTemplates++
+		}
+	}
+
+	// There is no TrainJob-level policy for an untargeted ReplicatedJob to fall back to.
+	for i, rJob := range rJobs {
+		if !targeted.Has(rJob.Name) {
+			allErrs = append(allErrs, field.Invalid(rJobsPath.Index(i).Child("name"), rJob.Name, schedulingUntargetedErrorMsg))
+		}
+	}
+
+	if podGroupTemplates > schedulingv1beta1.WorkloadMaxPodGroupTemplates {
+		allErrs = append(allErrs, field.Invalid(schedulingPath.Child("replicatedJobs"), podGroupTemplates,
+			fmt.Sprintf(schedulingTooManyPodGroupTemplatesErrorMsg, schedulingv1beta1.WorkloadMaxPodGroupTemplates)))
+	}
+	return allErrs
+}
+
 func (w *TrainingRuntimeValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.TrainingRuntime) (admission.Warnings, error) {
 	log := ctrl.LoggerFrom(ctx).WithName("trainingruntime-webhook")
 	log.V(5).Info("Validating update", "trainingRuntime", klog.KObj(newObj))
-	return nil, validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+	allErrs := validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs)
+	allErrs = append(allErrs, validateScheduling(&newObj.Spec, &oldObj.Spec)...)
+	return nil, allErrs.ToAggregate()
 }
 
 func (w *TrainingRuntimeValidator) ValidateDelete(ctx context.Context, obj *trainer.TrainingRuntime) (admission.Warnings, error) {

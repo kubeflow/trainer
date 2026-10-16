@@ -83,7 +83,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource":              schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJob":                         schema_pkg_apis_trainer_v1alpha1_TrainJob(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobList":                     schema_pkg_apis_trainer_v1alpha1_TrainJobList(ref),
-		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobScheduling":               schema_pkg_apis_trainer_v1alpha1_TrainJobScheduling(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobSpec":                     schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobStatus":                   schema_pkg_apis_trainer_v1alpha1_TrainJobStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTemplateSpec":             schema_pkg_apis_trainer_v1alpha1_TrainJobTemplateSpec(ref),
@@ -92,6 +91,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerStatus":                    schema_pkg_apis_trainer_v1alpha1_TrainerStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntime":                  schema_pkg_apis_trainer_v1alpha1_TrainingRuntime(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeList":              schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeList(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeScheduling":        schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeScheduling(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeSpec":              schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeSpecPatch":         schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpecPatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.UniformSpace":                     schema_pkg_apis_trainer_v1alpha1_UniformSpace(ref),
@@ -2434,57 +2434,6 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobList(ref common.ReferenceCallback)
 	}
 }
 
-func schema_pkg_apis_trainer_v1alpha1_TrainJobScheduling(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "TrainJobScheduling defines the Workload-Aware Scheduling configuration for a TrainJob. Unless the TrainJobCompositePodGroup feature gate is enabled, a runtime must configure scheduling using one of the following models, and each ReplicatedJob can be configured by exactly one of them, since composite Gang-of-Gangs PodGroup hierarchies linking a parent PodGroup to leaf PodGroups are not created without that gate:\n  - the TrainJob-level (level 1) model: set schedulingPolicy, schedulingConstraints,\n    and/or disruptionMode to configure a single PodGroup covering the whole\n    TrainJob, and leave replicatedJobs unset.\n  - the per-ReplicatedJob (level 2) model: set replicatedJobs and leave schedulingPolicy,\n    schedulingConstraints, and disruptionMode unset at the top level.\n    Every ReplicatedJob in the runtime template must then be targeted by exactly one\n    replicatedJobs entry, since there is no top-level policy for an untargeted\n    ReplicatedJob to fall back to.\n  - the per-Job (level 3) model: set job on a replicatedJobs entry, so every replica\n    (Job) of the targeted ReplicatedJob gets its own PodGroup. The entry must target\n    exactly one ReplicatedJob and leave its schedulingPolicy, schedulingConstraints, and\n    disruptionMode unset. Level 2 and level 3 entries can be combined for different\n    ReplicatedJobs of the same runtime.\n\nSequenced startup (dependsOn or an InOrder startupPolicy) creates Jobs sequentially, so a single TrainJob-level gang could never reach its minCount. A runtime using sequenced startup must therefore use the per-ReplicatedJob model.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"schedulingPolicy": {
-						SchemaProps: spec.SchemaProps{
-							Description: "schedulingPolicy defines the TrainJob-level (level 1) scheduling policy for every Pod created by the TrainJob. Defaults to Gang when scheduling is set but schedulingPolicy is nil and replicatedJobs is not set. TrainJob-level gang scheduling, including the default, cannot be used with sequenced startup. Mutually exclusive with replicatedJobs: see the type-level comment.",
-							Ref:         ref(v1alpha3.WorkloadCompositePodGroupSchedulingPolicy{}.OpenAPIModelName()),
-						},
-					},
-					"schedulingConstraints": {
-						SchemaProps: spec.SchemaProps{
-							Description: "schedulingConstraints defines TrainJob-level (level 1) topology constraints for every Pod created by the TrainJob. Mutually exclusive with replicatedJobs: see the type-level comment.",
-							Ref:         ref(v1alpha3.WorkloadCompositePodGroupSchedulingConstraints{}.OpenAPIModelName()),
-						},
-					},
-					"disruptionMode": {
-						SchemaProps: spec.SchemaProps{
-							Description: "disruptionMode defines how the Pods of the entire TrainJob (level 1) can be disrupted. Mutually exclusive with replicatedJobs: see the type-level comment.",
-							Ref:         ref(v1alpha3.WorkloadCompositePodGroupDisruptionMode{}.OpenAPIModelName()),
-						},
-					},
-					"replicatedJobs": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "replicatedJobs specifies per-ReplicatedJob (level 2) scheduling configuration. Each entry targets one or more ReplicatedJobs of the runtime template. Without the TrainJobCompositePodGroup feature gate, this field is mutually exclusive with the TrainJob-level schedulingPolicy, schedulingConstraints, and disruptionMode fields. The item limit matches the upstream limit of PodGroupTemplates in a Workload.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ReplicatedJobScheduling"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ReplicatedJobScheduling", v1alpha3.WorkloadCompositePodGroupDisruptionMode{}.OpenAPIModelName(), v1alpha3.WorkloadCompositePodGroupSchedulingConstraints{}.OpenAPIModelName(), v1alpha3.WorkloadCompositePodGroupSchedulingPolicy{}.OpenAPIModelName()},
-	}
-}
-
 func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -2951,6 +2900,57 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeList(ref common.ReferenceCa
 	}
 }
 
+func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeScheduling(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TrainingRuntimeScheduling defines the Workload-Aware Scheduling configuration for a TrainJob. Unless the TrainJobCompositePodGroup feature gate is enabled, a runtime must configure scheduling using one of the following models, and each ReplicatedJob can be configured by exactly one of them, since composite Gang-of-Gangs PodGroup hierarchies linking a parent PodGroup to leaf PodGroups are not created without that gate:\n  - the TrainJob-level (level 1) model: set schedulingPolicy, schedulingConstraints,\n    and/or disruptionMode to configure a single PodGroup covering the whole\n    TrainJob, and leave replicatedJobs unset.\n  - the per-ReplicatedJob (level 2) model: set replicatedJobs and leave schedulingPolicy,\n    schedulingConstraints, and disruptionMode unset at the top level.\n    Every ReplicatedJob in the runtime template must then be targeted by exactly one\n    replicatedJobs entry, since there is no top-level policy for an untargeted\n    ReplicatedJob to fall back to.\n  - the per-Job (level 3) model: set job on a replicatedJobs entry, so every replica\n    (Job) of the targeted ReplicatedJob gets its own PodGroup. The entry must target\n    exactly one ReplicatedJob and leave its schedulingPolicy, schedulingConstraints, and\n    disruptionMode unset. Level 2 and level 3 entries can be combined for different\n    ReplicatedJobs of the same runtime.\n\nSequenced startup (dependsOn or an InOrder startupPolicy) creates Jobs sequentially, so a single TrainJob-level gang could never reach its minCount. A runtime using sequenced startup must therefore use the per-ReplicatedJob model.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"schedulingPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingPolicy defines the TrainJob-level (level 1) scheduling policy for every Pod created by the TrainJob. Defaults to Gang when scheduling is set but schedulingPolicy is nil and replicatedJobs is not set. TrainJob-level gang scheduling, including the default, cannot be used with sequenced startup. Mutually exclusive with replicatedJobs: see the type-level comment.",
+							Ref:         ref(v1alpha3.WorkloadCompositePodGroupSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"schedulingConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingConstraints defines TrainJob-level (level 1) topology constraints for every Pod created by the TrainJob. Mutually exclusive with replicatedJobs: see the type-level comment.",
+							Ref:         ref(v1alpha3.WorkloadCompositePodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
+					"disruptionMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "disruptionMode defines how the Pods of the entire TrainJob (level 1) can be disrupted. Mutually exclusive with replicatedJobs: see the type-level comment.",
+							Ref:         ref(v1alpha3.WorkloadCompositePodGroupDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"replicatedJobs": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "replicatedJobs specifies per-ReplicatedJob (level 2) scheduling configuration. Each entry targets one or more ReplicatedJobs of the runtime template. Without the TrainJobCompositePodGroup feature gate, this field is mutually exclusive with the TrainJob-level schedulingPolicy, schedulingConstraints, and disruptionMode fields. The item limit matches the upstream limit of PodGroupTemplates in a Workload.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ReplicatedJobScheduling"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ReplicatedJobScheduling", v1alpha3.WorkloadCompositePodGroupDisruptionMode{}.OpenAPIModelName(), v1alpha3.WorkloadCompositePodGroupSchedulingConstraints{}.OpenAPIModelName(), v1alpha3.WorkloadCompositePodGroupSchedulingPolicy{}.OpenAPIModelName()},
+	}
+}
+
 func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -2973,7 +2973,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref common.ReferenceCa
 					"scheduling": {
 						SchemaProps: spec.SchemaProps{
 							Description: "scheduling defines the Workload-Aware Scheduling configuration for TrainJobs which reference this runtime. When set, the TrainJob controller creates a Workload and the corresponding PodGroups for every TrainJob. When nil, no scheduling objects are created and TrainJob behavior is unchanged. This field is mutually exclusive with podGroupPolicy. This is an alpha feature and requires enabling the TrainJobWorkloadAwareScheduling feature gate. This field embeds upstream scheduling.k8s.io/v1alpha3 types and is excluded from the Trainer API stability guarantees until the upstream scheduling APIs graduate. More info: https://github.com/kubeflow/trainer/tree/master/proposals/3015-workload-aware-scheduling",
-							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobScheduling"),
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeScheduling"),
 						},
 					},
 					"template": {
@@ -2987,7 +2987,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetTemplateSpec", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicy", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicy", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobScheduling"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetTemplateSpec", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicy", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicy", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeScheduling"},
 	}
 }
 

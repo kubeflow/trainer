@@ -762,7 +762,7 @@ type TrainingRuntimeSpec struct {
     // behavior is unchanged.
     // Requires the TrainJobWorkloadAwareScheduling feature gate.
     // +optional
-    Scheduling *TrainJobScheduling `json:"scheduling,omitempty"`
+    Scheduling *TrainingRuntimeScheduling `json:"scheduling,omitempty"`
 
     // podGroupPolicy defines the configuration for the PodGroup to enable gang-scheduling via
     // supported plugins.
@@ -774,7 +774,7 @@ type TrainingRuntimeSpec struct {
     Template JobSetTemplateSpec `json:"template,omitzero"`
 }
 
-// TrainJobScheduling defines the Workload-Aware Scheduling configuration for a TrainJob.
+// TrainingRuntimeScheduling defines the Workload-Aware Scheduling configuration for a TrainJob.
 // Unless the TrainJobCompositePodGroup feature gate is enabled, a runtime must configure
 // scheduling using one of the following models, and each ReplicatedJob can be configured
 // by exactly one of them, since composite Gang-of-Gangs PodGroup hierarchies linking a
@@ -793,7 +793,7 @@ type TrainingRuntimeSpec struct {
 //     disruptionMode unset. Level 2 and level 3 entries can be combined for different
 //     ReplicatedJobs of the same runtime.
 // +kubebuilder:validation:XValidation:rule="!has(self.replicatedJobs) || self.replicatedJobs.all(e, self.replicatedJobs.filter(o, sets.intersects(o.targetReplicatedJobs, e.targetReplicatedJobs)).size() == 1)",message="a ReplicatedJob must not be targeted by more than one replicatedJobs entry"
-type TrainJobScheduling struct {
+type TrainingRuntimeScheduling struct {
     // schedulingPolicy defines the TrainJob-level (level 1) scheduling policy for every Pod
     // created by the TrainJob. Defaults to Gang when spec.scheduling is set but
     // schedulingPolicy is nil and replicatedJobs is not set.
@@ -918,7 +918,8 @@ JobSet template.
 The TrainingRuntime and ClusterTrainingRuntime validation enforces that:
 
 - `spec.scheduling` is rejected when the `TrainJobWorkloadAwareScheduling` feature gate is
-  disabled.
+  disabled. Updates that leave an existing `spec.scheduling` unchanged are allowed, so runtimes
+  stored while the gate was enabled remain editable after the gate is disabled.
 - `spec.scheduling` and `spec.podGroupPolicy` are mutually exclusive, so a runtime cannot request
   both the Workload API and the Coscheduling or Volcano plugins.
 - Every name in `targetReplicatedJobs` exists in `spec.template.spec.replicatedJobs`, and no
@@ -1140,7 +1141,7 @@ avoiding orphaned Pods with a stale `PodGroup` reference.
 | `numNodes` updated with gang scheduling  | Reject at admission, since `minCount` is immutable.                                  |
 | Restart                                  | Discover scheduling resources by reference; recreated Pods receive the same mapping. |
 | Delete                                   | OwnerReferences provide cleanup.                                                     |
-| Gate disabled with scheduling configured | Reject the runtime at admission.                                                     |
+| Gate disabled with scheduling configured | Reject new or changed scheduling at admission; unchanged scheduling is allowed.      |
 
 ### Feature Gate Dependencies
 

@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -2527,6 +2528,7 @@ func TestRuntimeInfo(t *testing.T) {
 				tt.templateType,
 				nil,
 				nil,
+				nil,
 			)
 
 			if err == nil {
@@ -2537,6 +2539,22 @@ func TestRuntimeInfo(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+func TestNewRuntimeInfoScheduling(t *testing.T) {
+	scheduling := &trainer.TrainingRuntimeScheduling{
+		ReplicatedJobs: []trainer.ReplicatedJobScheduling{{TargetReplicatedJobs: []string{constants.Node}}},
+	}
+	trainingRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj()
+	trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj()
+
+	info, err := (&TrainingRuntime{}).newRuntimeInfo(trainJob, trainingRuntime.Spec.Template, nil, nil, scheduling)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if diff := cmp.Diff(scheduling, info.RuntimePolicy.Scheduling); len(diff) != 0 {
+		t.Errorf("Unexpected RuntimePolicy.Scheduling (-want,+got):\n%s", diff)
 	}
 }
 
@@ -2792,5 +2810,50 @@ func TestToApplyConfig(t *testing.T) {
 				t.Errorf("Unexpected apply configuration (-want,+got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestTrainingRuntimeValidateObjectsScheduling(t *testing.T) {
+	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	baseRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime")
+	existingRuntime := baseRuntime.RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+		Scheduling(&trainer.TrainingRuntimeScheduling{
+			ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+				{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+				{
+					TargetReplicatedJobs: []string{constants.Node},
+					Job: &trainer.JobScheduling{
+						ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
+							Name:                      "tpu-slice",
+							ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+						}},
+					},
+				},
+			},
+		}).
+		Obj()).
+		Obj()
+	trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+		RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+		Trainer(testingutil.MakeTrainJobTrainerWrapper().
+			ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "gpu-template"}).
+			Obj()).
+		Obj()
+
+	clientBuilder := testingutil.NewClientBuilder().WithObjects(existingRuntime)
+	trainingRuntime, err := NewTrainingRuntime(ctx, clientBuilder.Build(), testingutil.AsIndex(clientBuilder), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, fieldErrors := trainingRuntime.ValidateObjects(ctx, nil, trainJob)
+	wantErrs := field.ErrorList{
+		field.Forbidden(field.NewPath("spec", "trainer", "resourceClaimsPerNode"), ""),
+	}
+	if diff := cmp.Diff(wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail")); diff != "" {
+		t.Errorf("Unexpected field errors (-want,+got):\n%s", diff)
 	}
 }

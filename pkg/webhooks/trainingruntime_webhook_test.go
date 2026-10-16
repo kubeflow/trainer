@@ -23,7 +23,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -31,6 +34,7 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -246,5 +250,184 @@ func TestTrainingRuntimeValidateDelete(t *testing.T) {
 	}
 	if len(warnings) != 0 {
 		t.Errorf("ValidateDelete() warnings = %v, want nil", warnings)
+	}
+}
+
+func TestValidateScheduling(t *testing.T) {
+	gang := &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+		Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{},
+	}
+	runtimeSpec := func(scheduling *trainer.TrainingRuntimeScheduling) *trainer.TrainingRuntimeSpec {
+		spec := testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper("ns", "runtime").Obj().Spec).
+			Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+			Scheduling(scheduling).
+			Obj()
+		return &spec
+	}
+	schedulingPath := field.NewPath("spec", "scheduling")
+	rJobsPath := field.NewPath("spec", "template", "spec", "replicatedJobs")
+
+	cases := map[string]struct {
+		enableWAS bool
+		oldSpec   *trainer.TrainingRuntimeSpec
+		newSpec   *trainer.TrainingRuntimeSpec
+		wantError field.ErrorList
+	}{
+		"scheduling is not set and feature gate is disabled": {
+			newSpec: runtimeSpec(nil),
+		},
+		"scheduling is set on create and feature gate is disabled": {
+			newSpec: runtimeSpec(&trainer.TrainingRuntimeScheduling{SchedulingPolicy: gang}),
+			wantError: field.ErrorList{
+				field.Forbidden(schedulingPath, ""),
+			},
+		},
+		"unchanged scheduling on update is allowed when feature gate is disabled": {
+			oldSpec: runtimeSpec(&trainer.TrainingRuntimeScheduling{SchedulingPolicy: gang}),
+			newSpec: runtimeSpec(&trainer.TrainingRuntimeScheduling{SchedulingPolicy: gang}),
+		},
+		"changed scheduling on update is rejected when feature gate is disabled": {
+			oldSpec: runtimeSpec(nil),
+			newSpec: runtimeSpec(&trainer.TrainingRuntimeScheduling{SchedulingPolicy: gang}),
+			wantError: field.ErrorList{
+				field.Forbidden(schedulingPath, ""),
+			},
+		},
+		"valid TrainJob-level scheduling": {
+			enableWAS: true,
+			newSpec:   runtimeSpec(&trainer.TrainingRuntimeScheduling{SchedulingPolicy: gang}),
+		},
+		"valid per-ReplicatedJob scheduling targeting every ReplicatedJob": {
+			enableWAS: true,
+			newSpec: runtimeSpec(&trainer.TrainingRuntimeScheduling{
+				ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+					{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+					{TargetReplicatedJobs: []string{constants.Node}},
+				},
+			}),
+		},
+		"targetReplicatedJobs references a ReplicatedJob which does not exist": {
+			enableWAS: true,
+			newSpec: runtimeSpec(&trainer.TrainingRuntimeScheduling{
+				ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+					{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+					{TargetReplicatedJobs: []string{constants.Node, "invalid"}},
+				},
+			}),
+			wantError: field.ErrorList{
+				field.Invalid(schedulingPath.Child("replicatedJobs").Index(1).Child("targetReplicatedJobs").Index(1), "", ""),
+			},
+		},
+		"per-ReplicatedJob scheduling leaves a ReplicatedJob untargeted": {
+			enableWAS: true,
+			newSpec: runtimeSpec(&trainer.TrainingRuntimeScheduling{
+				ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+					{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+				},
+			}),
+			wantError: field.ErrorList{
+				field.Invalid(rJobsPath.Index(2).Child("name"), "", ""),
+			},
+		},
+		"Job-level scheduling resolves to the maximum number of PodGroupTemplates": {
+			enableWAS: true,
+			newSpec: func() *trainer.TrainingRuntimeSpec {
+				spec := runtimeSpec(&trainer.TrainingRuntimeScheduling{
+					ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+						{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+						{TargetReplicatedJobs: []string{constants.Node}, Job: &trainer.JobScheduling{}},
+					},
+				})
+				spec.Template.Spec.ReplicatedJobs[2].Replicas = 7
+				return spec
+			}(),
+		},
+		"Job-level scheduling resolves to more PodGroupTemplates than the Workload allows": {
+			enableWAS: true,
+			newSpec: func() *trainer.TrainingRuntimeSpec {
+				spec := runtimeSpec(&trainer.TrainingRuntimeScheduling{
+					ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+						{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+						{TargetReplicatedJobs: []string{constants.Node}, Job: &trainer.JobScheduling{}},
+					},
+				})
+				spec.Template.Spec.ReplicatedJobs[2].Replicas = 8
+				return spec
+			}(),
+			wantError: field.ErrorList{
+				field.Invalid(schedulingPath.Child("replicatedJobs"), "", ""),
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, tc.enableWAS)
+			gotErr := validateScheduling(tc.newSpec, tc.oldSpec)
+			if diff := cmp.Diff(tc.wantError, gotErr, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); len(diff) != 0 {
+				t.Errorf("validateScheduling() mismatch (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestTrainingRuntimeValidateScheduling(t *testing.T) {
+	newRuntime := func(scheduling *trainer.TrainingRuntimeScheduling) *trainer.TrainingRuntime {
+		return testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").
+			RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj().Spec).
+				Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+				Scheduling(scheduling).
+				Obj()).
+			Obj()
+	}
+	scheduling := &trainer.TrainingRuntimeScheduling{
+		ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+			{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer, constants.Node}},
+		},
+	}
+	cases := map[string]struct {
+		enableWAS bool
+		oldObj    *trainer.TrainingRuntime
+		newObj    *trainer.TrainingRuntime
+		wantErr   bool
+	}{
+		"create is rejected when the feature gate is disabled": {
+			newObj:  newRuntime(scheduling),
+			wantErr: true,
+		},
+		"create is accepted when the feature gate is enabled": {
+			enableWAS: true,
+			newObj:    newRuntime(scheduling),
+		},
+		"update adding scheduling is rejected when the feature gate is disabled": {
+			oldObj:  newRuntime(nil),
+			newObj:  newRuntime(scheduling),
+			wantErr: true,
+		},
+		"update leaving a ReplicatedJob untargeted is rejected when the feature gate is enabled": {
+			enableWAS: true,
+			oldObj:    newRuntime(scheduling),
+			newObj: newRuntime(&trainer.TrainingRuntimeScheduling{
+				ReplicatedJobs: []trainer.ReplicatedJobScheduling{{TargetReplicatedJobs: []string{constants.Node}}},
+			}),
+			wantErr: true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, tc.enableWAS)
+			_, ctx := ktesting.NewTestContext(t)
+			validator := &TrainingRuntimeValidator{}
+			var err error
+			if tc.oldObj == nil {
+				_, err = validator.ValidateCreate(ctx, tc.newObj)
+			} else {
+				_, err = validator.ValidateUpdate(ctx, tc.oldObj, tc.newObj)
+			}
+			if gotErr := err != nil; gotErr != tc.wantErr {
+				t.Errorf("unexpected error: got %v, wantErr %v", err, tc.wantErr)
+			}
+		})
 	}
 }

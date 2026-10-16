@@ -130,7 +130,7 @@ type TrainingRuntimeSpec struct {
 	// stability guarantees until the upstream scheduling APIs graduate.
 	// More info: https://github.com/kubeflow/trainer/tree/master/proposals/3015-workload-aware-scheduling
 	// +optional
-	Scheduling *TrainJobScheduling `json:"scheduling,omitempty"`
+	Scheduling *TrainingRuntimeScheduling `json:"scheduling,omitempty"`
 
 	// template for the JobSet which will be used by TrainJob.
 	// +optional
@@ -188,7 +188,7 @@ type VolcanoPodGroupPolicySource struct {
 	NetworkTopology *volcanov1beta1.NetworkTopologySpec `json:"networkTopology,omitempty"`
 }
 
-// TrainJobScheduling defines the Workload-Aware Scheduling configuration for a TrainJob.
+// TrainingRuntimeScheduling defines the Workload-Aware Scheduling configuration for a TrainJob.
 // Unless the TrainJobCompositePodGroup feature gate is enabled, a runtime must configure
 // scheduling using one of the following models, and each ReplicatedJob can be configured
 // by exactly one of them, since composite Gang-of-Gangs PodGroup hierarchies linking a
@@ -212,7 +212,7 @@ type VolcanoPodGroupPolicySource struct {
 // must therefore use the per-ReplicatedJob model.
 // +kubebuilder:validation:XValidation:rule="!has(self.replicatedJobs) || size(self.replicatedJobs) == 0 || (!has(self.schedulingPolicy) && !has(self.schedulingConstraints) && !has(self.disruptionMode))", message="schedulingPolicy, schedulingConstraints, and disruptionMode cannot be set together with replicatedJobs"
 // +kubebuilder:validation:XValidation:rule="!has(self.replicatedJobs) || self.replicatedJobs.all(e, self.replicatedJobs.filter(o, o.targetReplicatedJobs.exists(n, n in e.targetReplicatedJobs)).size() == 1)", message="a ReplicatedJob must not be targeted by more than one replicatedJobs entry"
-type TrainJobScheduling struct {
+type TrainingRuntimeScheduling struct {
 	// schedulingPolicy defines the TrainJob-level (level 1) scheduling policy for every Pod
 	// created by the TrainJob. Defaults to Gang when scheduling is set but schedulingPolicy is
 	// nil and replicatedJobs is not set.

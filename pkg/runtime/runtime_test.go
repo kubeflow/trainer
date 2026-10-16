@@ -28,6 +28,7 @@ import (
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 )
@@ -426,6 +427,23 @@ func TestNewInfo(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				Scheduler:   &Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
+		"scheduling is specified": {
+			infoOpts: []InfoOption{
+				WithScheduling(&trainer.TrainingRuntimeScheduling{
+					ReplicatedJobs: []trainer.ReplicatedJobScheduling{{TargetReplicatedJobs: []string{constants.Node}}},
+				}),
+			},
+			wantInfo: &Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{
+						ReplicatedJobs: []trainer.ReplicatedJobScheduling{{TargetReplicatedJobs: []string{constants.Node}}},
+					},
+				},
+				Scheduler: &Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"image and command are extracted from containers and init containers": {

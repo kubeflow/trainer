@@ -40,9 +40,9 @@ from kubeflow_trainer_api.models.trainer_v1alpha1_replicated_job_scheduling impo
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1TrainJobScheduling(BaseModel):
+class TrainerV1alpha1TrainingRuntimeScheduling(BaseModel):
     """
-    TrainJobScheduling defines the Workload-Aware Scheduling configuration for a TrainJob. Unless the TrainJobCompositePodGroup feature gate is enabled, a runtime must configure scheduling using one of the following models, and each ReplicatedJob can be configured by exactly one of them, since composite Gang-of-Gangs PodGroup hierarchies linking a parent PodGroup to leaf PodGroups are not created without that gate:   - the TrainJob-level (level 1) model: set schedulingPolicy, schedulingConstraints,     and/or disruptionMode to configure a single PodGroup covering the whole     TrainJob, and leave replicatedJobs unset.   - the per-ReplicatedJob (level 2) model: set replicatedJobs and leave schedulingPolicy,     schedulingConstraints, and disruptionMode unset at the top level.     Every ReplicatedJob in the runtime template must then be targeted by exactly one     replicatedJobs entry, since there is no top-level policy for an untargeted     ReplicatedJob to fall back to.   - the per-Job (level 3) model: set job on a replicatedJobs entry, so every replica     (Job) of the targeted ReplicatedJob gets its own PodGroup. The entry must target     exactly one ReplicatedJob and leave its schedulingPolicy, schedulingConstraints, and     disruptionMode unset. Level 2 and level 3 entries can be combined for different     ReplicatedJobs of the same runtime.  Sequenced startup (dependsOn or an InOrder startupPolicy) creates Jobs sequentially, so a single TrainJob-level gang could never reach its minCount. A runtime using sequenced startup must therefore use the per-ReplicatedJob model.
+    TrainingRuntimeScheduling defines the Workload-Aware Scheduling configuration for a TrainJob. Unless the TrainJobCompositePodGroup feature gate is enabled, a runtime must configure scheduling using one of the following models, and each ReplicatedJob can be configured by exactly one of them, since composite Gang-of-Gangs PodGroup hierarchies linking a parent PodGroup to leaf PodGroups are not created without that gate:   - the TrainJob-level (level 1) model: set schedulingPolicy, schedulingConstraints,     and/or disruptionMode to configure a single PodGroup covering the whole     TrainJob, and leave replicatedJobs unset.   - the per-ReplicatedJob (level 2) model: set replicatedJobs and leave schedulingPolicy,     schedulingConstraints, and disruptionMode unset at the top level.     Every ReplicatedJob in the runtime template must then be targeted by exactly one     replicatedJobs entry, since there is no top-level policy for an untargeted     ReplicatedJob to fall back to.   - the per-Job (level 3) model: set job on a replicatedJobs entry, so every replica     (Job) of the targeted ReplicatedJob gets its own PodGroup. The entry must target     exactly one ReplicatedJob and leave its schedulingPolicy, schedulingConstraints, and     disruptionMode unset. Level 2 and level 3 entries can be combined for different     ReplicatedJobs of the same runtime.  Sequenced startup (dependsOn or an InOrder startupPolicy) creates Jobs sequentially, so a single TrainJob-level gang could never reach its minCount. A runtime using sequenced startup must therefore use the per-ReplicatedJob model.
     """ # noqa: E501
     disruption_mode: Optional[IoK8sApiSchedulingV1alpha3WorkloadCompositePodGroupDisruptionMode] = Field(default=None, description="disruptionMode defines how the Pods of the entire TrainJob (level 1) can be disrupted. Mutually exclusive with replicatedJobs: see the type-level comment.", alias="disruptionMode")
     replicated_jobs: Optional[List[TrainerV1alpha1ReplicatedJobScheduling]] = Field(default=None, description="replicatedJobs specifies per-ReplicatedJob (level 2) scheduling configuration. Each entry targets one or more ReplicatedJobs of the runtime template. Without the TrainJobCompositePodGroup feature gate, this field is mutually exclusive with the TrainJob-level schedulingPolicy, schedulingConstraints, and disruptionMode fields. The item limit matches the upstream limit of PodGroupTemplates in a Workload.", alias="replicatedJobs")
@@ -68,7 +68,7 @@ class TrainerV1alpha1TrainJobScheduling(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrainJobScheduling from a JSON string"""
+        """Create an instance of TrainerV1alpha1TrainingRuntimeScheduling from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -109,7 +109,7 @@ class TrainerV1alpha1TrainJobScheduling(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrainJobScheduling from a dict"""
+        """Create an instance of TrainerV1alpha1TrainingRuntimeScheduling from a dict"""
         if obj is None:
             return None
 

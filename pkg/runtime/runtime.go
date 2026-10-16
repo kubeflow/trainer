@@ -49,7 +49,7 @@ type Info struct {
 type RuntimePolicy struct {
 	MLPolicySource *trainer.MLPolicySource
 	PodGroupPolicy *trainer.PodGroupPolicy
-	//FluxPolicySource *trainer.FluxMLPolicySource
+	Scheduling     *trainer.TrainingRuntimeScheduling
 }
 
 type TemplateSpec struct {
@@ -129,6 +129,12 @@ func WithMLPolicySource(mlPolicy *trainer.MLPolicy) InfoOption {
 func WithPodGroupPolicy(pgPolicy *trainer.PodGroupPolicy) InfoOption {
 	return func(o *InfoOptions) {
 		o.runtimePolicy.PodGroupPolicy = pgPolicy
+	}
+}
+
+func WithScheduling(scheduling *trainer.TrainingRuntimeScheduling) InfoOption {
+	return func(o *InfoOptions) {
+		o.runtimePolicy.Scheduling = scheduling
 	}
 }
 

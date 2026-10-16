@@ -23,12 +23,15 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -171,5 +174,66 @@ func TestClusterTrainingRuntimeValidateDelete(t *testing.T) {
 	}
 	if len(warnings) != 0 {
 		t.Errorf("ValidateDelete() warnings = %v, want nil", warnings)
+	}
+}
+
+func TestClusterTrainingRuntimeValidateScheduling(t *testing.T) {
+	newRuntime := func(scheduling *trainer.TrainingRuntimeScheduling) *trainer.ClusterTrainingRuntime {
+		return testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+			RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj().Spec).
+				Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+				Scheduling(scheduling).
+				Obj()).
+			Obj()
+	}
+	scheduling := &trainer.TrainingRuntimeScheduling{
+		ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+			{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer, constants.Node}},
+		},
+	}
+	cases := map[string]struct {
+		enableWAS bool
+		oldObj    *trainer.ClusterTrainingRuntime
+		newObj    *trainer.ClusterTrainingRuntime
+		wantErr   bool
+	}{
+		"create is rejected when the feature gate is disabled": {
+			newObj:  newRuntime(scheduling),
+			wantErr: true,
+		},
+		"create is accepted when the feature gate is enabled": {
+			enableWAS: true,
+			newObj:    newRuntime(scheduling),
+		},
+		"update adding scheduling is rejected when the feature gate is disabled": {
+			oldObj:  newRuntime(nil),
+			newObj:  newRuntime(scheduling),
+			wantErr: true,
+		},
+		"update leaving a ReplicatedJob untargeted is rejected when the feature gate is enabled": {
+			enableWAS: true,
+			oldObj:    newRuntime(scheduling),
+			newObj: newRuntime(&trainer.TrainingRuntimeScheduling{
+				ReplicatedJobs: []trainer.ReplicatedJobScheduling{{TargetReplicatedJobs: []string{constants.Node}}},
+			}),
+			wantErr: true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, tc.enableWAS)
+			_, ctx := ktesting.NewTestContext(t)
+			validator := &ClusterTrainingRuntimeValidator{}
+			var err error
+			if tc.oldObj == nil {
+				_, err = validator.ValidateCreate(ctx, tc.newObj)
+			} else {
+				_, err = validator.ValidateUpdate(ctx, tc.oldObj, tc.newObj)
+			}
+			if gotErr := err != nil; gotErr != tc.wantErr {
+				t.Errorf("unexpected error: got %v, wantErr %v", err, tc.wantErr)
+			}
+		})
 	}
 }
