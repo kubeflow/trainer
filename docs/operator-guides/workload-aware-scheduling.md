@@ -24,15 +24,16 @@ Workload-Aware Scheduling support was introduced in Kubeflow Trainer v2.4.0 behi
 `TrainJobWorkloadAwareScheduling` alpha feature gate. With the gate disabled, runtimes that set
 `spec.scheduling` are rejected.
 
-This phase supports a single scheduling level per ReplicatedJob. `CompositePodGroups`, which
-combine the PodGroups of a TrainJob into a hierarchy (for example, a gang of gangs across
-ReplicatedJobs), will be supported in the next phases. You can track the progress in
-[the KEP-3015](https://github.com/kubeflow/trainer/tree/master/proposals/3015-workload-aware-scheduling)
+Currently, TrainJob supports a single scheduling level per ReplicatedJob. `CompositePodGroups` will
+be supported in the next phases It will allow to combine the PodGroups of a TrainJob into a hierarchy
+(for example, a gang of gangs across ReplicatedJobs).
+You can track the progress in [the KEP-3015](https://github.com/kubeflow/trainer/tree/master/proposals/3015-workload-aware-scheduling).
 :::
 
-:::{note}
-Make sure to follow [the Runtime guide](runtime.md) to understand the basics of Kubeflow
-Trainer Runtimes.
+:::{warning}
+The `spec.scheduling` API is in alpha and may change in backward-incompatible ways in future
+Kubeflow Trainer releases. It also depends on the Kubernetes Workload and PodGroup APIs, which are
+still evolving.
 :::
 
 ## Prerequisites
