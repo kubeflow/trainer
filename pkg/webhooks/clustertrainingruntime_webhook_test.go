@@ -108,15 +108,15 @@ func TestClusterTrainingRuntimeValidateUpdate(t *testing.T) {
 					Template: trainer.JobSetTemplateSpec{
 						Spec: func() jobsetv1alpha2.JobSetSpec {
 							js := testingutil.MakeJobSetWrapper("", "")
-							js.Replicas(2, constants.DatasetInitializer, constants.ModelInitializer, constants.Node)
+							js.Replicas(0, constants.DatasetInitializer, constants.ModelInitializer, constants.Node)
 							return js.Obj().Spec
 						}(),
 					},
 				}).Obj(),
 			wantError: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(0).Child("replicas"), int32(2), ""),
-				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("replicas"), int32(2), ""),
-				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).Child("replicas"), int32(2), ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(0).Child("replicas"), int32(0), ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("replicas"), int32(0), ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).Child("replicas"), int32(0), ""),
 			},
 		},
 		"update from invalid old object succeeds": {
@@ -125,7 +125,7 @@ func TestClusterTrainingRuntimeValidateUpdate(t *testing.T) {
 					Template: trainer.JobSetTemplateSpec{
 						Spec: func() jobsetv1alpha2.JobSetSpec {
 							js := testingutil.MakeJobSetWrapper("", "")
-							js.Replicas(2, constants.DatasetInitializer, constants.ModelInitializer, constants.Node)
+							js.Replicas(0, constants.DatasetInitializer, constants.ModelInitializer, constants.Node)
 							return js.Obj().Spec
 						}(),
 					},

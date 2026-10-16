@@ -2383,6 +2383,34 @@ func TestTorchValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Obj(),
 		},
+		"trainer replicatedJob with multiple replicas is not supported": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().TorchPolicy().Obj()).
+					Obj(),
+				),
+				runtime.WithTemplateSpecObjApply(jobsetv1alpha2ac.JobSetSpec().
+					WithReplicatedJobs(jobsetv1alpha2ac.ReplicatedJob().
+						WithName(constants.Node).
+						WithReplicas(2).
+						WithTemplate(batchv1ac.JobTemplateSpec().
+							WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}).
+							WithSpec(batchv1ac.JobSpec().
+								WithTemplate(corev1ac.PodTemplateSpec().
+									WithSpec(corev1ac.PodSpec()),
+								),
+							),
+						),
+					),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "runtimeRef"), int32(2),
+					"trainer replicatedJob replicas must be 1 for the Torch runtime"),
+			},
+		},
 		"envInjection target container does not exist": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().

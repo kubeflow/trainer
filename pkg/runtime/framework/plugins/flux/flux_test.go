@@ -245,6 +245,30 @@ func TestValidate(t *testing.T) {
 			},
 			newObj: &trainer.TrainJob{},
 		},
+		"invalid when trainer replicatedJob has multiple replicas": {
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						Flux: &trainer.FluxMLPolicySource{},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: v1alpha2.JobSetSpec().
+						WithReplicatedJobs(v1alpha2.ReplicatedJob().
+							WithName(constants.Node).
+							WithReplicas(2).
+							WithTemplate(batchv1ac.JobTemplateSpec().
+								WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}),
+							),
+						),
+				},
+			},
+			newObj: &trainer.TrainJob{},
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "runtimeRef"), int32(2),
+					"trainer replicatedJob replicas must be 1 for the Flux runtime"),
+			},
+		},
 		"invalid when node podSet includes reserved flux installer init container": {
 			info: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{

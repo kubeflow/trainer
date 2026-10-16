@@ -85,6 +85,14 @@ func (m *MPI) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobOb
 		return nil, allErrs
 	}
 	specPath := field.NewPath("spec")
+	// The MPI hostfile and the launcher are built for a single Job per replicatedJob.
+	// The trainer ancestor is the launcher, so the node replicatedJob must be validated as well.
+	for _, rJobName := range []string{constants.Launcher, constants.Node} {
+		if replicas := runtime.ReplicatedJobReplicas(runtimeInfo, rJobName); replicas > 1 {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("runtimeRef"), replicas,
+				fmt.Sprintf("%s replicatedJob replicas must be 1 for the MPI runtime", rJobName)))
+		}
+	}
 	// validate PodSet configurations based on NumNodes and RunLauncherAsNode.
 	if trainJobTrainer := newJobObj.Spec.Trainer; trainJobTrainer != nil && ptr.Deref(trainJobTrainer.NumNodes, 1) >= 2 && ptr.Deref(runtimeInfo.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false) {
 		if runtimeInfo.FindPodSetByName(constants.Launcher) == nil || runtimeInfo.FindPodSetByName(constants.Node) == nil {
