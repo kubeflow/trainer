@@ -46,6 +46,23 @@ tests:
               - update
               - watch
 
+  - it: Should allow managing Workload-Aware Scheduling objects
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - scheduling.k8s.io
+            resources:
+              - podgroups
+              - workloads
+            verbs:
+              - create
+              - get
+              - list
+              - patch
+              - watch
+
   - it: Should allow metrics authentication reviews
     asserts:
       - contains:
