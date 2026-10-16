@@ -24,15 +24,20 @@ import (
 	"slices"
 	"strings"
 
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	schedulingv1beta1ac "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
@@ -51,13 +56,18 @@ const (
 )
 
 // Workload plugin integrates TrainJob with the Kubernetes Workload-Aware Scheduling APIs.
-type Workload struct{}
+type Workload struct {
+	client client.Client
+}
 
 var _ framework.CustomValidationPlugin = (*Workload)(nil)
 var _ framework.EnforceSchedulingPlugin = (*Workload)(nil)
+var _ framework.ComponentBuilderPlugin = (*Workload)(nil)
 
-func New(context.Context, client.Client, client.FieldIndexer, *configapi.Configuration) (framework.Plugin, error) {
-	return &Workload{}, nil
+// +kubebuilder:rbac:groups=scheduling.k8s.io,resources=workloads;podgroups,verbs=create;get;list;watch;patch
+
+func New(_ context.Context, c client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
+	return &Workload{client: c}, nil
 }
 
 func (w *Workload) Name() string {
@@ -124,6 +134,70 @@ func (w *Workload) EnforceScheduling(info *runtime.Info, trainJob *trainer.Train
 			WithPodGroupName(podGroupName(trainJob, templateName))
 	}
 	return nil
+}
+
+// Build builds the Workload and the PodGroups of the TrainJob. The Workload and the PodGroups are
+// never updated once created, so only the missing objects are built.
+func (w *Workload) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
+	if info == nil || trainJob == nil || info.RuntimePolicy.Scheduling == nil {
+		return nil, nil
+	}
+	builders := newBuilders(info, trainJob)
+	workload, err := buildWorkload(builders)
+	if err != nil {
+		return nil, err
+	}
+
+	var objects []apiruntime.ApplyConfiguration
+	if err := w.client.Get(ctx, client.ObjectKeyFromObject(workload), &schedulingv1beta1.Workload{}); err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return nil, err
+		}
+		spec, err := apply.FromTypedObjWithFields[schedulingv1beta1ac.WorkloadSpecApplyConfiguration](workload, "spec")
+		if err != nil {
+			return nil, err
+		}
+		objects = append(objects, schedulingv1beta1ac.Workload(workload.Name, workload.Namespace).
+			WithOwnerReferences(metav1ac.OwnerReference().
+				WithAPIVersion(trainer.GroupVersion.String()).
+				WithKind(trainer.TrainJobKind).
+				WithName(trainJob.Name).
+				WithUID(trainJob.UID).
+				WithController(true).
+				WithBlockOwnerDeletion(true)).
+			WithSpec(spec))
+	}
+
+	for _, b := range builders {
+		wl, err := b.BuildWorkload()
+		if err != nil {
+			return nil, err
+		}
+		templateName := wl.Spec.PodGroupTemplates[0].Name
+		podGroup, err := b.NewPodGroup(podGroupName(trainJob, templateName), templateName)
+		if err != nil {
+			return nil, err
+		}
+		if err := w.client.Get(ctx, client.ObjectKeyFromObject(podGroup), &schedulingv1beta1.PodGroup{}); err != nil {
+			if client.IgnoreNotFound(err) != nil {
+				return nil, err
+			}
+			spec, err := apply.FromTypedObjWithFields[schedulingv1beta1ac.PodGroupSpecApplyConfiguration](podGroup, "spec")
+			if err != nil {
+				return nil, err
+			}
+			objects = append(objects, schedulingv1beta1ac.PodGroup(podGroup.Name, podGroup.Namespace).
+				WithOwnerReferences(metav1ac.OwnerReference().
+					WithAPIVersion(trainer.GroupVersion.String()).
+					WithKind(trainer.TrainJobKind).
+					WithName(trainJob.Name).
+					WithUID(trainJob.UID).
+					WithController(true).
+					WithBlockOwnerDeletion(true)).
+				WithSpec(spec))
+		}
+	}
+	return objects, nil
 }
 
 // workloadName returns the name of the Workload owned by the TrainJob.
