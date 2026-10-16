@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -41,10 +40,10 @@ const (
 	rJobContainerNamesErrorMsg = "must contain the required container for the ancestor: %s"
 	rJobContainerClaimErrorMsg = "references resourceClaim %q which is not defined in the Pod's resourceClaims"
 
-	schedulingFeatureGateErrorMsg              = "TrainJobWorkloadAwareScheduling feature gate is disabled"
-	schedulingTargetNotFoundErrorMsg           = "must reference a replicatedJob in spec.template.spec.replicatedJobs"
-	schedulingUntargetedErrorMsg               = "must be targeted by a spec.scheduling.replicatedJobs entry when spec.scheduling.replicatedJobs is set"
-	schedulingTooManyPodGroupTemplatesErrorMsg = "must not resolve to more than %d PodGroupTemplates; a job entry resolves to one PodGroupTemplate per replica of its ReplicatedJob"
+	schedulingFeatureGateErrorMsg    = "TrainJobWorkloadAwareScheduling feature gate is disabled"
+	schedulingTargetNotFoundErrorMsg = "must reference a replicatedJob in spec.template.spec.replicatedJobs"
+	schedulingUntargetedErrorMsg     = "must be targeted by a spec.scheduling.replicatedJobs entry when spec.scheduling.replicatedJobs is set"
+	schedulingJobReplicasErrorMsg    = "must target a ReplicatedJob with at most 1 replica; a PodGroup per replica is not supported yet"
 )
 
 var (
@@ -175,9 +174,6 @@ func validateScheduling(newSpec, oldSpec *trainer.TrainingRuntimeSpec) field.Err
 		replicas[rJob.Name] = rJob.Replicas
 	}
 	targeted := sets.New[string]()
-	// Every level 2 entry resolves to one PodGroupTemplate, while every level 3 entry resolves to
-	// one PodGroupTemplate per replica (Job) of the targeted ReplicatedJob.
-	var podGroupTemplates int32
 	for i, entry := range scheduling.ReplicatedJobs {
 		targetsPath := schedulingPath.Child("replicatedJobs").Index(i).Child("targetReplicatedJobs")
 		for j, name := range entry.TargetReplicatedJobs {
@@ -186,10 +182,12 @@ func validateScheduling(newSpec, oldSpec *trainer.TrainingRuntimeSpec) field.Err
 			}
 			targeted.Insert(name)
 		}
-		if entry.Job != nil && len(entry.TargetReplicatedJobs) == 1 {
-			podGroupTemplates += replicas[entry.TargetReplicatedJobs[0]]
-		} else {
-			podGroupTemplates++
+		// A ReplicatedJob has a single Pod template shared by all of its replicas (Jobs), so a
+		// distinct PodGroup can't be assigned to the Pods of each replica yet.
+		// TODO (andreyvelich): We need to use scheduling.k8s.io/workload-name Job annotation in k8s v1.38
+		if entry.Job != nil && len(entry.TargetReplicatedJobs) == 1 && replicas[entry.TargetReplicatedJobs[0]] > 1 {
+			allErrs = append(allErrs, field.Invalid(schedulingPath.Child("replicatedJobs").Index(i).Child("job"),
+				replicas[entry.TargetReplicatedJobs[0]], schedulingJobReplicasErrorMsg))
 		}
 	}
 
@@ -198,11 +196,6 @@ func validateScheduling(newSpec, oldSpec *trainer.TrainingRuntimeSpec) field.Err
 		if !targeted.Has(rJob.Name) {
 			allErrs = append(allErrs, field.Invalid(rJobsPath.Index(i).Child("name"), rJob.Name, schedulingUntargetedErrorMsg))
 		}
-	}
-
-	if podGroupTemplates > schedulingv1beta1.WorkloadMaxPodGroupTemplates {
-		allErrs = append(allErrs, field.Invalid(schedulingPath.Child("replicatedJobs"), podGroupTemplates,
-			fmt.Sprintf(schedulingTooManyPodGroupTemplatesErrorMsg, schedulingv1beta1.WorkloadMaxPodGroupTemplates)))
 	}
 	return allErrs
 }

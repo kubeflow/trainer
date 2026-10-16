@@ -286,6 +286,8 @@ type ReplicatedJobScheduling struct {
 	// one ReplicatedJob name and the level 2 schedulingPolicy, schedulingConstraints, and
 	// disruptionMode fields must not be set, since they configure a shared PodGroup that the
 	// job field replaces with one PodGroup per Job.
+	// Currently, the targeted ReplicatedJob must have at most 1 replica, since a distinct PodGroup
+	// can't be assigned to the Pods of each replica before k8s v1.38.
 	// +optional
 	Job *JobScheduling `json:"job,omitempty"`
 }

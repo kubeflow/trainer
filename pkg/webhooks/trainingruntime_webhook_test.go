@@ -329,20 +329,16 @@ func TestValidateScheduling(t *testing.T) {
 				field.Invalid(rJobsPath.Index(2).Child("name"), "", ""),
 			},
 		},
-		"Job-level scheduling resolves to the maximum number of PodGroupTemplates": {
+		"Job-level scheduling targeting a ReplicatedJob with one replica": {
 			enableWAS: true,
-			newSpec: func() *trainer.TrainingRuntimeSpec {
-				spec := runtimeSpec(&trainer.TrainingRuntimeScheduling{
-					ReplicatedJobs: []trainer.ReplicatedJobScheduling{
-						{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
-						{TargetReplicatedJobs: []string{constants.Node}, Job: &trainer.JobScheduling{}},
-					},
-				})
-				spec.Template.Spec.ReplicatedJobs[2].Replicas = 7
-				return spec
-			}(),
+			newSpec: runtimeSpec(&trainer.TrainingRuntimeScheduling{
+				ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+					{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+					{TargetReplicatedJobs: []string{constants.Node}, Job: &trainer.JobScheduling{}},
+				},
+			}),
 		},
-		"Job-level scheduling resolves to more PodGroupTemplates than the Workload allows": {
+		"Job-level scheduling targeting a ReplicatedJob with more than one replica": {
 			enableWAS: true,
 			newSpec: func() *trainer.TrainingRuntimeSpec {
 				spec := runtimeSpec(&trainer.TrainingRuntimeScheduling{
@@ -351,11 +347,11 @@ func TestValidateScheduling(t *testing.T) {
 						{TargetReplicatedJobs: []string{constants.Node}, Job: &trainer.JobScheduling{}},
 					},
 				})
-				spec.Template.Spec.ReplicatedJobs[2].Replicas = 8
+				spec.Template.Spec.ReplicatedJobs[2].Replicas = 2
 				return spec
 			}(),
 			wantError: field.ErrorList{
-				field.Invalid(schedulingPath.Child("replicatedJobs"), "", ""),
+				field.Invalid(schedulingPath.Child("replicatedJobs").Index(1).Child("job"), "", ""),
 			},
 		},
 	}
