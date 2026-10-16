@@ -792,3 +792,29 @@ func TestFindContainerByName(t *testing.T) {
 		})
 	}
 }
+
+func TestFindByName(t *testing.T) {
+	podSets := PodSets{
+		{Name: constants.DatasetInitializer, Count: ptr.To[int32](1)},
+		{Name: constants.Node, Count: ptr.To[int32](4)},
+	}
+	cases := map[string]struct {
+		name       string
+		wantPodSet *PodSet
+	}{
+		"PodSet exists": {
+			name:       constants.Node,
+			wantPodSet: &PodSet{Name: constants.Node, Count: ptr.To[int32](4)},
+		},
+		"PodSet does not exist": {
+			name: constants.Launcher,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if diff := cmp.Diff(tc.wantPodSet, podSets.FindByName(tc.name)); len(diff) != 0 {
+				t.Errorf("Unexpected PodSet (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}

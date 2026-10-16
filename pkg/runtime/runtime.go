@@ -266,6 +266,14 @@ func (ps PodSets) FindByAncestor(ancestor string) *PodSet {
 	return nil
 }
 
+// FindByName finds the PodSet with the given name, which is the name of its ReplicatedJob.
+func (ps PodSets) FindByName(name string) *PodSet {
+	if idx := slices.IndexFunc(ps, func(p PodSet) bool { return p.Name == name }); idx != -1 {
+		return &ps[idx]
+	}
+	return nil
+}
+
 func RuntimeRefToRuntimeRegistryKey(runtimeRef trainer.RuntimeRef) string {
 	return schema.GroupKind{
 		Group: ptr.Deref(runtimeRef.APIGroup, ""),

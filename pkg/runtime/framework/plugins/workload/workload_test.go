@@ -18,6 +18,7 @@ package workload
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -25,11 +26,18 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -39,86 +47,167 @@ import (
 )
 
 func TestWorkload(t *testing.T) {
-	trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj()
-
 	cases := map[string]struct {
-		trainJob   *trainer.TrainJob
-		info       *runtime.Info
-		expectInfo *runtime.Info
+		trainJob         *trainer.TrainJob
+		info             *runtime.Info
+		objs             []client.Object
+		expectInfo       *runtime.Info
+		expectObjs       []apiruntime.Object
+		expectBuildError error
 	}{
 		"no action when info is nil": {
-			trainJob: trainJob,
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj(),
 		},
 		"no action when trainJob is nil": {
 			info: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
 				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{{Name: constants.Node}},
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](1)}},
 				},
 			},
 			expectInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
 				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{{Name: constants.Node}},
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](1)}},
 				},
 			},
 		},
 		"no action when the runtime does not set scheduling": {
-			trainJob: trainJob,
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj(),
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{{Name: constants.Node}},
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](1)}},
 				},
 			},
 			expectInfo: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{{Name: constants.Node}},
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](1)}},
 				},
 			},
 		},
-		"TrainJob-level scheduling assigns every PodSet to one PodGroup": {
-			trainJob: trainJob,
+		"TrainJob-level gang scheduling builds one Workload and PodGroup for every Pod": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj(),
 			info: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
 				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+						jobsetv1alpha2ac.ReplicatedJob().WithName("sidecar").WithReplicas(2).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(1).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+					),
 					PodSets: []runtime.PodSet{
-						{Name: constants.DatasetInitializer},
-						{Name: constants.Node},
+						{Name: "sidecar", Count: ptr.To[int32](1)},
+						{Name: constants.Node, Count: ptr.To[int32](2)},
 					},
 				},
 			},
 			expectInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
 				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+						jobsetv1alpha2ac.ReplicatedJob().WithName("sidecar").WithReplicas(2).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(1).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+					),
 					PodSets: []runtime.PodSet{
 						{
-							Name:            constants.DatasetInitializer,
-							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName(podGroupName(trainJob, "test-job")),
+							Name:            "sidecar",
+							Count:           ptr.To[int32](1),
+							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-b6ff97ef4e"),
 						},
 						{
 							Name:            constants.Node,
-							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName(podGroupName(trainJob, "test-job")),
+							Count:           ptr.To[int32](2),
+							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-b6ff97ef4e"),
 						},
 					},
 				},
 			},
+			expectObjs: []apiruntime.Object{
+				&schedulingv1beta1.Workload{
+					TypeMeta: metav1.TypeMeta{APIVersion: schedulingv1beta1.SchemeGroupVersion.String(), Kind: "Workload"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+					Spec: schedulingv1beta1.WorkloadSpec{
+						ControllerRef: &schedulingv1beta1.TypedLocalObjectReference{
+							APIGroup: trainer.GroupVersion.Group,
+							Kind:     trainer.TrainJobKind,
+							Name:     "test-job",
+						},
+						PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{
+							{Name: "test-job", SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4}}},
+						},
+					},
+				},
+				&schedulingv1beta1.PodGroup{
+					TypeMeta: metav1.TypeMeta{APIVersion: schedulingv1beta1.SchemeGroupVersion.String(), Kind: "PodGroup"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b-b6ff97ef4e",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+					Spec: schedulingv1beta1.PodGroupSpec{
+						WorkloadRef:      &schedulingv1beta1.WorkloadReference{WorkloadName: "test-job-e2577dd78b", TemplateName: "test-job"},
+						SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4}},
+					},
+				},
+			},
 		},
-		"per-ReplicatedJob scheduling assigns every entry to its own PodGroup": {
-			trainJob: trainJob,
+		"per-ReplicatedJob scheduling builds one PodGroup for every entry": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj(),
 			info: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
 					Scheduling: &trainer.TrainingRuntimeScheduling{
 						ReplicatedJobs: []trainer.ReplicatedJobScheduling{
-							{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
-							{TargetReplicatedJobs: []string{constants.Node}},
+							{
+								TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer},
+								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+									Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+								},
+							},
+							{
+								TargetReplicatedJobs: []string{constants.Node},
+								SchedulingConstraints: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints{
+									Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/rack"}},
+								},
+							},
 						},
 					},
 				},
 				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.DatasetInitializer).WithReplicas(1).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.ModelInitializer).WithReplicas(1).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(1).
+							WithDependsOn(jobsetv1alpha2ac.DependsOn().WithName(constants.DatasetInitializer).WithStatus(jobsetv1alpha2.DependencyComplete)).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().
+								WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec().WithPriorityClassName("high-priority"))))),
+					),
 					PodSets: []runtime.PodSet{
-						{Name: constants.DatasetInitializer},
-						{Name: constants.ModelInitializer},
-						{Name: constants.Node},
+						{Name: constants.DatasetInitializer, Count: ptr.To[int32](1)},
+						{Name: constants.ModelInitializer, Count: ptr.To[int32](1)},
+						{Name: constants.Node, Count: ptr.To[int32](4)},
 					},
 				},
 			},
@@ -126,60 +215,443 @@ func TestWorkload(t *testing.T) {
 				RuntimePolicy: runtime.RuntimePolicy{
 					Scheduling: &trainer.TrainingRuntimeScheduling{
 						ReplicatedJobs: []trainer.ReplicatedJobScheduling{
-							{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
-							{TargetReplicatedJobs: []string{constants.Node}},
+							{
+								TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer},
+								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+									Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+								},
+							},
+							{
+								TargetReplicatedJobs: []string{constants.Node},
+								SchedulingConstraints: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints{
+									Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/rack"}},
+								},
+							},
 						},
 					},
 				},
 				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.DatasetInitializer).WithReplicas(1).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.ModelInitializer).WithReplicas(1).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(1).
+							WithDependsOn(jobsetv1alpha2ac.DependsOn().WithName(constants.DatasetInitializer).WithStatus(jobsetv1alpha2.DependencyComplete)).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().
+								WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec().WithPriorityClassName("high-priority"))))),
+					),
 					PodSets: []runtime.PodSet{
 						{
 							Name:            constants.DatasetInitializer,
-							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName(podGroupName(trainJob, "0-dataset-initializer-model-initializer")),
+							Count:           ptr.To[int32](1),
+							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-0-dataset-initializer-model-init-8cb2fda4f5"),
 						},
 						{
 							Name:            constants.ModelInitializer,
-							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName(podGroupName(trainJob, "0-dataset-initializer-model-initializer")),
+							Count:           ptr.To[int32](1),
+							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-0-dataset-initializer-model-init-8cb2fda4f5"),
 						},
 						{
 							Name:            constants.Node,
-							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName(podGroupName(trainJob, "1-node")),
+							Count:           ptr.To[int32](4),
+							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-1-node-cc90ebe740"),
 						},
 					},
 				},
 			},
+			expectObjs: []apiruntime.Object{
+				&schedulingv1beta1.Workload{
+					TypeMeta: metav1.TypeMeta{APIVersion: schedulingv1beta1.SchemeGroupVersion.String(), Kind: "Workload"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+					Spec: schedulingv1beta1.WorkloadSpec{
+						ControllerRef: &schedulingv1beta1.TypedLocalObjectReference{
+							APIGroup: trainer.GroupVersion.Group,
+							Kind:     trainer.TrainJobKind,
+							Name:     "test-job",
+						},
+						PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{
+							{Name: "0-dataset-initializer-model-initializer", SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Basic: &schedulingv1beta1.BasicSchedulingPolicy{}}},
+							{
+								Name:             "1-node",
+								SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4}},
+								SchedulingConstraints: &schedulingv1beta1.PodGroupSchedulingConstraints{
+									Topology: []schedulingv1beta1.TopologyConstraint{{Key: "topology.kubernetes.io/rack"}},
+								},
+								PriorityClassName: "high-priority",
+							},
+						},
+					},
+				},
+				&schedulingv1beta1.PodGroup{
+					TypeMeta: metav1.TypeMeta{APIVersion: schedulingv1beta1.SchemeGroupVersion.String(), Kind: "PodGroup"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b-0-dataset-initializer-model-init-8cb2fda4f5",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+					Spec: schedulingv1beta1.PodGroupSpec{
+						WorkloadRef:      &schedulingv1beta1.WorkloadReference{WorkloadName: "test-job-e2577dd78b", TemplateName: "0-dataset-initializer-model-initializer"},
+						SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Basic: &schedulingv1beta1.BasicSchedulingPolicy{}},
+					},
+				},
+				&schedulingv1beta1.PodGroup{
+					TypeMeta: metav1.TypeMeta{APIVersion: schedulingv1beta1.SchemeGroupVersion.String(), Kind: "PodGroup"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b-1-node-cc90ebe740",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+					Spec: schedulingv1beta1.PodGroupSpec{
+						WorkloadRef:      &schedulingv1beta1.WorkloadReference{WorkloadName: "test-job-e2577dd78b", TemplateName: "1-node"},
+						SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4}},
+						SchedulingConstraints: &schedulingv1beta1.PodGroupSchedulingConstraints{
+							Topology: []schedulingv1beta1.TopologyConstraint{{Key: "topology.kubernetes.io/rack"}},
+						},
+						PriorityClassName: "high-priority",
+					},
+				},
+			},
 		},
-		"Job-level scheduling assigns the Job of the ReplicatedJob to its own PodGroup": {
-			trainJob: trainJob,
+		"ReplicatedJob depending on another target of the same entry is excluded from minCount": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj(),
 			info: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
 					Scheduling: &trainer.TrainingRuntimeScheduling{
 						ReplicatedJobs: []trainer.ReplicatedJobScheduling{
-							{TargetReplicatedJobs: []string{constants.Node}, Job: &trainer.JobScheduling{}},
+							{TargetReplicatedJobs: []string{constants.Launcher, constants.Node}},
 						},
 					},
 				},
 				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{{Name: constants.Node}},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(1).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Launcher).WithReplicas(1).
+							WithDependsOn(jobsetv1alpha2ac.DependsOn().WithName(constants.Node).WithStatus(jobsetv1alpha2.DependencyReady)).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+					),
+					PodSets: []runtime.PodSet{
+						{Name: constants.Node, Count: ptr.To[int32](3)},
+						{Name: constants.Launcher, Count: ptr.To[int32](1)},
+					},
 				},
 			},
 			expectInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
 					Scheduling: &trainer.TrainingRuntimeScheduling{
 						ReplicatedJobs: []trainer.ReplicatedJobScheduling{
-							{TargetReplicatedJobs: []string{constants.Node}, Job: &trainer.JobScheduling{}},
+							{TargetReplicatedJobs: []string{constants.Launcher, constants.Node}},
 						},
 					},
 				},
 				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(1).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Launcher).WithReplicas(1).
+							WithDependsOn(jobsetv1alpha2ac.DependsOn().WithName(constants.Node).WithStatus(jobsetv1alpha2.DependencyReady)).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+					),
 					PodSets: []runtime.PodSet{
 						{
 							Name:            constants.Node,
-							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName(podGroupName(trainJob, "node-0")),
+							Count:           ptr.To[int32](3),
+							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-0-launcher-node-e4613efea6"),
+						},
+						{
+							Name:            constants.Launcher,
+							Count:           ptr.To[int32](1),
+							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-0-launcher-node-e4613efea6"),
 						},
 					},
 				},
 			},
+			expectObjs: []apiruntime.Object{
+				&schedulingv1beta1.Workload{
+					TypeMeta: metav1.TypeMeta{APIVersion: schedulingv1beta1.SchemeGroupVersion.String(), Kind: "Workload"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+					Spec: schedulingv1beta1.WorkloadSpec{
+						ControllerRef: &schedulingv1beta1.TypedLocalObjectReference{
+							APIGroup: trainer.GroupVersion.Group,
+							Kind:     trainer.TrainJobKind,
+							Name:     "test-job",
+						},
+						PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{
+							{Name: "0-launcher-node", SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 3}}},
+						},
+					},
+				},
+				&schedulingv1beta1.PodGroup{
+					TypeMeta: metav1.TypeMeta{APIVersion: schedulingv1beta1.SchemeGroupVersion.String(), Kind: "PodGroup"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b-0-launcher-node-e4613efea6",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+					Spec: schedulingv1beta1.PodGroupSpec{
+						WorkloadRef:      &schedulingv1beta1.WorkloadReference{WorkloadName: "test-job-e2577dd78b", TemplateName: "0-launcher-node"},
+						SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 3}},
+					},
+				},
+			},
+		},
+		"Job-level scheduling builds the PodGroup of the Job": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj(),
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{
+						ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+							{
+								TargetReplicatedJobs: []string{constants.Node},
+								Job: &trainer.JobScheduling{
+									DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
+										All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+									},
+									ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
+										Name:                      "tpu-slice",
+										ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+									}},
+								},
+							},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(1).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+					),
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](4)}},
+				},
+			},
+			expectInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{
+						ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+							{
+								TargetReplicatedJobs: []string{constants.Node},
+								Job: &trainer.JobScheduling{
+									DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
+										All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+									},
+									ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
+										Name:                      "tpu-slice",
+										ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+									}},
+								},
+							},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(1).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+					),
+					PodSets: []runtime.PodSet{
+						{
+							Name:            constants.Node,
+							Count:           ptr.To[int32](4),
+							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-node-0-baa3c64c89"),
+						},
+					},
+				},
+			},
+			expectObjs: []apiruntime.Object{
+				&schedulingv1beta1.Workload{
+					TypeMeta: metav1.TypeMeta{APIVersion: schedulingv1beta1.SchemeGroupVersion.String(), Kind: "Workload"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+					Spec: schedulingv1beta1.WorkloadSpec{
+						ControllerRef: &schedulingv1beta1.TypedLocalObjectReference{
+							APIGroup: trainer.GroupVersion.Group,
+							Kind:     trainer.TrainJobKind,
+							Name:     "test-job",
+						},
+						PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{
+							{
+								Name:             "node-0",
+								SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4}},
+								DisruptionMode:   &schedulingv1beta1.DisruptionMode{All: &schedulingv1beta1.AllDisruptionMode{}},
+								ResourceClaims: []schedulingv1beta1.PodGroupResourceClaim{{
+									Name:                      "tpu-slice",
+									ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+								}},
+							},
+						},
+					},
+				},
+				&schedulingv1beta1.PodGroup{
+					TypeMeta: metav1.TypeMeta{APIVersion: schedulingv1beta1.SchemeGroupVersion.String(), Kind: "PodGroup"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b-node-0-baa3c64c89",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+					Spec: schedulingv1beta1.PodGroupSpec{
+						WorkloadRef:      &schedulingv1beta1.WorkloadReference{WorkloadName: "test-job-e2577dd78b", TemplateName: "node-0"},
+						SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4}},
+						DisruptionMode:   &schedulingv1beta1.DisruptionMode{All: &schedulingv1beta1.AllDisruptionMode{}},
+						ResourceClaims: []schedulingv1beta1.PodGroupResourceClaim{{
+							Name:                      "tpu-slice",
+							ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+						}},
+					},
+				},
+			},
+		},
+		"existing Workload and PodGroup are not updated": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj(),
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](2)}},
+				},
+			},
+			objs: []client.Object{
+				&schedulingv1beta1.Workload{ObjectMeta: metav1.ObjectMeta{Name: "test-job-e2577dd78b", Namespace: metav1.NamespaceDefault}},
+				&schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "test-job-e2577dd78b-b6ff97ef4e", Namespace: metav1.NamespaceDefault}},
+			},
+			expectInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:            constants.Node,
+							Count:           ptr.To[int32](2),
+							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-b6ff97ef4e"),
+						},
+					},
+				},
+			},
+		},
+		"missing PodGroup is built when the Workload exists": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj(),
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](2)}},
+				},
+			},
+			objs: []client.Object{
+				&schedulingv1beta1.Workload{ObjectMeta: metav1.ObjectMeta{Name: "test-job-e2577dd78b", Namespace: metav1.NamespaceDefault}},
+			},
+			expectInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:            constants.Node,
+							Count:           ptr.To[int32](2),
+							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-b6ff97ef4e"),
+						},
+					},
+				},
+			},
+			expectObjs: []apiruntime.Object{
+				&schedulingv1beta1.PodGroup{
+					TypeMeta: metav1.TypeMeta{APIVersion: schedulingv1beta1.SchemeGroupVersion.String(), Kind: "PodGroup"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b-b6ff97ef4e",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+					Spec: schedulingv1beta1.PodGroupSpec{
+						WorkloadRef:      &schedulingv1beta1.WorkloadReference{WorkloadName: "test-job-e2577dd78b", TemplateName: "test-job"},
+						SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 2}},
+					},
+				},
+			},
+		},
+		"error when getting existing Workload": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj(),
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](2)}},
+				},
+			},
+			expectInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:            constants.Node,
+							Count:           ptr.To[int32](2),
+							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-b6ff97ef4e"),
+						},
+					},
+				},
+			},
+			expectBuildError: errors.New("error when getting existing Workload"),
 		},
 	}
 	for name, c := range cases {
@@ -188,16 +660,39 @@ func TestWorkload(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			t.Cleanup(cancel)
 
-			plugin, err := New(ctx, utiltesting.NewClientBuilder().Build(), nil, nil)
+			clientBuilder := utiltesting.NewClientBuilder().WithObjects(c.objs...)
+			if c.expectBuildError != nil {
+				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(context.Context, client.WithWatch, client.ObjectKey, client.Object, ...client.GetOption) error {
+						return c.expectBuildError
+					},
+				})
+			}
+			cli := clientBuilder.Build()
+			plugin, err := New(ctx, cli, utiltesting.AsIndex(clientBuilder), nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize Workload plugin: %v", err)
 			}
 
+			// Test EnforceScheduling
 			if err := plugin.(framework.EnforceSchedulingPlugin).EnforceScheduling(c.info, c.trainJob); err != nil {
 				t.Fatalf("Unexpected error from EnforceScheduling: %v", err)
 			}
 			if diff := cmp.Diff(c.expectInfo, c.info); len(diff) != 0 {
 				t.Errorf("Unexpected info from EnforceScheduling (-want, +got): %s", diff)
+			}
+
+			// Test Build
+			objs, err := plugin.(framework.ComponentBuilderPlugin).Build(ctx, c.info, c.trainJob)
+			if diff := cmp.Diff(c.expectBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)
+			}
+			typedObjs, err := utiltesting.ToObject(cli.Scheme(), objs...)
+			if err != nil {
+				t.Fatalf("Failed to convert objects: %v", err)
+			}
+			if diff := cmp.Diff(c.expectObjs, typedObjs); len(diff) != 0 {
+				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -546,5 +1041,38 @@ func TestHashedName(t *testing.T) {
 func TestNameHash(t *testing.T) {
 	if got, want := nameHash("uid"), "e2577dd78b"; got != want {
 		t.Errorf("Unexpected name hash: got %q, want %q", got, want)
+	}
+}
+
+func TestFindReplicatedJob(t *testing.T) {
+	cases := map[string]struct {
+		jobSetSpec *jobsetv1alpha2ac.JobSetSpecApplyConfiguration
+		name       string
+		wantRJob   *jobsetv1alpha2ac.ReplicatedJobApplyConfiguration
+	}{
+		"ReplicatedJob exists": {
+			jobSetSpec: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+				jobsetv1alpha2ac.ReplicatedJob().WithName(constants.DatasetInitializer),
+				jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(2),
+			),
+			name:     constants.Node,
+			wantRJob: jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(2),
+		},
+		"ReplicatedJob does not exist": {
+			jobSetSpec: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+				jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node),
+			),
+			name: constants.Launcher,
+		},
+		"JobSet spec is nil": {
+			name: constants.Node,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if diff := cmp.Diff(tc.wantRJob, findReplicatedJob(tc.jobSetSpec, tc.name)); len(diff) != 0 {
+				t.Errorf("Unexpected ReplicatedJob (-want,+got):\n%s", diff)
+			}
+		})
 	}
 }
