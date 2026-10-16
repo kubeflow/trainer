@@ -1073,23 +1073,31 @@ following the existing Extensions Framework pattern used by Coscheduling and Vol
 registered when the `TrainJobWorkloadAwareScheduling` feature gate is enabled, and is a no-op for
 runtimes that do not set `spec.scheduling`.
 
-The plugin implements the following framework interfaces, in pipeline order. No new extension
-point is added: the plugin combines `EnforcePodSpecPlugin` and `ComponentBuilderPlugin` the same
-way the TrainJobStatus plugin does.
+The plugin implements the following framework interfaces, in pipeline order.
 
-#### EnforcePodSpec Phase
+#### EnforceScheduling Phase
 
-Enforcement only has to set one field on the Pod spec of every scheduling group:
+A new `EnforceSchedulingPlugin` extension point configures the parameters declared in the runtime
+`.spec.scheduling` on the `runtime.Info` object.
+
+```go
+type EnforceSchedulingPlugin interface {
+    Plugin
+    EnforceScheduling(info *runtime.Info, trainJob *trainer.TrainJob) error
+}
+```
+
+`RunEnforceSchedulingPlugins` runs after `RunEnforceMLPolicyPlugins` and
+`RunEnforcePodGroupPolicyPlugins` and before `RunEnforcePodSpecPlugins`, so the PodSet counts that
+Gang `minCount` is derived from are final by the time this plugin runs. The plugin sets the
+`SchedulingGroup` of every PodSet, and the Pod and container `ResourceClaims` of the PodSets
+targeted by `job.resourceClaims`. The JobSet plugin propagates them to the Pod spec:
 
 ```yaml
 spec:
   schedulingGroup:
     podGroupName: <workload-name>-<hash>
 ```
-
-`RunEnforcePodSpecPlugins` already runs after `RunEnforceMLPolicyPlugins` and
-`RunEnforcePodGroupPolicyPlugins` and before `RunPreComponentBuilderPlugins`, so the PodSet counts
-that Gang `minCount` is derived from are final by the time this plugin runs:
 
 #### Build Phase
 
@@ -1211,14 +1219,14 @@ In `pkg/runtime/framework/plugins/workload`:
 - Naming patterns conform to [Naming Conventions](#naming-conventions) and respect length
   limits, including truncation for long TrainJob and ReplicatedJob names and distinct names per
   replica in level 3.
-- `EnforcePodSpec` sets the expected `SchedulingGroupName` on every PodSet, including the case
+- `EnforceScheduling` sets the expected `SchedulingGroup` on every PodSet, including the case
   where different ReplicatedJobs belong to different groups.
 
 In `pkg/runtime/framework/core`:
 
-- `RunEnforcePodSpecPlugins` passes the whole `Info` object to every registered
-  `EnforcePodSpecPlugin`, and the existing TrainJobStatus expectations still hold after the
-  signature change.
+- `RunEnforceSchedulingPlugins` passes the `Info` object to every registered
+  `EnforceSchedulingPlugin`, and `RuntimeInfo` runs it after `RunEnforcePodGroupPolicyPlugins` and
+  before `RunEnforcePodSpecPlugins`.
 
 In `pkg/webhooks`:
 

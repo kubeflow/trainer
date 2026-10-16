@@ -672,3 +672,91 @@ func TestFromTypedObjWithFields(t *testing.T) {
 		})
 	}
 }
+
+func TestUpsertPodResourceClaims(t *testing.T) {
+	cases := map[string]struct {
+		existing []corev1ac.PodResourceClaimApplyConfiguration
+		toUpsert []corev1ac.PodResourceClaimApplyConfiguration
+		want     []corev1ac.PodResourceClaimApplyConfiguration
+	}{
+		"update existing resource claim": {
+			existing: []corev1ac.PodResourceClaimApplyConfiguration{
+				*corev1ac.PodResourceClaim().WithName("gpu").WithResourceClaimTemplateName("old-template"),
+			},
+			toUpsert: []corev1ac.PodResourceClaimApplyConfiguration{
+				*corev1ac.PodResourceClaim().WithName("gpu").WithResourceClaimTemplateName("new-template"),
+			},
+			want: []corev1ac.PodResourceClaimApplyConfiguration{
+				*corev1ac.PodResourceClaim().WithName("gpu").WithResourceClaimTemplateName("new-template"),
+			},
+		},
+		"insert new resource claim": {
+			existing: []corev1ac.PodResourceClaimApplyConfiguration{
+				*corev1ac.PodResourceClaim().WithName("gpu").WithResourceClaimTemplateName("gpu-template"),
+			},
+			toUpsert: []corev1ac.PodResourceClaimApplyConfiguration{
+				*corev1ac.PodResourceClaim().WithName("tpu-slice").WithResourceClaimTemplateName("tpu-slice-template"),
+			},
+			want: []corev1ac.PodResourceClaimApplyConfiguration{
+				*corev1ac.PodResourceClaim().WithName("gpu").WithResourceClaimTemplateName("gpu-template"),
+				*corev1ac.PodResourceClaim().WithName("tpu-slice").WithResourceClaimTemplateName("tpu-slice-template"),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			claims := make([]corev1ac.PodResourceClaimApplyConfiguration, len(tc.existing))
+			copy(claims, tc.existing)
+			UpsertPodResourceClaims(&claims, tc.toUpsert...)
+			if diff := cmp.Diff(tc.want, claims); diff != "" {
+				t.Errorf("Unexpected Pod resource claims (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestUpsertResourceClaims(t *testing.T) {
+	cases := map[string]struct {
+		existing []corev1ac.ResourceClaimApplyConfiguration
+		toUpsert []corev1ac.ResourceClaimApplyConfiguration
+		want     []corev1ac.ResourceClaimApplyConfiguration
+	}{
+		"existing resource claim is not duplicated": {
+			existing: []corev1ac.ResourceClaimApplyConfiguration{
+				*corev1ac.ResourceClaim().WithName("gpu"),
+			},
+			toUpsert: []corev1ac.ResourceClaimApplyConfiguration{
+				*corev1ac.ResourceClaim().WithName("gpu"),
+			},
+			want: []corev1ac.ResourceClaimApplyConfiguration{
+				*corev1ac.ResourceClaim().WithName("gpu"),
+			},
+		},
+		"resource claim with a different request is inserted": {
+			existing: []corev1ac.ResourceClaimApplyConfiguration{
+				*corev1ac.ResourceClaim().WithName("gpu").WithRequest("first"),
+			},
+			toUpsert: []corev1ac.ResourceClaimApplyConfiguration{
+				*corev1ac.ResourceClaim().WithName("gpu").WithRequest("second"),
+				*corev1ac.ResourceClaim().WithName("tpu-slice"),
+			},
+			want: []corev1ac.ResourceClaimApplyConfiguration{
+				*corev1ac.ResourceClaim().WithName("gpu").WithRequest("first"),
+				*corev1ac.ResourceClaim().WithName("gpu").WithRequest("second"),
+				*corev1ac.ResourceClaim().WithName("tpu-slice"),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			claims := make([]corev1ac.ResourceClaimApplyConfiguration, len(tc.existing))
+			copy(claims, tc.existing)
+			UpsertResourceClaims(&claims, tc.toUpsert...)
+			if diff := cmp.Diff(tc.want, claims); diff != "" {
+				t.Errorf("Unexpected container resource claims (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

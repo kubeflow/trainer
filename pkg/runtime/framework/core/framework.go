@@ -41,6 +41,7 @@ type Framework struct {
 	plugins                      map[string]framework.Plugin
 	enforceMLPlugins             []framework.EnforceMLPolicyPlugin
 	enforcePodGroupPolicyPlugins []framework.EnforcePodGroupPolicyPlugin
+	enforceSchedulingPlugins     []framework.EnforceSchedulingPlugin
 	enforcePodSpecPlugins        []framework.EnforcePodSpecPlugin
 	customValidationPlugins      []framework.CustomValidationPlugin
 	watchExtensionPlugins        []framework.WatchExtensionPlugin
@@ -79,6 +80,9 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 		}
 		if p, ok := plugin.(framework.EnforcePodGroupPolicyPlugin); ok {
 			f.enforcePodGroupPolicyPlugins = append(f.enforcePodGroupPolicyPlugins, p)
+		}
+		if p, ok := plugin.(framework.EnforceSchedulingPlugin); ok {
+			f.enforceSchedulingPlugins = append(f.enforceSchedulingPlugins, p)
 		}
 		if p, ok := plugin.(framework.EnforcePodSpecPlugin); ok {
 			f.enforcePodSpecPlugins = append(f.enforcePodSpecPlugins, p)
@@ -126,6 +130,21 @@ func (f *Framework) RunEnforceMLPolicyPlugins(info *runtime.Info, trainJob *trai
 func (f *Framework) RunEnforcePodGroupPolicyPlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	for _, plugin := range f.enforcePodGroupPolicyPlugins {
 		if err := plugin.EnforcePodGroupPolicy(info, trainJob); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RunEnforceSchedulingPlugins configures the Workload-Aware Scheduling parameters declared in the
+// runtime `.spec.scheduling` on the Info object. It must run after RunEnforceMLPolicyPlugins, which
+// can still adjust the PodSet counts.
+func (f *Framework) RunEnforceSchedulingPlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
+	if info == nil {
+		return nil
+	}
+	for _, plugin := range f.enforceSchedulingPlugins {
+		if err := plugin.EnforceScheduling(info, trainJob); err != nil {
 			return err
 		}
 	}

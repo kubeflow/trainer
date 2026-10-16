@@ -535,6 +535,10 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 
 	for psIdx, ps := range info.TemplateSpec.PodSets {
 		apply.UpsertVolumes(&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Volumes, ps.Volumes...)
+		if ps.SchedulingGroup != nil {
+			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.SchedulingGroup = ps.SchedulingGroup
+		}
+		apply.UpsertPodResourceClaims(&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.ResourceClaims, ps.ResourceClaims...)
 		for containerIdx, container := range ps.Containers {
 			if len(container.Command) > 0 {
 				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Command = container.Command
@@ -554,6 +558,7 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 				&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].VolumeMounts,
 				container.VolumeMounts...,
 			)
+			upsertContainerResourceClaims(&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx], container.ResourceClaims...)
 		}
 		initContainers := jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers
 		for containerIdx, container := range ps.InitContainers {
@@ -585,6 +590,7 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 				&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].VolumeMounts,
 				container.VolumeMounts...,
 			)
+			upsertContainerResourceClaims(&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx], container.ResourceClaims...)
 		}
 	}
 
@@ -649,4 +655,15 @@ func (j *JobSet) Status(ctx context.Context, trainJob *trainer.TrainJob) (*train
 	status.JobsStatus = statuses
 
 	return status, nil
+}
+
+// upsertContainerResourceClaims upserts the DRA resource claims into the container resources.claims.
+func upsertContainerResourceClaims(container *corev1ac.ContainerApplyConfiguration, claims ...corev1ac.ResourceClaimApplyConfiguration) {
+	if len(claims) == 0 {
+		return
+	}
+	if container.Resources == nil {
+		container.Resources = corev1ac.ResourceRequirements()
+	}
+	apply.UpsertResourceClaims(&container.Resources.Claims, claims...)
 }

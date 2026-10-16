@@ -123,8 +123,8 @@ func (r *TrainingRuntime) DeleteObjects(ctx context.Context, trainJob *trainer.T
 
 // RuntimeInfo builds the Info object for a TrainJob and consolidates it through the
 // Build Phase extension points, in this order:
-//  1. EnforceMLPolicy, then EnforcePodGroupPolicy, for the parameters declared in the
-//     runtime `.spec.mlPolicy` and `.spec.podGroupPolicy`.
+//  1. EnforceMLPolicy, then EnforcePodGroupPolicy, then EnforceScheduling, for the parameters
+//     declared in the runtime `.spec.mlPolicy`, `.spec.podGroupPolicy`, and `.spec.scheduling`.
 //  2. EnforcePodSpec, for the PodSet concerns enabled outside of MLPolicy and PodGroupPolicy APIs.
 //  3. PreBuildSync, which consolidates the Info object with the concrete runtime template.
 func (r *TrainingRuntime) RuntimeInfo(
@@ -144,6 +144,9 @@ func (r *TrainingRuntime) RuntimeInfo(
 		return nil, err
 	}
 	if err = r.framework.RunEnforcePodGroupPolicyPlugins(info, trainJob); err != nil {
+		return nil, err
+	}
+	if err = r.framework.RunEnforceSchedulingPlugins(info, trainJob); err != nil {
 		return nil, err
 	}
 	if err = r.framework.RunEnforcePodSpecPlugins(info, trainJob); err != nil {

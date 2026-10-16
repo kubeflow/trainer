@@ -3512,6 +3512,100 @@ func TestBuild(t *testing.T) {
 				},
 			},
 		},
+		"scheduling group and resource claims synced to JobSet replicated jobs": {
+			info: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:            constants.Node,
+							Count:           ptr.To[int32](1),
+							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("pod-group"),
+							ResourceClaims: []corev1ac.PodResourceClaimApplyConfiguration{
+								*corev1ac.PodResourceClaim().WithName("tpu-slice").WithResourceClaimTemplateName("tpu-slice-template"),
+							},
+							InitContainers: []runtime.Container{{
+								Name: "preflight-check",
+								ResourceClaims: []corev1ac.ResourceClaimApplyConfiguration{
+									*corev1ac.ResourceClaim().WithName("tpu-slice"),
+								},
+							}},
+							Containers: []runtime.Container{{
+								Name: constants.Node,
+								ResourceClaims: []corev1ac.ResourceClaimApplyConfiguration{
+									*corev1ac.ResourceClaim().WithName("tpu-slice"),
+								},
+							}},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithResourceClaims(
+													corev1ac.PodResourceClaim().WithName("gpu").WithResourceClaimTemplateName("gpu-template"),
+												).
+												WithInitContainers(
+													corev1ac.Container().WithName("preflight-check"),
+												).
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Obj(),
+			wantObjs: []apiruntime.Object{
+				&jobsetv1alpha2.JobSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{
+							{APIVersion: trainer.GroupVersion.String(), Kind: trainer.TrainJobKind, Name: "test-job", Controller: ptr.To(true)},
+						},
+					},
+					Spec: jobsetv1alpha2.JobSetSpec{
+						ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+							{
+								Name: constants.Node,
+								Template: batchv1.JobTemplateSpec{
+									Spec: batchv1.JobSpec{
+										Template: corev1.PodTemplateSpec{
+											Spec: corev1.PodSpec{
+												SchedulingGroup: &corev1.PodSchedulingGroup{PodGroupName: ptr.To("pod-group")},
+												ResourceClaims: []corev1.PodResourceClaim{
+													{Name: "gpu", ResourceClaimTemplateName: ptr.To("gpu-template")},
+													{Name: "tpu-slice", ResourceClaimTemplateName: ptr.To("tpu-slice-template")},
+												},
+												InitContainers: []corev1.Container{{
+													Name:      "preflight-check",
+													Resources: corev1.ResourceRequirements{Claims: []corev1.ResourceClaim{{Name: "tpu-slice"}}},
+												}},
+												Containers: []corev1.Container{{
+													Name:      constants.Node,
+													Resources: corev1.ResourceRequirements{Claims: []corev1.ResourceClaim{{Name: "tpu-slice"}}},
+												}},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 		"init container with ports and volume mounts synced": {
 			info: &runtime.Info{
 				Labels:      make(map[string]string),

@@ -56,6 +56,13 @@ type EnforceMLPolicyPlugin interface {
 	EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error
 }
 
+// EnforceSchedulingPlugin configures the Workload-Aware Scheduling parameters declared in the
+// runtime `.spec.scheduling` on the Info object.
+type EnforceSchedulingPlugin interface {
+	Plugin
+	EnforceScheduling(info *runtime.Info, trainJob *trainer.TrainJob) error
+}
+
 // EnforcePodSpecPlugin mutates the PodSpec of a TrainJob's PodSets for
 // concerns that are not driven by MLPolicy or PodGroupPolicy APIs.
 type EnforcePodSpecPlugin interface {

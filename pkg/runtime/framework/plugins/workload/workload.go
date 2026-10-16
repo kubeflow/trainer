@@ -18,9 +18,16 @@ package workload
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
+	"fmt"
+	"slices"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -34,6 +41,12 @@ import (
 const (
 	Name = "Workload"
 
+	// maxNameLength is the maximum length of the generated Workload, PodGroupTemplate, and PodGroup
+	// names, which must be DNS labels.
+	maxNameLength = validation.DNS1123LabelMaxLength
+	// nameHashLength is the length of the hash in the generated names.
+	nameHashLength = 10
+
 	resourceClaimsErrorMsg = "must not be set when the runtime sets spec.scheduling.replicatedJobs[].job.resourceClaims"
 )
 
@@ -41,6 +54,7 @@ const (
 type Workload struct{}
 
 var _ framework.CustomValidationPlugin = (*Workload)(nil)
+var _ framework.EnforceSchedulingPlugin = (*Workload)(nil)
 
 func New(context.Context, client.Client, client.FieldIndexer, *configapi.Configuration) (framework.Plugin, error) {
 	return &Workload{}, nil
@@ -93,4 +107,82 @@ func hasJobResourceClaims(scheduling *trainer.TrainingRuntimeScheduling) bool {
 		}
 	}
 	return false
+}
+
+// EnforceScheduling assigns the Pods of every PodSet to the PodGroup of the scheduling group which
+// its ReplicatedJob belongs to.
+func (w *Workload) EnforceScheduling(info *runtime.Info, trainJob *trainer.TrainJob) error {
+	if info == nil || trainJob == nil || info.RuntimePolicy.Scheduling == nil {
+		return nil
+	}
+	for i, ps := range info.TemplateSpec.PodSets {
+		templateName, ok := podGroupTemplateName(trainJob, info.RuntimePolicy.Scheduling, ps.Name)
+		if !ok {
+			continue
+		}
+		info.TemplateSpec.PodSets[i].SchedulingGroup = corev1ac.PodSchedulingGroup().
+			WithPodGroupName(podGroupName(trainJob, templateName))
+	}
+	return nil
+}
+
+// workloadName returns the name of the Workload owned by the TrainJob.
+func workloadName(trainJob *trainer.TrainJob) string {
+	return hashedName(trainJob.Name, nameHash(string(trainJob.UID)))
+}
+
+// podGroupTemplateName returns the name of the PodGroupTemplate which the given ReplicatedJob
+// belongs to, or false when no replicatedJobs entry targets the ReplicatedJob.
+func podGroupTemplateName(trainJob *trainer.TrainJob, scheduling *trainer.TrainingRuntimeScheduling, rJobName string) (string, bool) {
+	if len(scheduling.ReplicatedJobs) == 0 {
+		return trainJob.Name, true
+	}
+	for i, entry := range scheduling.ReplicatedJobs {
+		if !slices.Contains(entry.TargetReplicatedJobs, rJobName) {
+			continue
+		}
+		if entry.Job != nil {
+			// The targeted ReplicatedJob has at most 1 replica, so its only Job has the index 0.
+			return boundedName(fmt.Sprintf("%s-%d", rJobName, 0)), true
+		}
+		// ReplicatedJob names can't start with a digit, so the entry index keeps the name unique.
+		return boundedName(fmt.Sprintf("%d-%s", i, strings.Join(entry.TargetReplicatedJobs, "-"))), true
+	}
+	return "", false
+}
+
+// podGroupName returns the name of the PodGroup materialized from the given PodGroupTemplate.
+// The TrainJob-level PodGroupTemplate is named after the TrainJob, so its redundant name segment
+// is omitted.
+func podGroupName(trainJob *trainer.TrainJob, templateName string) string {
+	wlName := workloadName(trainJob)
+	prefix := wlName
+	if templateName != trainJob.Name {
+		prefix = fmt.Sprintf("%s-%s", wlName, templateName)
+	}
+	return hashedName(prefix, nameHash(fmt.Sprintf("%s/%s", wlName, templateName)))
+}
+
+// boundedName returns the name if it fits into a DNS label, and a truncated hashed name otherwise.
+func boundedName(name string) string {
+	if len(name) <= maxNameLength {
+		return name
+	}
+	return hashedName(name, nameHash(name))
+}
+
+// hashedName appends "-<hash>" to the prefix, truncating the prefix so the name fits into a DNS
+// label while remaining deterministic and unique, since the hash encodes the full identity.
+func hashedName(prefix, hash string) string {
+	name := fmt.Sprintf("%s-%s", prefix, hash)
+	if len(name) <= maxNameLength {
+		return name
+	}
+	return fmt.Sprintf("%s-%s", prefix[:maxNameLength-1-len(hash)], hash)
+}
+
+// nameHash returns the hash of the identity used in the generated names.
+func nameHash(identity string) string {
+	hash := sha1.Sum([]byte(identity))
+	return hex.EncodeToString(hash[:])[:nameHashLength]
 }
