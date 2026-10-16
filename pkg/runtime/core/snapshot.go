@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,9 +36,15 @@ const (
 	runtimeDataKey        = "runtime"
 )
 
+// errorInvalidRuntimeSnapshot is wrapped by every error getRuntimeSnapshot returns because the
+// snapshot ConfigMap exists but cannot be used. It is not returned for failures to read the
+// ConfigMap, which may be transient and succeed on retry.
+var errorInvalidRuntimeSnapshot = errors.New("invalid runtime snapshot")
+
 // getRuntimeSnapshot retrieves the runtime snapshot from the ConfigMap and unmarshalls the value into runtimeObj.
-// Returns an error if the snapshot ConfigMap doesn't exist or if the data is invalid. The value of runtimeObj is
-// only valid if no error was returned.
+// Returns an error if the snapshot ConfigMap doesn't exist or if the data is invalid. Errors for invalid data
+// wrap errorInvalidRuntimeSnapshot; errors from reading the ConfigMap are returned unchanged. The value of
+// runtimeObj is only valid if no error was returned.
 func getRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.TrainJob, runtimeObj client.Object) error {
 	cm := &corev1.ConfigMap{}
 	cmKey := client.ObjectKey{
@@ -51,18 +58,18 @@ func getRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.
 
 	// Validate snapshot belongs to this TrainJob
 	if owner := metav1.GetControllerOf(cm); owner == nil || owner.UID != trainJob.UID {
-		return fmt.Errorf("invalid runtime snapshot: a snapshot configmap exists but is owned by another object")
+		return fmt.Errorf("%w: a snapshot configmap exists but is owned by another object", errorInvalidRuntimeSnapshot)
 	}
 
 	// Read the runtime data from ConfigMap
 	runtimeYAML, ok := cm.Data[runtimeDataKey]
 	if !ok {
-		return fmt.Errorf("invalid runtime snapshot: snapshot ConfigMap missing %q data key", runtimeDataKey)
+		return fmt.Errorf("%w: snapshot ConfigMap missing %q data key", errorInvalidRuntimeSnapshot, runtimeDataKey)
 	}
 
 	// Unmarshal YAML into the runtime type
 	if err := yaml.Unmarshal([]byte(runtimeYAML), runtimeObj); err != nil {
-		return fmt.Errorf("invalid runtime snapshot: unable to unmarshal the snapshot: %w", err)
+		return fmt.Errorf("%w: unable to unmarshal the snapshot: %w", errorInvalidRuntimeSnapshot, err)
 	}
 
 	// Validate snapshot matches expected RuntimeRef
@@ -81,7 +88,8 @@ func getRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.
 			expectedGroup = *trainJob.Spec.RuntimeRef.APIGroup
 		}
 		return fmt.Errorf(
-			"invalid runtime snapshot: the snapshot refers to the wrong runtime: expecting a runtime with name, api group and kind of %q, %q, %q but found runtime with name, api group and kind of %q, %q, %q",
+			"%w: the snapshot refers to the wrong runtime: expecting a runtime with name, api group and kind of %q, %q, %q but found runtime with name, api group and kind of %q, %q, %q",
+			errorInvalidRuntimeSnapshot,
 			trainJob.Spec.RuntimeRef.Name,
 			expectedGroup,
 			expectedKind,

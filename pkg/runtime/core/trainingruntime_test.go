@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -25,6 +26,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,8 +36,11 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
+	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -2500,6 +2505,196 @@ test-job-node-0-1.test-job slots=8
 
 			if diff := cmp.Diff(tc.wantObjs, resultObjs, append(cmpOpts, tc.ObjCmpOpts...)...); len(diff) != 0 {
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestTrainingRuntimeDeleteObjects(t *testing.T) {
+	errSnapshotGet := errors.New("failed to read snapshot ConfigMap")
+
+	resRequests := corev1.ResourceList{
+		corev1.ResourceCPU: resource.MustParse("1"),
+	}
+
+	runtimeWithVolcano := func(name string) *trainer.TrainingRuntime {
+		return testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, name).
+			RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, name).Spec).
+					PodGroupPolicyVolcano(&trainer.VolcanoPodGroupPolicySource{}).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Obj(),
+			).Obj()
+	}
+
+	// runtimeWithBrokenTorch declares a Torch envInjection target that the template does not
+	// have, so the Torch plugin rejects the runtime while its Info is being built.
+	runtimeWithBrokenTorch := func(name string) *trainer.TrainingRuntime {
+		return testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, name).
+			RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, name).Spec).
+					WithMLPolicy(testingutil.MakeMLPolicyWrapper().
+						WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+							TorchPolicyWithEnvInjection(&trainer.EnvInjection{
+								Targets: []trainer.EnvInjectionTarget{{JobName: constants.Node, ContainerNames: []string{"missing"}}},
+							}).Obj()).
+						Obj()).
+					PodGroupPolicyVolcano(&trainer.VolcanoPodGroupPolicySource{}).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Obj(),
+			).Obj()
+	}
+
+	failedTrainJob := func(name, runtimeName string) *trainer.TrainJob {
+		return testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, name).
+			UID("uid").
+			RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+			Conditions(metav1.Condition{Type: trainer.TrainJobFailed, Status: metav1.ConditionTrue}).
+			Trainer(testingutil.MakeTrainJobTrainerWrapper().Obj()).
+			Obj()
+	}
+
+	ownedPodGroup := func(name string) *volcanov1beta1.PodGroup {
+		// No TypeMeta: Delete() returns whatever the fake client's Get() populates,
+		// which (like a real client) leaves TypeMeta unset on a typed object.
+		pg := testingutil.MakeVolcanoPodGroup(metav1.NamespaceDefault, name).
+			ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), name, "uid").
+			Obj()
+		pg.TypeMeta = metav1.TypeMeta{}
+		return pg
+	}
+
+	cases := map[string]struct {
+		trainingRuntime *trainer.TrainingRuntime
+		trainJob        *trainer.TrainJob
+		podGroup        *volcanov1beta1.PodGroup
+		withSnapshot    bool
+		invalidSnapshot bool
+		// omitLiveRuntime seeds the snapshot but not the live runtime, as when the runtime is
+		// deleted after the TrainJob finishes.
+		omitLiveRuntime bool
+		// snapshotGetErr makes reading the snapshot ConfigMap fail.
+		snapshotGetErr error
+		wantObjs       []client.Object
+		wantErr        error
+	}{
+		"resolves from an existing snapshot": {
+			trainingRuntime: runtimeWithVolcano("test-runtime"),
+			trainJob:        failedTrainJob("test-job", "test-runtime"),
+			podGroup:        ownedPodGroup("test-job"),
+			withSnapshot:    true,
+			wantObjs:        []client.Object{ownedPodGroup("test-job")},
+		},
+		"no snapshot falls back to the live TrainingRuntime": {
+			trainingRuntime: runtimeWithVolcano("test-runtime"),
+			trainJob:        failedTrainJob("test-job", "test-runtime"),
+			podGroup:        ownedPodGroup("test-job"),
+			wantObjs:        []client.Object{ownedPodGroup("test-job")},
+		},
+		"TrainingRuntime no longer exists returns no objects and no error": {
+			trainJob: failedTrainJob("test-job", "test-runtime"),
+			podGroup: ownedPodGroup("test-job"),
+			wantObjs: nil,
+		},
+		"invalid snapshot returns no objects and no error": {
+			trainingRuntime: runtimeWithVolcano("test-runtime"),
+			trainJob:        failedTrainJob("test-job", "test-runtime"),
+			podGroup:        ownedPodGroup("test-job"),
+			withSnapshot:    true,
+			invalidSnapshot: true,
+			wantObjs:        nil,
+		},
+		"runtime whose Info cannot be built returns no objects and no error": {
+			trainingRuntime: runtimeWithBrokenTorch("test-runtime"),
+			trainJob:        failedTrainJob("test-job", "test-runtime"),
+			podGroup:        ownedPodGroup("test-job"),
+			wantObjs:        nil,
+		},
+		"snapshot without the live runtime still returns the PodGroup": {
+			trainingRuntime: runtimeWithVolcano("test-runtime"),
+			trainJob:        failedTrainJob("test-job", "test-runtime"),
+			podGroup:        ownedPodGroup("test-job"),
+			withSnapshot:    true,
+			omitLiveRuntime: true,
+			wantObjs:        []client.Object{ownedPodGroup("test-job")},
+		},
+		"failed read of the snapshot is returned so the reconcile is retried": {
+			trainingRuntime: runtimeWithVolcano("test-runtime"),
+			trainJob:        failedTrainJob("test-job", "test-runtime"),
+			podGroup:        ownedPodGroup("test-job"),
+			snapshotGetErr:  errSnapshotGet,
+			wantErr:         errSnapshotGet,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			clientBuilder := testingutil.NewClientBuilder()
+			if tc.trainingRuntime != nil && !tc.omitLiveRuntime {
+				clientBuilder.WithObjects(tc.trainingRuntime)
+			}
+			if tc.podGroup != nil {
+				clientBuilder.WithObjects(tc.podGroup)
+			}
+			if tc.snapshotGetErr != nil {
+				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, ok := obj.(*corev1.ConfigMap); ok {
+							return tc.snapshotGetErr
+						}
+						return c.Get(ctx, key, obj, opts...)
+					},
+				})
+			}
+			c := clientBuilder.Build()
+
+			if tc.withSnapshot && tc.trainingRuntime != nil {
+				snapshotRuntime := tc.trainingRuntime.DeepCopy()
+				if tc.invalidSnapshot {
+					// A snapshot owned by a different UID than the TrainJob referencing it
+					// is invalid: getRuntimeSnapshot rejects it before DeleteObjects can
+					// even resolve a PodGroupPolicy to check plugins against.
+					otherTrainJob := tc.trainJob.DeepCopy()
+					otherTrainJob.UID = "some-other-uid"
+					if err := createRuntimeSnapshot(ctx, c, otherTrainJob, snapshotRuntime); err != nil {
+						t.Fatalf("Failed to seed invalid runtime snapshot: %v", err)
+					}
+				} else {
+					if err := createRuntimeSnapshot(ctx, c, tc.trainJob, snapshotRuntime); err != nil {
+						t.Fatalf("Failed to seed runtime snapshot: %v", err)
+					}
+				}
+			}
+
+			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			gotObjs, err := trainingRuntime.DeleteObjects(ctx, tc.trainJob)
+			if diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantObjs, gotObjs, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion")); len(diff) != 0 {
+				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
+			}
+
+			// Unlike NewObjects, DeleteObjects must never create a runtime snapshot: it
+			// is on the cleanup path, so creating one here would be pointless work for a
+			// TrainJob that is finishing, not starting.
+			if !tc.withSnapshot && tc.snapshotGetErr == nil {
+				err := c.Get(ctx, client.ObjectKey{
+					Name:      tc.trainJob.Name + runtimeSnapshotSuffix,
+					Namespace: tc.trainJob.Namespace,
+				}, &corev1.ConfigMap{})
+				if !apierrors.IsNotFound(err) {
+					t.Errorf("Expected no runtime snapshot to be created, got error: %v", err)
+				}
 			}
 		})
 	}

@@ -32,6 +32,7 @@ import (
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
+	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -3255,5 +3256,141 @@ alpha-node-0-1.alpha slots=8
 			})
 		})
 
+		ginkgo.Context("Integration tests for the Volcano PodGroupPolicy", func() {
+			ginkgo.BeforeEach(func() {
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "alpha").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha").
+					Trainer(
+						testingutil.MakeTrainJobTrainerWrapper().
+							Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Obj()).
+					Obj()
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				trainingRuntime = testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").
+					RuntimeSpec(
+						testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").Spec).
+							PodGroupPolicyVolcano(&trainer.VolcanoPodGroupPolicySource{}).
+							Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+							Obj()).
+					Obj()
+			})
+
+			ginkgo.It("Should delete the PodGroup when the TrainJob is suspended, and recreate it on resume", func() {
+				ginkgo.By("Creating TrainingRuntime and TrainJob")
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if JobSet and PodGroup are created")
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &jobsetv1alpha2.JobSet{})).Should(gomega.Succeed())
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &volcanov1beta1.PodGroup{})).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Suspending the TrainJob")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					gotTrainJob.Spec.Suspend = ptr.To(true)
+					g.Expect(k8sClient.Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Checking that the PodGroup is deleted and does not come back while suspended")
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &volcanov1beta1.PodGroup{})).Should(testingutil.BeNotFoundError())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				gomega.Consistently(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &volcanov1beta1.PodGroup{})).Should(testingutil.BeNotFoundError())
+				}, util.ConsistentDuration, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Resuming the TrainJob")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					gotTrainJob.Spec.Suspend = ptr.To(false)
+					g.Expect(k8sClient.Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Checking that the PodGroup is recreated")
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &volcanov1beta1.PodGroup{})).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should delete the PodGroup when the TrainJob reaches the Complete condition", func() {
+				ginkgo.By("Creating TrainingRuntime and TrainJob")
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if JobSet and PodGroup are created")
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &jobsetv1alpha2.JobSet{})).Should(gomega.Succeed())
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &volcanov1beta1.PodGroup{})).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Updating the JobSet conditions to successful completion")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					meta.SetStatusCondition(&jobSet.Status.Conditions, metav1.Condition{
+						Type:    string(jobsetv1alpha2.JobSetCompleted),
+						Reason:  jobsetconsts.AllJobsCompletedReason,
+						Message: jobsetconsts.AllJobsCompletedMessage,
+						Status:  metav1.ConditionTrue,
+					})
+					g.Expect(k8sClient.Status().Update(ctx, jobSet)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Checking that the TrainJob has the Complete condition and the PodGroup is deleted")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(meta.IsStatusConditionTrue(gotTrainJob.Status.Conditions, trainer.TrainJobComplete)).Should(gomega.BeTrue())
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &volcanov1beta1.PodGroup{})).Should(testingutil.BeNotFoundError())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should delete the PodGroup when the TrainJob reaches the Failed condition", func() {
+				ginkgo.By("Creating TrainingRuntime and TrainJob")
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if JobSet and PodGroup are created")
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &jobsetv1alpha2.JobSet{})).Should(gomega.Succeed())
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &volcanov1beta1.PodGroup{})).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Updating the JobSet conditions to failed")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					meta.SetStatusCondition(&jobSet.Status.Conditions, metav1.Condition{
+						Type:    string(jobsetv1alpha2.JobSetFailed),
+						Reason:  jobsetconsts.FailedJobsReason,
+						Message: jobsetconsts.FailedJobsMessage,
+						Status:  metav1.ConditionTrue,
+					})
+					g.Expect(k8sClient.Status().Update(ctx, jobSet)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Checking that the TrainJob has the Failed condition and the PodGroup is deleted")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(meta.IsStatusConditionTrue(gotTrainJob.Status.Conditions, trainer.TrainJobFailed)).Should(gomega.BeTrue())
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &volcanov1beta1.PodGroup{})).Should(testingutil.BeNotFoundError())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+		})
 	})
 })
