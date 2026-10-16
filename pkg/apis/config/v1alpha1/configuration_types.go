@@ -267,6 +267,15 @@ type TLSOptions struct {
 	// +kubebuilder:validation:items:MaxLength=100
 	CipherSuites []string `json:"cipherSuites,omitempty"`
 
+	// curvePreferences is the list of elliptic curve preferences in
+	// preference order, using Go crypto/tls curve names (for example
+	// X25519 or CurveP256).
+	// +optional
+	// +listType=atomic
+	// +kubebuilder:validation:MaxItems=32
+	// +kubebuilder:validation:items:MaxLength=32
+	CurvePreferences []string `json:"curvePreferences,omitempty"`
+
 	// nextProtos is the list of application-level protocols negotiated during
 	// the TLS handshake. Set to ["h2", "http/1.1"] to enable HTTP/2, or omit
 	// to disable it (mitigates CVE-2023-44487 and CVE-2023-39325).
