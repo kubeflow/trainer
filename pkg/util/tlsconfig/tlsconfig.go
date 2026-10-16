@@ -54,6 +54,11 @@ func Apply(c *tls.Config, opts *configapi.TLSOptions) {
 			c.CipherSuites = ids
 		}
 	}
+	if len(opts.CurvePreferences) > 0 {
+		if curves := parseCurveIDs(opts.CurvePreferences); len(curves) > 0 {
+			c.CurvePreferences = curves
+		}
+	}
 }
 
 // parseTLSVersion converts a TLS version string to its uint16 constant.
@@ -103,4 +108,30 @@ func parseCipherSuiteIDs(names []string) []uint16 {
 		}
 	}
 	return ids
+}
+
+// supportedCurves maps Go crypto/tls curve names to their tls.CurveID values.
+var supportedCurves = map[string]tls.CurveID{
+	"CurveP256":          tls.CurveP256,
+	"CurveP384":          tls.CurveP384,
+	"CurveP521":          tls.CurveP521,
+	"X25519":             tls.X25519,
+	"X25519MLKEM768":     tls.X25519MLKEM768,
+	"SecP256r1MLKEM768":  tls.SecP256r1MLKEM768,
+	"SecP384r1MLKEM1024": tls.SecP384r1MLKEM1024,
+}
+
+// parseCurveIDs converts curve preference name strings to their tls.CurveID
+// values. Unrecognized names are ignored with a warning, which leaves the Go
+// default curve selection for them rather than failing the server startup.
+func parseCurveIDs(names []string) []tls.CurveID {
+	curves := make([]tls.CurveID, 0, len(names))
+	for _, name := range names {
+		if id, ok := supportedCurves[name]; ok {
+			curves = append(curves, id)
+		} else {
+			klog.Warningf("Unrecognized TLS curve preference %q, ignoring", name)
+		}
+	}
+	return curves
 }

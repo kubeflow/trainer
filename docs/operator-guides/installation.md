@@ -79,6 +79,33 @@ case delete any remaining runtimes manually or with `helm uninstall`.
 For the available Helm values to configure runtimes, see the
 [kubeflow-trainer Helm chart documentation](https://github.com/kubeflow/trainer/tree/master/charts/kubeflow-trainer).
 
+### Controller TLS configuration
+
+The controller manager applies the `tls` section of its configuration to all
+of its TLS servers: the webhooks, the metrics server, and the runtime status
+server.
+
+```yaml
+tls:
+  minVersion: "1.2"
+  cipherSuites:
+    - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+  curvePreferences:
+    - X25519
+    - CurveP256
+```
+
+- `minVersion`: the minimum TLS version (`1.0`, `1.1`, `1.2`, or `1.3`).
+- `cipherSuites`: the allowed cipher suites using Go
+  [crypto/tls](https://pkg.go.dev/crypto/tls#CipherSuites) suite names.
+  TLS 1.3 cipher suites cannot be configured by Go, so this list only takes
+  effect for connections below TLS 1.3.
+- `curvePreferences`: the elliptic curves offered during the handshake, in
+  preference order, using Go crypto/tls curve names (for example `X25519` or
+  `CurveP256`).
+- `nextProtos`: the ALPN protocol list. It defaults to HTTP/1.1 only, which
+  disables HTTP/2 (mitigates CVE-2023-44487 and CVE-2023-39325).
+
 ## Install with Kustomize
 
 Run the following command to deploy Kubeflow Trainer control plane with kustomize:

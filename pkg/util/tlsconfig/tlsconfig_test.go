@@ -32,6 +32,7 @@ func TestApply(t *testing.T) {
 		wantNextProtos   []string
 		wantMinVersion   uint16
 		wantCipherSuites []uint16
+		wantCurvePrefs   []tls.CurveID
 	}{
 		"nil options disable HTTP/2": {
 			opts:           nil,
@@ -111,15 +112,38 @@ func TestApply(t *testing.T) {
 			wantNextProtos:   []string{"http/1.1"},
 			wantCipherSuites: nil,
 		},
+		"curve preferences are resolved to their IDs in order": {
+			opts: &configapi.TLSOptions{
+				CurvePreferences: []string{"X25519", "CurveP256"},
+			},
+			wantNextProtos: []string{"http/1.1"},
+			wantCurvePrefs: []tls.CurveID{tls.X25519, tls.CurveP256},
+		},
+		"unrecognized curve preferences are dropped": {
+			opts: &configapi.TLSOptions{
+				CurvePreferences: []string{"NOT_A_REAL_CURVE", "CurveP384"},
+			},
+			wantNextProtos: []string{"http/1.1"},
+			wantCurvePrefs: []tls.CurveID{tls.CurveP384},
+		},
+		"all-unrecognized curve preferences leave the Go defaults in place": {
+			opts: &configapi.TLSOptions{
+				CurvePreferences: []string{"NOT_A_REAL_CURVE"},
+			},
+			wantNextProtos: []string{"http/1.1"},
+			wantCurvePrefs: nil,
+		},
 		"all options are applied together": {
 			opts: &configapi.TLSOptions{
-				MinVersion:   configapi.TLSVersion12,
-				CipherSuites: []string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"},
-				NextProtos:   []string{"h2", "http/1.1"},
+				MinVersion:       configapi.TLSVersion12,
+				CipherSuites:     []string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"},
+				CurvePreferences: []string{"X25519"},
+				NextProtos:       []string{"h2", "http/1.1"},
 			},
 			wantNextProtos:   []string{"h2", "http/1.1"},
 			wantMinVersion:   tls.VersionTLS12,
 			wantCipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256},
+			wantCurvePrefs:   []tls.CurveID{tls.X25519},
 		},
 	}
 
@@ -136,6 +160,9 @@ func TestApply(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantCipherSuites, got.CipherSuites, cmpopts.EquateEmpty()); len(diff) != 0 {
 				t.Errorf("Unexpected CipherSuites (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantCurvePrefs, got.CurvePreferences, cmpopts.EquateEmpty()); len(diff) != 0 {
+				t.Errorf("Unexpected CurvePreferences (-want,+got):\n%s", diff)
 			}
 		})
 	}
