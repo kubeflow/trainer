@@ -107,7 +107,7 @@ func (f *Framework) RunManager(cfg *rest.Config, startControllers bool) (context
 	// Alpha feature gates exercised by the integration suites.
 	gomega.ExpectWithOffset(1, utilfeature.DefaultMutableFeatureGate.Set(string(features.TrainJobDynamicResourceAllocation)+"=true")).To(gomega.Succeed())
 
-	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer(), nil)
+	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetAPIReader(), mgr.GetFieldIndexer(), nil)
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())
 	gomega.ExpectWithOffset(1, runtimes).NotTo(gomega.BeNil())
 
