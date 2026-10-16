@@ -109,15 +109,27 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		if !trainjob.IsTrainJobFinished(&trainJob) {
 			err = r.reconcileObjects(ctx, runtime, &trainJob)
 			if err != nil {
-				// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
-				//  the creation of the runtime resources failed and the TrainJob is backed off until
-				//  the next retry attempt.
+				// Surface the error in TrainJob status as a condition
+				meta.SetStatusCondition(&trainJob.Status.Conditions, metav1.Condition{
+					Type:    trainer.TrainJobRuntimeResourcesReady,
+					Status:  metav1.ConditionFalse,
+					Reason:  trainer.TrainJobRuntimeResourcesCreationFailedReason,
+					Message: err.Error(),
+				})
 				// The event message is truncated to stay within the maximum length limit (1024 chars).
 				message := fmt.Sprintf("TrainJob resources reconciliation failed: %.950v", err.Error())
 				if len(err.Error()) > 950 {
 					message = fmt.Sprintf("%s ...", message)
 				}
 				r.recorder.Eventf(&trainJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "Reconciling", message)
+			} else {
+				// Runtime resources created successfully
+				meta.SetStatusCondition(&trainJob.Status.Conditions, metav1.Condition{
+					Type:    trainer.TrainJobRuntimeResourcesReady,
+					Status:  metav1.ConditionTrue,
+					Reason:  trainer.TrainJobRuntimeResourcesCreatedReason,
+					Message: "Runtime resources created successfully",
+				})
 			}
 		}
 		if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {

@@ -62,6 +62,9 @@ const (
 
 	// TrainJobFailed means that the actual jobs have failed its execution.
 	TrainJobFailed string = "Failed"
+
+	// TrainJobRuntimeResourcesReady means that runtime resources were created successfully.
+	TrainJobRuntimeResourcesReady string = "RuntimeResourcesReady"
 )
 
 const (
@@ -81,6 +84,14 @@ const (
 	// when the TrainJob exceeds its ActiveDeadlineSeconds.
 	// Matches the Kubernetes Job behavior.
 	TrainJobDeadlineExceededReason string = "DeadlineExceeded"
+
+	// TrainJobRuntimeResourcesCreatedReason is the "RuntimeResourcesReady" condition reason
+	// when runtime resources (JobSet, Secrets, ConfigMaps) are created successfully.
+	TrainJobRuntimeResourcesCreatedReason string = "ResourcesCreated"
+
+	// TrainJobRuntimeResourcesCreationFailedReason is the "RuntimeResourcesReady" condition reason
+	// when runtime resource creation fails.
+	TrainJobRuntimeResourcesCreationFailedReason string = "ResourceCreationFailed"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
