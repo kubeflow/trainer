@@ -114,6 +114,7 @@ func newItem(
 		minCount = &podCount
 	}
 
+	// The runtime webhook ensures that the ReplicatedJobs sharing a PodGroup use the same priorityClassName.
 	var priorityClassName string
 	if rJob := findReplicatedJob(jobSetSpec, rJobNames[0]); rJob != nil {
 		priorityClassName = ptr.Deref(rJob.Template.Spec.Template.Spec.PriorityClassName, "")

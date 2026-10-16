@@ -354,6 +354,56 @@ func TestValidateScheduling(t *testing.T) {
 				field.Invalid(schedulingPath.Child("replicatedJobs").Index(1).Child("job"), "", ""),
 			},
 		},
+		"TrainJob-level scheduling with the same priorityClassName for every ReplicatedJob": {
+			enableWAS: true,
+			newSpec: func() *trainer.TrainingRuntimeSpec {
+				spec := runtimeSpec(&trainer.TrainingRuntimeScheduling{SchedulingPolicy: gang})
+				for i := range spec.Template.Spec.ReplicatedJobs {
+					spec.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.PriorityClassName = "high-priority"
+				}
+				return spec
+			}(),
+		},
+		"TrainJob-level scheduling with a different priorityClassName for a ReplicatedJob": {
+			enableWAS: true,
+			newSpec: func() *trainer.TrainingRuntimeSpec {
+				spec := runtimeSpec(&trainer.TrainingRuntimeScheduling{SchedulingPolicy: gang})
+				spec.Template.Spec.ReplicatedJobs[2].Template.Spec.Template.Spec.PriorityClassName = "high-priority"
+				return spec
+			}(),
+			wantError: field.ErrorList{
+				field.Invalid(rJobsPath.Index(2).Child("template", "spec", "template", "spec", "priorityClassName"), "", ""),
+			},
+		},
+		"per-ReplicatedJob scheduling entry with a different priorityClassName for a target": {
+			enableWAS: true,
+			newSpec: func() *trainer.TrainingRuntimeSpec {
+				spec := runtimeSpec(&trainer.TrainingRuntimeScheduling{
+					ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+						{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+						{TargetReplicatedJobs: []string{constants.Node}},
+					},
+				})
+				spec.Template.Spec.ReplicatedJobs[1].Template.Spec.Template.Spec.PriorityClassName = "high-priority"
+				return spec
+			}(),
+			wantError: field.ErrorList{
+				field.Invalid(schedulingPath.Child("replicatedJobs").Index(0).Child("targetReplicatedJobs").Index(1), "", ""),
+			},
+		},
+		"per-ReplicatedJob scheduling entries with a single target can use different priorityClassNames": {
+			enableWAS: true,
+			newSpec: func() *trainer.TrainingRuntimeSpec {
+				spec := runtimeSpec(&trainer.TrainingRuntimeScheduling{
+					ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+						{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+						{TargetReplicatedJobs: []string{constants.Node}, Job: &trainer.JobScheduling{}},
+					},
+				})
+				spec.Template.Spec.ReplicatedJobs[2].Template.Spec.Template.Spec.PriorityClassName = "high-priority"
+				return spec
+			}(),
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

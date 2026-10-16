@@ -40,10 +40,12 @@ const (
 	rJobContainerNamesErrorMsg = "must contain the required container for the ancestor: %s"
 	rJobContainerClaimErrorMsg = "references resourceClaim %q which is not defined in the Pod's resourceClaims"
 
-	schedulingFeatureGateErrorMsg    = "TrainJobWorkloadAwareScheduling feature gate is disabled"
-	schedulingTargetNotFoundErrorMsg = "must reference a replicatedJob in spec.template.spec.replicatedJobs"
-	schedulingUntargetedErrorMsg     = "must be targeted by a spec.scheduling.replicatedJobs entry when spec.scheduling.replicatedJobs is set"
-	schedulingJobReplicasErrorMsg    = "must target a ReplicatedJob with at most 1 replica; a PodGroup per replica is not supported yet"
+	schedulingFeatureGateErrorMsg      = "TrainJobWorkloadAwareScheduling feature gate is disabled"
+	schedulingTargetNotFoundErrorMsg   = "must reference a replicatedJob in spec.template.spec.replicatedJobs"
+	schedulingUntargetedErrorMsg       = "must be targeted by a spec.scheduling.replicatedJobs entry when spec.scheduling.replicatedJobs is set"
+	schedulingJobReplicasErrorMsg      = "must target a ReplicatedJob with at most 1 replica; a PodGroup per replica is not supported yet"
+	schedulingTrainJobPriorityErrorMsg = "must match %q of the other ReplicatedJobs sharing the TrainJob-level PodGroup"
+	schedulingGroupPriorityErrorMsg    = "priorityClassName %q must match %q of the other ReplicatedJobs sharing this PodGroup"
 )
 
 var (
@@ -164,14 +166,25 @@ func validateScheduling(newSpec, oldSpec *trainer.TrainingRuntimeSpec) field.Err
 		return allErrs
 	}
 
+	rJobs := newSpec.Template.Spec.ReplicatedJobs
 	if len(scheduling.ReplicatedJobs) == 0 {
+		// All ReplicatedJobs share the TrainJob-level (level 1) PodGroup, which has a single priority.
+		for i := 1; i < len(rJobs); i++ {
+			expected := rJobs[0].Template.Spec.Template.Spec.PriorityClassName
+			if actual := rJobs[i].Template.Spec.Template.Spec.PriorityClassName; actual != expected {
+				allErrs = append(allErrs, field.Invalid(
+					rJobsPath.Index(i).Child("template", "spec", "template", "spec", "priorityClassName"),
+					actual, fmt.Sprintf(schedulingTrainJobPriorityErrorMsg, expected)))
+			}
+		}
 		return allErrs
 	}
 
-	rJobs := newSpec.Template.Spec.ReplicatedJobs
 	replicas := make(map[string]int32, len(rJobs))
+	priorityClassNames := make(map[string]string, len(rJobs))
 	for _, rJob := range rJobs {
 		replicas[rJob.Name] = rJob.Replicas
+		priorityClassNames[rJob.Name] = rJob.Template.Spec.Template.Spec.PriorityClassName
 	}
 	targeted := sets.New[string]()
 	for i, entry := range scheduling.ReplicatedJobs {
@@ -188,6 +201,16 @@ func validateScheduling(newSpec, oldSpec *trainer.TrainingRuntimeSpec) field.Err
 		if entry.Job != nil && len(entry.TargetReplicatedJobs) == 1 && replicas[entry.TargetReplicatedJobs[0]] > 1 {
 			allErrs = append(allErrs, field.Invalid(schedulingPath.Child("replicatedJobs").Index(i).Child("job"),
 				replicas[entry.TargetReplicatedJobs[0]], schedulingJobReplicasErrorMsg))
+		}
+		// The targets of a per-ReplicatedJob (level 2) entry share a PodGroup, which has a single priority.
+		if entry.Job == nil {
+			expected := priorityClassNames[entry.TargetReplicatedJobs[0]]
+			for j, name := range entry.TargetReplicatedJobs[1:] {
+				if actual, ok := priorityClassNames[name]; ok && actual != expected {
+					allErrs = append(allErrs, field.Invalid(targetsPath.Index(j+1), name,
+						fmt.Sprintf(schedulingGroupPriorityErrorMsg, actual, expected)))
+				}
+			}
 		}
 	}
 
