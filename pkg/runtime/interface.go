@@ -37,7 +37,7 @@ type Runtime interface {
 	// removed for the TrainJob. It must be safe to call on every reconcile, regardless
 	// of the TrainJob's status, and must be idempotent.
 	DeleteObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]client.Object, error)
-	RuntimeInfo(trainJob *trainer.TrainJob, runtimeTemplateSpec any, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy) (*Info, error)
+	RuntimeInfo(trainJob *trainer.TrainJob, runtimeTemplateSpec any, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy, scheduling *trainer.TrainingRuntimeScheduling) (*Info, error)
 	TrainJobStatus(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error)
 	EventHandlerRegistrars() []ReconcilerBuilder
 	ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList)

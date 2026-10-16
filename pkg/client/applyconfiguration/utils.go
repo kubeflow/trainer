@@ -122,14 +122,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.TrainerStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntime"):
 		return &trainerv1alpha1.TrainingRuntimeApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntimeScheduling"):
+		return &trainerv1alpha1.TrainingRuntimeSchedulingApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntimeSpec"):
 		return &trainerv1alpha1.TrainingRuntimeSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntimeSpecPatch"):
 		return &trainerv1alpha1.TrainingRuntimeSpecPatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainJob"):
 		return &trainerv1alpha1.TrainJobApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("TrainJobScheduling"):
-		return &trainerv1alpha1.TrainJobSchedulingApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainJobSpec"):
 		return &trainerv1alpha1.TrainJobSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainJobStatus"):

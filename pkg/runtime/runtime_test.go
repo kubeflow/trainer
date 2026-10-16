@@ -429,6 +429,23 @@ func TestNewInfo(t *testing.T) {
 				Scheduler:   &Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
+		"scheduling is specified": {
+			infoOpts: []InfoOption{
+				WithScheduling(&trainer.TrainingRuntimeScheduling{
+					ReplicatedJobs: []trainer.ReplicatedJobScheduling{{TargetReplicatedJobs: []string{constants.Node}}},
+				}),
+			},
+			wantInfo: &Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{
+						ReplicatedJobs: []trainer.ReplicatedJobScheduling{{TargetReplicatedJobs: []string{constants.Node}}},
+					},
+				},
+				Scheduler: &Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
 		"image and command are extracted from containers and init containers": {
 			infoOpts: []InfoOption{
 				WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 2, corev1.PodSpec{

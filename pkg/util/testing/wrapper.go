@@ -1433,7 +1433,7 @@ func (s *TrainingRuntimeSpecWrapper) PodGroupPolicyCoschedulingSchedulingTimeout
 	return s
 }
 
-func (s *TrainingRuntimeSpecWrapper) Scheduling(scheduling *trainer.TrainJobScheduling) *TrainingRuntimeSpecWrapper {
+func (s *TrainingRuntimeSpecWrapper) Scheduling(scheduling *trainer.TrainingRuntimeScheduling) *TrainingRuntimeSpecWrapper {
 	s.TrainingRuntimeSpec.Scheduling = scheduling
 	return s
 }

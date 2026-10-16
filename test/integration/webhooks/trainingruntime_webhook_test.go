@@ -315,7 +315,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
 									Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{},
 								},
@@ -333,7 +333,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{}).
+							Scheduling(&trainer.TrainingRuntimeScheduling{}).
 							Obj()).
 						Obj()
 				},
@@ -344,7 +344,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{}).
+							Scheduling(&trainer.TrainingRuntimeScheduling{}).
 							PodGroupPolicyCoschedulingSchedulingTimeout(60).
 							Obj()).
 						Obj()
@@ -356,7 +356,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					runtime := baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{}).
+							Scheduling(&trainer.TrainingRuntimeScheduling{}).
 							Obj()).
 						Obj()
 					runtime.Spec.Template.Spec.Scheduling = &jobsetv1alpha2.JobSetScheduling{}
@@ -369,7 +369,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					runtime := baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{}).
+							Scheduling(&trainer.TrainingRuntimeScheduling{}).
 							Obj()).
 						Obj()
 					runtime.Spec.Template.Spec.ReplicatedJobs[2].Template.Spec.Scheduling = &batchv1.JobSchedulingConfiguration{}
@@ -382,7 +382,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					runtime := baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{}).
+							Scheduling(&trainer.TrainingRuntimeScheduling{}).
 							Obj()).
 						Obj()
 					runtime.Spec.Template.Spec.ReplicatedJobs[2].Template.Spec.Template.Spec.SchedulingGroup = &corev1.PodSchedulingGroup{
@@ -397,7 +397,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{}).
+							Scheduling(&trainer.TrainingRuntimeScheduling{}).
 							DependsOn(constants.Node, jobsetv1alpha2.DependsOn{
 								Name:   constants.DatasetInitializer,
 								Status: jobsetv1alpha2.DependencyComplete,
@@ -412,7 +412,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					runtime := baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
 									Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{},
 								},
@@ -431,7 +431,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
 									Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
 								},
@@ -450,7 +450,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								ReplicatedJobs: []trainer.ReplicatedJobScheduling{
 									{
 										TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer},
@@ -480,7 +480,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
 									Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{},
 								},
@@ -498,7 +498,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								ReplicatedJobs: []trainer.ReplicatedJobScheduling{
 									{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.Node}},
 									{TargetReplicatedJobs: []string{constants.Node}},
@@ -514,7 +514,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{}},
 							}).
 							Obj()).
@@ -527,7 +527,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
 									Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
 									Gang:  &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{},
@@ -543,7 +543,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
 									Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{MinGroupCount: ptr.To[int32](2)},
 								},
@@ -558,7 +558,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{
 									TargetReplicatedJobs: []string{constants.Node},
 									SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
@@ -576,7 +576,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								DisruptionMode: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{
 									Single: &schedulingv1alpha3.WorkloadCompositePodGroupSingleDisruptionMode{},
 									All:    &schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{},
@@ -592,7 +592,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								ReplicatedJobs: []trainer.ReplicatedJobScheduling{
 									{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
 									{
@@ -619,7 +619,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{
 									TargetReplicatedJobs: []string{constants.ModelInitializer, constants.Node},
 									Job:                  &trainer.JobScheduling{},
@@ -635,7 +635,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{
 									TargetReplicatedJobs: []string{constants.Node},
 									SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
@@ -654,7 +654,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{
 									TargetReplicatedJobs: []string{constants.Node},
 									Job: &trainer.JobScheduling{
@@ -674,7 +674,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{
 									TargetReplicatedJobs: []string{constants.Node},
 									Job: &trainer.JobScheduling{
@@ -690,6 +690,37 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 						Obj()
 				},
 				gomega.MatchError(gomega.ContainSubstring("exactly one of resourceClaimName or resourceClaimTemplateName must be set")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with targetReplicatedJobs referencing a ReplicatedJob which does not exist",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainingRuntimeScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+									{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+									{TargetReplicatedJobs: []string{constants.Node, "invalid"}},
+								},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("must reference a replicatedJob in spec.template.spec.replicatedJobs")),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with per-ReplicatedJob scheduling leaving a ReplicatedJob untargeted",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainingRuntimeScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+									{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+								},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("must be targeted by a spec.scheduling.replicatedJobs entry")),
 			),
 		)
 		ginkgo.DescribeTable("Defaulting TrainingRuntime on creation", func(trainingRuntime func() *trainer.TrainingRuntime, wantTrainingRuntime func() *trainer.TrainingRuntime) {

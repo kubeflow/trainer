@@ -111,6 +111,7 @@ func (f *Framework) RunManager(cfg *rest.Config, startControllers bool) (context
 		string(features.TrainJobDynamicResourceAllocation): true,
 		string(features.TrainJobStatus):                    false,
 		string(features.OptimizationJob):                   false,
+		string(features.TrainJobWorkloadAwareScheduling):   true,
 	})).To(gomega.Succeed())
 
 	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer(), nil)

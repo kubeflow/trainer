@@ -140,7 +140,7 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{
+							Scheduling(&trainer.TrainingRuntimeScheduling{
 								ReplicatedJobs: []trainer.ReplicatedJobScheduling{
 									{
 										TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer},
@@ -160,7 +160,7 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-							Scheduling(&trainer.TrainJobScheduling{}).
+							Scheduling(&trainer.TrainingRuntimeScheduling{}).
 							PodGroupPolicyVolcano(&trainer.VolcanoPodGroupPolicySource{}).
 							Obj()).
 						Obj()
