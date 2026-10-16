@@ -375,10 +375,20 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 		}
 		oldJobSet = nil
 	}
-	if oldJobSet != nil &&
-		!ptr.Deref(trainJob.Spec.Suspend, false) &&
-		!ptr.Deref(oldJobSet.Spec.Suspend, false) {
-		return nil, nil
+	wasSuspendedByTrainJob := false
+	if cond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobSuspended); cond != nil && cond.Status == metav1.ConditionTrue && cond.Reason == trainer.TrainJobSuspendedReason {
+		wasSuspendedByTrainJob = true
+	}
+	if oldJobSet != nil {
+		trainJobSuspended := ptr.Deref(trainJob.Spec.Suspend, false)
+		jobSetSuspended := ptr.Deref(oldJobSet.Spec.Suspend, false)
+
+		if !trainJobSuspended && !jobSetSuspended {
+			return nil, nil
+		}
+		if !trainJobSuspended && jobSetSuspended && !wasSuspendedByTrainJob {
+			return nil, nil
+		}
 	}
 
 	jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
@@ -455,14 +465,16 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 		WithAnnotations(maps.Clone(info.Annotations)).
 		WithSpec(jobSetSpec))
 
-	// TODO (andreyvelich): Refactor the builder with wrappers for PodSpec.
-	// TODO: Once we remove deprecated runtime.Info.Trainer, we should remove JobSet Builder with DeprecatedTrainer().
+	suspend := trainJob.Spec.Suspend
+	if oldJobSet != nil && !ptr.Deref(trainJob.Spec.Suspend, false) && ptr.Deref(oldJobSet.Spec.Suspend, false) && !wasSuspendedByTrainJob {
+		suspend = oldJobSet.Spec.Suspend
+	}
 	jobSet := jobSetBuilder.
 		Initializer(trainJob).
 		Trainer(info, trainJob).
 		PodLabels(info.Scheduler.PodLabels).
 		PodAnnotations(info.Scheduler.PodAnnotations).
-		Suspend(trainJob.Spec.Suspend).
+		Suspend(suspend).
 		Build().
 		WithOwnerReferences(metav1ac.OwnerReference().
 			WithAPIVersion(trainer.GroupVersion.String()).
@@ -494,6 +506,11 @@ func (j *JobSet) Status(ctx context.Context, trainJob *trainer.TrainJob) (*train
 	if failed := meta.FindStatusCondition(jobSet.Status.Conditions, string(jobsetv1alpha2.JobSetFailed)); failed != nil && failed.Status == metav1.ConditionTrue {
 		failed.Type = trainer.TrainJobFailed
 		meta.SetStatusCondition(&status.Conditions, *failed)
+	}
+	if suspended := meta.FindStatusCondition(jobSet.Status.Conditions, string(jobsetv1alpha2.JobSetSuspended)); suspended != nil {
+		c := *suspended
+		c.Type = trainer.TrainJobSuspended
+		meta.SetStatusCondition(&status.Conditions, c)
 	}
 
 	var statuses []trainer.JobStatus

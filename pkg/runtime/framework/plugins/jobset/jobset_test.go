@@ -26,6 +26,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -2782,6 +2783,185 @@ func TestBuild(t *testing.T) {
 				}),
 			); len(diff) != 0 {
 				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+// TestBuildExternalSuspension verifies that when a JobSet is suspended externally
+// (e.g. by Kueue) and the TrainJob itself was NOT suspended by the user,
+// the Build method returns nil (no-op) rather than reverting the suspension.
+func TestBuildExternalSuspension(t *testing.T) {
+	minimalInfo := &runtime.Info{
+		Labels:      make(map[string]string),
+		Annotations: make(map[string]string),
+		TemplateSpec: runtime.TemplateSpec{
+			PodSets: []runtime.PodSet{{
+				Name:       constants.Node,
+				Containers: []runtime.Container{{Name: constants.Node}},
+			}},
+			ObjApply: jobsetv1alpha2ac.JobSetSpec().
+				WithReplicatedJobs(jobsetv1alpha2ac.ReplicatedJob().
+					WithName(constants.Node).
+					WithTemplate(batchv1ac.JobTemplateSpec().
+						WithSpec(batchv1ac.JobSpec().
+							WithTemplate(corev1ac.PodTemplateSpec().
+								WithSpec(corev1ac.PodSpec().
+									WithContainers(corev1ac.Container().WithName(constants.Node)),
+								),
+							),
+						),
+					),
+				),
+		},
+		Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+	}
+
+	cases := map[string]struct {
+		existingJobSet *jobsetv1alpha2.JobSet
+		trainJob       *trainer.TrainJob
+		wantNoOp       bool // true means Build must return nil (no objects to apply)
+	}{
+		"external suspension: Kueue suspends JobSet, TrainJob never suspended": {
+			existingJobSet: &jobsetv1alpha2.JobSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault},
+				Spec:       jobsetv1alpha2.JobSetSpec{Suspend: ptr.To(true)},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Obj(),
+			wantNoOp: true,
+		},
+		"TrainJob resume: user suspends then resumes TrainJob, Build should unsuspend JobSet": {
+			existingJobSet: &jobsetv1alpha2.JobSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault},
+				Spec:       jobsetv1alpha2.JobSetSpec{Suspend: ptr.To(true)},
+			},
+			trainJob: func() *trainer.TrainJob {
+				tj := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj()
+				// User previously suspended then set Suspend back to false.
+				// The Suspended condition with Reason=Suspended indicates TrainJob was suspended by user.
+				tj.Status.Conditions = []metav1.Condition{{
+					Type:   trainer.TrainJobSuspended,
+					Status: metav1.ConditionTrue,
+					Reason: trainer.TrainJobSuspendedReason,
+				}}
+				return tj
+			}(),
+			wantNoOp: false,
+		},
+		"normal running: JobSet and TrainJob both unsuspended, no-op": {
+			existingJobSet: &jobsetv1alpha2.JobSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault},
+				Spec:       jobsetv1alpha2.JobSetSpec{Suspend: ptr.To(false)},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Obj(),
+			wantNoOp: true,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			builder := utiltesting.NewClientBuilder()
+			if tc.existingJobSet != nil {
+				builder = builder.WithObjects(tc.existingJobSet)
+			}
+			cli := builder.Build()
+
+			p, err := New(ctx, cli, nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+			}
+
+			objs, err := p.(framework.ComponentBuilderPlugin).Build(ctx, minimalInfo, tc.trainJob)
+			if err != nil {
+				t.Fatalf("Unexpected error from Build: %v", err)
+			}
+
+			if tc.wantNoOp && len(objs) != 0 {
+				t.Errorf("expected no-op (nil objs), got %d objects", len(objs))
+			}
+			if !tc.wantNoOp && len(objs) == 0 {
+				t.Errorf("expected objects to be returned, got nil")
+			}
+		})
+	}
+}
+
+// TestJobSetStatusSuspendedCondition verifies that JobSetSuspended is correctly
+// propagated to the TrainJobSuspended condition in j.Status().
+func TestJobSetStatusSuspendedCondition(t *testing.T) {
+	cases := map[string]struct {
+		jobSet       *jobsetv1alpha2.JobSet
+		trainJob     *trainer.TrainJob
+		wantSuspCond *metav1.Condition // nil means no TrainJobSuspended condition expected
+	}{
+		"JobSet is externally suspended: TrainJobSuspended condition must be set": {
+			jobSet: &jobsetv1alpha2.JobSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault},
+				Status: jobsetv1alpha2.JobSetStatus{
+					Conditions: []metav1.Condition{{
+						Type:    string(jobsetv1alpha2.JobSetSuspended),
+						Status:  metav1.ConditionTrue,
+						Reason:  "Suspended",
+						Message: "JobSet is suspended",
+					}},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantSuspCond: &metav1.Condition{
+				Type:    trainer.TrainJobSuspended,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Suspended",
+				Message: "JobSet is suspended",
+			},
+		},
+		"JobSet is not suspended: no TrainJobSuspended condition propagated": {
+			jobSet: &jobsetv1alpha2.JobSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault},
+				Status:     jobsetv1alpha2.JobSetStatus{},
+			},
+			trainJob:     utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantSuspCond: nil,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			cli := utiltesting.NewClientBuilder().
+				WithStatusSubresource(tc.jobSet).
+				WithObjects(tc.jobSet).
+				Build()
+
+			p, err := New(ctx, cli, nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+			}
+
+			status, err := p.(framework.TrainJobStatusPlugin).Status(ctx, tc.trainJob)
+			if err != nil {
+				t.Fatalf("Unexpected error from Status: %v", err)
+			}
+
+			var got *metav1.Condition
+			if status != nil {
+				if c := apimeta.FindStatusCondition(status.Conditions, trainer.TrainJobSuspended); c != nil {
+					got = c
+				}
+			}
+
+			if diff := cmp.Diff(tc.wantSuspCond, got,
+				cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime", "ObservedGeneration"),
+			); len(diff) != 0 {
+				t.Errorf("Unexpected TrainJobSuspended condition (-want,+got):\n%s", diff)
 			}
 		})
 	}
