@@ -5,7 +5,7 @@ requires-python = ">=3.12"
 dependencies = [
   "huggingface-hub>=2.1.1,<2.2",
   "opendal>=0.47.10",
-  "kubernetes>=36.0.3",
+  "kubernetes>=37.0.1",
 ]
 
 [tool.uv]
