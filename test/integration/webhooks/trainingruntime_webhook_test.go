@@ -722,6 +722,19 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 				},
 				gomega.MatchError(gomega.ContainSubstring("must be targeted by a spec.scheduling.replicatedJobs entry")),
 			),
+			ginkgo.Entry("Should fail to create trainingRuntime with TrainJob-level scheduling and different priorityClassNames",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					runtime := baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainingRuntimeScheduling{}).
+							Obj()).
+						Obj()
+					runtime.Spec.Template.Spec.ReplicatedJobs[2].Template.Spec.Template.Spec.PriorityClassName = "high-priority"
+					return runtime
+				},
+				gomega.MatchError(gomega.ContainSubstring("of the other ReplicatedJobs sharing the TrainJob-level PodGroup")),
+			),
 		)
 		ginkgo.DescribeTable("Defaulting TrainingRuntime on creation", func(trainingRuntime func() *trainer.TrainingRuntime, wantTrainingRuntime func() *trainer.TrainingRuntime) {
 			created := trainingRuntime()
