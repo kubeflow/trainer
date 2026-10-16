@@ -85,6 +85,15 @@ func TestWorkload(t *testing.T) {
 				},
 			},
 		},
+		"no Workload is built when the runtime has no ReplicatedJobs": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj(),
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
+			},
+			expectInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
+			},
+		},
 		"TrainJob-level gang scheduling builds one Workload and PodGroup for every Pod": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj(),
 			info: &runtime.Info{
@@ -1072,6 +1081,103 @@ func TestFindReplicatedJob(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if diff := cmp.Diff(tc.wantRJob, findReplicatedJob(tc.jobSetSpec, tc.name)); len(diff) != 0 {
 				t.Errorf("Unexpected ReplicatedJob (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestMinCount(t *testing.T) {
+	cases := map[string]struct {
+		podSets      runtime.PodSets
+		jobSetSpec   *jobsetv1alpha2ac.JobSetSpecApplyConfiguration
+		rJobNames    []string
+		wantMinCount int32
+	}{
+		"Pods of every ReplicatedJob are counted": {
+			podSets: runtime.PodSets{
+				{Name: constants.DatasetInitializer, Count: ptr.To[int32](1)},
+				{Name: constants.Node, Count: ptr.To[int32](4)},
+			},
+			jobSetSpec: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+				jobsetv1alpha2ac.ReplicatedJob().WithName(constants.DatasetInitializer).WithReplicas(1),
+				jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(1),
+			),
+			rJobNames:    []string{constants.DatasetInitializer, constants.Node},
+			wantMinCount: 5,
+		},
+		"Pods of every replica are counted": {
+			podSets: runtime.PodSets{{Name: "sidecar", Count: ptr.To[int32](2)}},
+			jobSetSpec: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+				jobsetv1alpha2ac.ReplicatedJob().WithName("sidecar").WithReplicas(3),
+			),
+			rJobNames:    []string{"sidecar"},
+			wantMinCount: 6,
+		},
+		"ReplicatedJob depending on another ReplicatedJob of the group is excluded": {
+			podSets: runtime.PodSets{
+				{Name: constants.Node, Count: ptr.To[int32](3)},
+				{Name: constants.Launcher, Count: ptr.To[int32](1)},
+			},
+			jobSetSpec: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+				jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(1),
+				jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Launcher).WithReplicas(1).
+					WithDependsOn(jobsetv1alpha2ac.DependsOn().WithName(constants.Node).WithStatus(jobsetv1alpha2.DependencyReady)),
+			),
+			rJobNames:    []string{constants.Launcher, constants.Node},
+			wantMinCount: 3,
+		},
+		"ReplicatedJob depending on a ReplicatedJob outside of the group is counted": {
+			podSets: runtime.PodSets{{Name: constants.Node, Count: ptr.To[int32](4)}},
+			jobSetSpec: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+				jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(1).
+					WithDependsOn(jobsetv1alpha2ac.DependsOn().WithName(constants.DatasetInitializer).WithStatus(jobsetv1alpha2.DependencyComplete)),
+			),
+			rJobNames:    []string{constants.Node},
+			wantMinCount: 4,
+		},
+		"ReplicatedJob without a PodSet is not counted": {
+			podSets:      runtime.PodSets{{Name: constants.Node, Count: ptr.To[int32](4)}},
+			rJobNames:    []string{constants.Launcher, constants.Node},
+			wantMinCount: 4,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := minCount(tc.podSets, tc.jobSetSpec, tc.rJobNames); got != tc.wantMinCount {
+				t.Errorf("Unexpected minCount: got %d, want %d", got, tc.wantMinCount)
+			}
+		})
+	}
+}
+
+func TestPriorityClassName(t *testing.T) {
+	jobSetSpec := jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+		jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).
+			WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().
+				WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec().WithPriorityClassName("high-priority"))))),
+	)
+	cases := map[string]struct {
+		jobSetSpec *jobsetv1alpha2ac.JobSetSpecApplyConfiguration
+		rJobName   string
+		wantName   string
+	}{
+		"priorityClassName of the ReplicatedJob Pod template": {
+			jobSetSpec: jobSetSpec,
+			rJobName:   constants.Node,
+			wantName:   "high-priority",
+		},
+		"ReplicatedJob does not exist": {
+			jobSetSpec: jobSetSpec,
+			rJobName:   constants.Launcher,
+		},
+		"JobSet spec is nil": {
+			rJobName: constants.Node,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := priorityClassName(tc.jobSetSpec, tc.rJobName); got != tc.wantName {
+				t.Errorf("Unexpected priorityClassName: got %q, want %q", got, tc.wantName)
 			}
 		})
 	}
