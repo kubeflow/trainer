@@ -469,6 +469,28 @@ func TestEnvVar(t *testing.T) {
 				),
 			),
 		},
+		"file key ref": {
+			input: corev1.EnvVar{
+				Name: "FROM_FILE",
+				ValueFrom: &corev1.EnvVarSource{
+					FileKeyRef: &corev1.FileKeySelector{
+						VolumeName: "config",
+						Path:       "config.env",
+						Key:        "key",
+						Optional:   ptr.To(true),
+					},
+				},
+			},
+			want: corev1ac.EnvVar().WithName("FROM_FILE").WithValueFrom(
+				corev1ac.EnvVarSource().WithFileKeyRef(
+					corev1ac.FileKeySelector().
+						WithVolumeName("config").
+						WithPath("config.env").
+						WithKey("key").
+						WithOptional(true),
+				),
+			),
+		},
 		"field ref and resource field ref combined": {
 			input: corev1.EnvVar{
 				Name: "COMBINED",
