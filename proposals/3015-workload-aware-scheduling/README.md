@@ -651,6 +651,10 @@ spec:
 
 The TrainJob controller will create one `Workload` and multiple `PodGroups` per Replica in `node` ReplicatedJob.
 
+This story is not supported in the initial implementation: level 3 requires the targeted
+ReplicatedJob to have at most 1 replica, as described in [Validation](#validation). Supporting it
+is tracked in [Future Plans](#future-plans).
+
 ## Risk and Mitigations
 
 ### Upstream API Dependency
@@ -709,9 +713,14 @@ JobSet, and the individual Jobs (replicas) of each ReplicatedJob.
 | Level 2 – ReplicatedJobs | `scheduling.replicatedJobs[]`     | Gang-schedule trainer separately from initializers |
 | Level 3 – Jobs           | `scheduling.replicatedJobs[].job` | Each replica is its own gang                       |
 
-Level 3 is most useful for runtimes whose ReplicatedJobs set `replicas > 1`. The builtin Trainer
-runtimes map `trainJob.spec.trainer.numNodes` to Job `parallelism` with `replicas: 1`, so for them
-level 2 and level 3 produce the same single PodGroup per ReplicatedJob.
+Level 3 is designed for runtimes whose ReplicatedJobs set `replicas > 1`. However, a ReplicatedJob
+has a single Pod template shared by all of its replicas, and the TrainJob controller does not create
+the Jobs, so it can't assign a distinct `PodGroup` to the Pods of each replica. Until that is
+supported, level 3 requires the targeted ReplicatedJob to have at most 1 replica. The builtin
+Trainer runtimes map `trainJob.spec.trainer.numNodes` to Job `parallelism` with `replicas: 1`, so
+for them level 2 and level 3 produce the same single PodGroup per ReplicatedJob, and level 3 is
+used for the `PodGroup`-level `schedulingPolicy`, `schedulingConstraints`, `disruptionMode`, and
+`resourceClaims`.
 
 In alpha, level 1, level 2, and level 3 scheduling configurations are **mutually exclusive**, because
 it requires a `CompositePodGroup` to orchestrate hierarchy. We will relax this rule in the future iterations.
@@ -936,10 +945,10 @@ The TrainingRuntime and ClusterTrainingRuntime validation enforces that:
   gate, `targetReplicatedJobs` must also contain exactly one name when `job` is set.
 - An explicit `gang.minCount` is rejected. The Pod count of a TrainJob is derived from
   `trainJob.spec.trainer.numNodes` or `trainingRuntime.spec.mlPolicy.numNodes`.
-- The number of `PodGroupTemplates` the configuration resolves to does not exceed the upstream
-  `Workload` cap of 8. Level 3 multiplies the template count by the ReplicatedJob's `replicas`, so
-  a runtime with many replicas can exceed the cap; it is rejected rather than partitioned across
-  multiple `Workloads`.
+- A `job` entry targets a ReplicatedJob with at most 1 replica, since a distinct `PodGroup` can't
+  be assigned to the Pods of each replica yet. As a result, every `replicatedJobs` entry resolves
+  to one `PodGroupTemplate`, and the `maxItems: 8` limit of `replicatedJobs` keeps the configuration
+  within the upstream `Workload` cap of 8 `PodGroupTemplates`.
 - The JobSet `spec.scheduling`, the Job `spec.scheduling`, and the Pod `spec.schedulingGroup` are
   all owned by the TrainJob controller, since TrainJob owns the `Workload`.
 - A level 1 Gang policy, including the default when `schedulingPolicy` is unset, is rejected when
@@ -976,7 +985,8 @@ When the `TrainJobWorkloadAwareScheduling` feature gate is enabled and the resol
    sharing one PodGroup across the whole ReplicatedJob, so replicas can be gang-scheduled and
    preempted independently and can carry per-replica resource claims. job requires targetReplicatedJobs
    to name exactly one ReplicatedJob, and is mutually exclusive with the composite-level
-   schedulingPolicy, schedulingConstraints, and disruptionMode fields on the same entry.
+   schedulingPolicy, schedulingConstraints, and disruptionMode fields on the same entry. Until
+   per-replica PodGroups are supported, the targeted ReplicatedJob must have at most 1 replica.
 
 ### Controller Workflow
 
@@ -1295,6 +1305,15 @@ alpha in v1.37.
   TrainJob (either by patching the generated `minCount` in place, or by deleting and recreating the
   `Workload`/`PodGroup`), removing the current immutability restriction and the rejection of an
   explicit `gang.minCount`.
+- **Per-replica PodGroups for level 3**: lift the 1-replica restriction of `job` entries by
+  delegating `PodGroup` creation to the Job controller, as described in
+  [KEP-6089](https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/6089-was-controller-apis)
+  and [KEP-5547](https://github.com/kubernetes/enhancements/tree/master/keps/sig-apps/5547-integrate-workload-with-job).
+  The TrainJob controller sets the `scheduling.k8s.io/workload-name` and
+  `scheduling.k8s.io/group-template-name` annotations on the targeted ReplicatedJob's Job template,
+  leaves the Pod `schedulingGroup` unset, and every replica Job creates its own `PodGroup` from the
+  shared `PodGroupTemplate`. This requires a Kubernetes release whose Job controller resolves the
+  `Workload` by the `workload-name` annotation, which is planned for Kubernetes v1.38.
 - **Kueue integration**: expose enough of the scheduling shape for Kueue to build a representative
   aggregate workload for a TrainJob, and define partial eviction and per-ReplicatedJob restart
   behavior. This mirrors the phased Kueue plan in the JobSet KEP and requires a separate design on
