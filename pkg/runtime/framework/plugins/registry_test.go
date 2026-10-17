@@ -19,31 +19,61 @@ package plugins
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	"github.com/kubeflow/trainer/v2/pkg/features"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/coscheduling"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/flux"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jax"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/trainjobstatus"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/workload"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/xgboost"
 )
 
-func TestNewRegistryWorkloadPlugin(t *testing.T) {
+func TestNewRegistry(t *testing.T) {
 	cases := map[string]struct {
-		enableWAS      bool
-		wantRegistered bool
+		featureGates []featuregate.Feature
+		wantRegistry sets.Set[string]
 	}{
-		"Workload plugin is not registered when the feature gate is disabled": {},
-		"Workload plugin is registered when the feature gate is enabled": {
-			enableWAS:      true,
-			wantRegistered: true,
+		"TrainJobStatus plugin is registered when the TrainJobStatus feature gate is enabled": {
+			featureGates: []featuregate.Feature{features.TrainJobStatus},
+			wantRegistry: sets.New(
+				coscheduling.Name, flux.Name, volcano.Name, mpi.Name, plainml.Name, torch.Name, jobset.Name, jax.Name, xgboost.Name,
+				trainjobstatus.Name,
+			),
+		},
+		"Workload plugin is registered when the TrainJobWorkloadAwareScheduling feature gate is enabled": {
+			featureGates: []featuregate.Feature{features.TrainJobWorkloadAwareScheduling},
+			wantRegistry: sets.New(
+				coscheduling.Name, flux.Name, volcano.Name, mpi.Name, plainml.Name, torch.Name, jobset.Name, jax.Name, xgboost.Name,
+				workload.Name,
+			),
+		},
+		"TrainJobStatus and Workload plugins are registered when both feature gates are enabled": {
+			featureGates: []featuregate.Feature{features.TrainJobStatus, features.TrainJobWorkloadAwareScheduling},
+			wantRegistry: sets.New(
+				coscheduling.Name, flux.Name, volcano.Name, mpi.Name, plainml.Name, torch.Name, jobset.Name, jax.Name, xgboost.Name,
+				trainjobstatus.Name, workload.Name,
+			),
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, tc.enableWAS)
-			_, gotRegistered := NewRegistry()[workload.Name]
-			if gotRegistered != tc.wantRegistered {
-				t.Errorf("Unexpected Workload plugin registration: got %v, want %v", gotRegistered, tc.wantRegistered)
+			for _, featureGate := range tc.featureGates {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featureGate, true)
+			}
+			if diff := cmp.Diff(tc.wantRegistry, sets.KeySet(NewRegistry())); len(diff) != 0 {
+				t.Errorf("Unexpected registry (-want,+got): %s", diff)
 			}
 		})
 	}
