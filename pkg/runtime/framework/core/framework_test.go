@@ -31,8 +31,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,6 +49,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
@@ -2754,6 +2757,83 @@ func TestRunPreComponentBuilderPlugins(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo, testingutil.PodSetEndpointsCmpOpts); len(diff) != 0 {
 				t.Errorf("Unexpected runtimeInfo (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRunEnforceSchedulingPlugins(t *testing.T) {
+	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
+	cases := map[string]struct {
+		registry        fwkplugins.Registry
+		runtimeInfo     *runtime.Info
+		trainJob        *trainer.TrainJob
+		wantRuntimeInfo *runtime.Info
+	}{
+		"workload plugin is applied to runtime.Info": {
+			registry: fwkplugins.NewRegistry(),
+			runtimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](1)}},
+				},
+			},
+			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault, UID: "uid"}},
+			wantRuntimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:            constants.Node,
+						Count:           ptr.To[int32](1),
+						SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-b6ff97ef4e"),
+					}},
+				},
+			},
+		},
+		"an empty registry": {
+			runtimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](1)}},
+				},
+			},
+			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault, UID: "uid"}},
+			wantRuntimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](1)}},
+				},
+			},
+		},
+		"runtime.Info is nil": {
+			registry: fwkplugins.NewRegistry(),
+			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault, UID: "uid"}},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+			clientBuilder := testingutil.NewClientBuilder()
+
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = fwk.RunEnforceSchedulingPlugins(tc.runtimeInfo, tc.trainJob); err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo); len(diff) != 0 {
+				t.Errorf("Unexpected runtime.Info (-want,+got): %s", diff)
 			}
 		})
 	}

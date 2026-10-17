@@ -651,6 +651,10 @@ spec:
 
 The TrainJob controller will create one `Workload` and multiple `PodGroups` per Replica in `node` ReplicatedJob.
 
+This story is not supported in the initial implementation: level 3 requires the targeted
+ReplicatedJob to have at most 1 replica, as described in [Validation](#validation). Supporting it
+is tracked in [Future Plans](#future-plans).
+
 ## Risk and Mitigations
 
 ### Upstream API Dependency
@@ -709,9 +713,14 @@ JobSet, and the individual Jobs (replicas) of each ReplicatedJob.
 | Level 2 – ReplicatedJobs | `scheduling.replicatedJobs[]`     | Gang-schedule trainer separately from initializers |
 | Level 3 – Jobs           | `scheduling.replicatedJobs[].job` | Each replica is its own gang                       |
 
-Level 3 is most useful for runtimes whose ReplicatedJobs set `replicas > 1`. The builtin Trainer
-runtimes map `trainJob.spec.trainer.numNodes` to Job `parallelism` with `replicas: 1`, so for them
-level 2 and level 3 produce the same single PodGroup per ReplicatedJob.
+Level 3 is designed for runtimes whose ReplicatedJobs set `replicas > 1`. However, a ReplicatedJob
+has a single Pod template shared by all of its replicas, and the TrainJob controller does not create
+the Jobs, so it can't assign a distinct `PodGroup` to the Pods of each replica. Until that is
+supported, level 3 requires the targeted ReplicatedJob to have at most 1 replica. The builtin
+Trainer runtimes map `trainJob.spec.trainer.numNodes` to Job `parallelism` with `replicas: 1`, so
+for them level 2 and level 3 produce the same single PodGroup per ReplicatedJob, and level 3 is
+used for the `PodGroup`-level `schedulingPolicy`, `schedulingConstraints`, `disruptionMode`, and
+`resourceClaims`.
 
 In alpha, level 1, level 2, and level 3 scheduling configurations are **mutually exclusive**, because
 it requires a `CompositePodGroup` to orchestrate hierarchy. We will relax this rule in the future iterations.
@@ -762,7 +771,7 @@ type TrainingRuntimeSpec struct {
     // behavior is unchanged.
     // Requires the TrainJobWorkloadAwareScheduling feature gate.
     // +optional
-    Scheduling *Scheduling `json:"scheduling,omitempty"`
+    Scheduling *TrainingRuntimeScheduling `json:"scheduling,omitempty"`
 
     // podGroupPolicy defines the configuration for the PodGroup to enable gang-scheduling via
     // supported plugins.
@@ -774,11 +783,11 @@ type TrainingRuntimeSpec struct {
     Template JobSetTemplateSpec `json:"template,omitzero"`
 }
 
-// Scheduling defines the Workload-Aware Scheduling configuration for a TrainJob.
+// TrainingRuntimeScheduling defines the Workload-Aware Scheduling configuration for a TrainJob.
 // Unless the TrainJobCompositePodGroup feature gate is enabled, a runtime must configure
-// scheduling using exactly one of two mutually exclusive models, since composite
-// Gang-of-Gangs PodGroup hierarchies linking a parent PodGroup to leaf PodGroups
-// are not created without that gate:
+// scheduling using one of the following models, and each ReplicatedJob can be configured
+// by exactly one of them, since composite Gang-of-Gangs PodGroup hierarchies linking a
+// parent PodGroup to leaf PodGroups are not created without that gate:
 //   - the TrainJob-level (level 1) model: set schedulingPolicy, schedulingConstraints,
 //     and/or disruptionMode to configure a single PodGroup covering the whole
 //     TrainJob, and leave replicatedJobs unset.
@@ -787,8 +796,13 @@ type TrainingRuntimeSpec struct {
 //     Every ReplicatedJob in the runtime template must then be targeted by exactly one
 //     replicatedJobs entry, since there is no top-level policy for an untargeted
 //     ReplicatedJob to fall back to.
+//   - the per-Job (level 3) model: set job on a replicatedJobs entry, so every replica
+//     (Job) of the targeted ReplicatedJob gets its own PodGroup. The entry must target
+//     exactly one ReplicatedJob and leave its schedulingPolicy, schedulingConstraints, and
+//     disruptionMode unset. Level 2 and level 3 entries can be combined for different
+//     ReplicatedJobs of the same runtime.
 // +kubebuilder:validation:XValidation:rule="!has(self.replicatedJobs) || self.replicatedJobs.all(e, self.replicatedJobs.filter(o, sets.intersects(o.targetReplicatedJobs, e.targetReplicatedJobs)).size() == 1)",message="a ReplicatedJob must not be targeted by more than one replicatedJobs entry"
-type Scheduling struct {
+type TrainingRuntimeScheduling struct {
     // schedulingPolicy defines the TrainJob-level (level 1) scheduling policy for every Pod
     // created by the TrainJob. Defaults to Gang when spec.scheduling is set but
     // schedulingPolicy is nil and replicatedJobs is not set.
@@ -913,7 +927,8 @@ JobSet template.
 The TrainingRuntime and ClusterTrainingRuntime validation enforces that:
 
 - `spec.scheduling` is rejected when the `TrainJobWorkloadAwareScheduling` feature gate is
-  disabled.
+  disabled. Updates that leave an existing `spec.scheduling` unchanged are allowed, so runtimes
+  stored while the gate was enabled remain editable after the gate is disabled.
 - `spec.scheduling` and `spec.podGroupPolicy` are mutually exclusive, so a runtime cannot request
   both the Workload API and the Coscheduling or Volcano plugins.
 - Every name in `targetReplicatedJobs` exists in `spec.template.spec.replicatedJobs`, and no
@@ -930,10 +945,10 @@ The TrainingRuntime and ClusterTrainingRuntime validation enforces that:
   gate, `targetReplicatedJobs` must also contain exactly one name when `job` is set.
 - An explicit `gang.minCount` is rejected. The Pod count of a TrainJob is derived from
   `trainJob.spec.trainer.numNodes` or `trainingRuntime.spec.mlPolicy.numNodes`.
-- The number of `PodGroupTemplates` the configuration resolves to does not exceed the upstream
-  `Workload` cap of 8. Level 3 multiplies the template count by the ReplicatedJob's `replicas`, so
-  a runtime with many replicas can exceed the cap; it is rejected rather than partitioned across
-  multiple `Workloads`.
+- A `job` entry targets a ReplicatedJob with at most 1 replica, since a distinct `PodGroup` can't
+  be assigned to the Pods of each replica yet. As a result, every `replicatedJobs` entry resolves
+  to one `PodGroupTemplate`, and the `maxItems: 8` limit of `replicatedJobs` keeps the configuration
+  within the upstream `Workload` cap of 8 `PodGroupTemplates`.
 - The JobSet `spec.scheduling`, the Job `spec.scheduling`, and the Pod `spec.schedulingGroup` are
   all owned by the TrainJob controller, since TrainJob owns the `Workload`.
 - A level 1 Gang policy, including the default when `schedulingPolicy` is unset, is rejected when
@@ -970,7 +985,8 @@ When the `TrainJobWorkloadAwareScheduling` feature gate is enabled and the resol
    sharing one PodGroup across the whole ReplicatedJob, so replicas can be gang-scheduled and
    preempted independently and can carry per-replica resource claims. job requires targetReplicatedJobs
    to name exactly one ReplicatedJob, and is mutually exclusive with the composite-level
-   schedulingPolicy, schedulingConstraints, and disruptionMode fields on the same entry.
+   schedulingPolicy, schedulingConstraints, and disruptionMode fields on the same entry. Until
+   per-replica PodGroups are supported, the targeted ReplicatedJob must have at most 1 replica.
 
 ### Controller Workflow
 
@@ -1057,23 +1073,31 @@ following the existing Extensions Framework pattern used by Coscheduling and Vol
 registered when the `TrainJobWorkloadAwareScheduling` feature gate is enabled, and is a no-op for
 runtimes that do not set `spec.scheduling`.
 
-The plugin implements the following framework interfaces, in pipeline order. No new extension
-point is added: the plugin combines `EnforcePodSpecPlugin` and `ComponentBuilderPlugin` the same
-way the TrainJobStatus plugin does.
+The plugin implements the following framework interfaces, in pipeline order.
 
-#### EnforcePodSpec Phase
+#### EnforceScheduling Phase
 
-Enforcement only has to set one field on the Pod spec of every scheduling group:
+A new `EnforceSchedulingPlugin` extension point configures the parameters declared in the runtime
+`.spec.scheduling` on the `runtime.Info` object.
+
+```go
+type EnforceSchedulingPlugin interface {
+    Plugin
+    EnforceScheduling(info *runtime.Info, trainJob *trainer.TrainJob) error
+}
+```
+
+`RunEnforceSchedulingPlugins` runs after `RunEnforceMLPolicyPlugins` and
+`RunEnforcePodGroupPolicyPlugins` and before `RunEnforcePodSpecPlugins`, so the PodSet counts that
+Gang `minCount` is derived from are final by the time this plugin runs. The plugin sets the
+`SchedulingGroup` of every PodSet, and the Pod and container `ResourceClaims` of the PodSets
+targeted by `job.resourceClaims`. The JobSet plugin propagates them to the Pod spec:
 
 ```yaml
 spec:
   schedulingGroup:
     podGroupName: <workload-name>-<hash>
 ```
-
-`RunEnforcePodSpecPlugins` already runs after `RunEnforceMLPolicyPlugins` and
-`RunEnforcePodGroupPolicyPlugins` and before `RunPreComponentBuilderPlugins`, so the PodSet counts
-that Gang `minCount` is derived from are final by the time this plugin runs:
 
 #### Build Phase
 
@@ -1135,7 +1159,7 @@ avoiding orphaned Pods with a stale `PodGroup` reference.
 | `numNodes` updated with gang scheduling  | Reject at admission, since `minCount` is immutable.                                  |
 | Restart                                  | Discover scheduling resources by reference; recreated Pods receive the same mapping. |
 | Delete                                   | OwnerReferences provide cleanup.                                                     |
-| Gate disabled with scheduling configured | Reject the runtime at admission.                                                     |
+| Gate disabled with scheduling configured | Reject new or changed scheduling at admission; unchanged scheduling is allowed.      |
 
 ### Feature Gate Dependencies
 
@@ -1195,14 +1219,14 @@ In `pkg/runtime/framework/plugins/workload`:
 - Naming patterns conform to [Naming Conventions](#naming-conventions) and respect length
   limits, including truncation for long TrainJob and ReplicatedJob names and distinct names per
   replica in level 3.
-- `EnforcePodSpec` sets the expected `SchedulingGroupName` on every PodSet, including the case
+- `EnforceScheduling` sets the expected `SchedulingGroup` on every PodSet, including the case
   where different ReplicatedJobs belong to different groups.
 
 In `pkg/runtime/framework/core`:
 
-- `RunEnforcePodSpecPlugins` passes the whole `Info` object to every registered
-  `EnforcePodSpecPlugin`, and the existing TrainJobStatus expectations still hold after the
-  signature change.
+- `RunEnforceSchedulingPlugins` passes the `Info` object to every registered
+  `EnforceSchedulingPlugin`, and `RuntimeInfo` runs it after `RunEnforcePodGroupPolicyPlugins` and
+  before `RunEnforcePodSpecPlugins`.
 
 In `pkg/webhooks`:
 
@@ -1289,6 +1313,15 @@ alpha in v1.37.
   TrainJob (either by patching the generated `minCount` in place, or by deleting and recreating the
   `Workload`/`PodGroup`), removing the current immutability restriction and the rejection of an
   explicit `gang.minCount`.
+- **Per-replica PodGroups for level 3**: lift the 1-replica restriction of `job` entries by
+  delegating `PodGroup` creation to the Job controller, as described in
+  [KEP-6089](https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/6089-was-controller-apis)
+  and [KEP-5547](https://github.com/kubernetes/enhancements/tree/master/keps/sig-apps/5547-integrate-workload-with-job).
+  The TrainJob controller sets the `scheduling.k8s.io/workload-name` and
+  `scheduling.k8s.io/group-template-name` annotations on the targeted ReplicatedJob's Job template,
+  leaves the Pod `schedulingGroup` unset, and every replica Job creates its own `PodGroup` from the
+  shared `PodGroupTemplate`. This requires a Kubernetes release whose Job controller resolves the
+  `Workload` by the `workload-name` annotation, which is planned for Kubernetes v1.38.
 - **Kueue integration**: expose enough of the scheduling shape for Kueue to build a representative
   aggregate workload for a TrainJob, and define partial eviction and per-ReplicatedJob restart
   behavior. This mirrors the phased Kueue plan in the JobSet KEP and requires a separate design on

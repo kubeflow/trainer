@@ -28,6 +28,7 @@ import (
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 )
@@ -428,6 +429,67 @@ func TestNewInfo(t *testing.T) {
 				Scheduler:   &Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
+		"podSet carries the scheduling group and resource claims of the Pod template": {
+			infoOpts: []InfoOption{
+				WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name: constants.Node,
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+							Claims:   []corev1.ResourceClaim{{Name: "gpu"}},
+						},
+					}},
+				}, corev1ac.PodSpec().
+					WithSchedulingGroup(corev1ac.PodSchedulingGroup().WithPodGroupName("pod-group")).
+					WithResourceClaims(corev1ac.PodResourceClaim().WithName("gpu").WithResourceClaimTemplateName("gpu-template")).
+					WithContainers(corev1ac.Container().
+						WithName(constants.Node).
+						WithResources(corev1ac.ResourceRequirements().
+							WithRequests(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}).
+							WithClaims(corev1ac.ResourceClaim().WithName("gpu")))),
+				),
+			},
+			wantInfo: &Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				Scheduler:   &Scheduler{PodLabels: make(map[string]string)},
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{{
+						Name:            constants.Node,
+						Ancestor:        ptr.To(constants.AncestorTrainer),
+						Count:           ptr.To[int32](1),
+						SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("pod-group"),
+						ResourceClaims: []corev1ac.PodResourceClaimApplyConfiguration{
+							*corev1ac.PodResourceClaim().WithName("gpu").WithResourceClaimTemplateName("gpu-template"),
+						},
+						Containers: []Container{{
+							Name: constants.Node,
+							ResourceClaims: []corev1ac.ResourceClaimApplyConfiguration{
+								*corev1ac.ResourceClaim().WithName("gpu"),
+							},
+						}},
+						SinglePodRequests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+					}},
+				},
+			},
+		},
+		"scheduling is specified": {
+			infoOpts: []InfoOption{
+				WithScheduling(&trainer.TrainingRuntimeScheduling{
+					ReplicatedJobs: []trainer.ReplicatedJobScheduling{{TargetReplicatedJobs: []string{constants.Node}}},
+				}),
+			},
+			wantInfo: &Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{
+						ReplicatedJobs: []trainer.ReplicatedJobScheduling{{TargetReplicatedJobs: []string{constants.Node}}},
+					},
+				},
+				Scheduler: &Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
 		"image and command are extracted from containers and init containers": {
 			infoOpts: []InfoOption{
 				WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 2, corev1.PodSpec{
@@ -725,6 +787,32 @@ func TestFindContainerByName(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			got := tc.info.FindPodSetByAncestor(tc.psAncestor)
 			if diff := cmp.Diff(tc.want, got); len(diff) != 0 {
+				t.Errorf("Unexpected PodSet (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestFindByName(t *testing.T) {
+	podSets := PodSets{
+		{Name: constants.DatasetInitializer, Count: ptr.To[int32](1)},
+		{Name: constants.Node, Count: ptr.To[int32](4)},
+	}
+	cases := map[string]struct {
+		name       string
+		wantPodSet *PodSet
+	}{
+		"PodSet exists": {
+			name:       constants.Node,
+			wantPodSet: &PodSet{Name: constants.Node, Count: ptr.To[int32](4)},
+		},
+		"PodSet does not exist": {
+			name: constants.Launcher,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if diff := cmp.Diff(tc.wantPodSet, podSets.FindByName(tc.name)); len(diff) != 0 {
 				t.Errorf("Unexpected PodSet (-want,+got):\n%s", diff)
 			}
 		})

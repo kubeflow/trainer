@@ -39,6 +39,18 @@ const (
 	// Enables Dynamic Resource Allocation (DRA) support: trainer.resourceClaimsPerNode and
 	// resourceClaims / resources.claims in runtimePatches.
 	TrainJobDynamicResourceAllocation featuregate.Feature = "TrainJobDynamicResourceAllocation"
+
+	// owner: andreyvelich
+	// kep: https://github.com/kubeflow/trainer/blob/master/proposals/3015-workload-aware-scheduling/README.md
+	//
+	// Enables Workload-Aware Scheduling (WAS) support: spec.scheduling in TrainingRuntime and
+	// ClusterTrainingRuntime, and the creation of Workload and PodGroup objects for TrainJobs.
+	// Requires Kubernetes v1.37+ with the GenericWorkload feature gate enabled on kube-apiserver and
+	// kube-scheduler, and the scheduling.k8s.io/v1beta1 API enabled on kube-apiserver.
+	// Optional scheduling fields require additional Kubernetes feature gates:
+	// TopologyAwareWorkloadScheduling for schedulingConstraints, and DRAWorkloadResourceClaims for
+	// resourceClaims.
+	TrainJobWorkloadAwareScheduling featuregate.Feature = "TrainJobWorkloadAwareScheduling"
 )
 
 // defaultFeatureGates consists of all known Trainer-specific feature keys.
@@ -51,6 +63,8 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	TrainJobStatus: {Default: false, PreRelease: featuregate.Alpha},
 
 	TrainJobDynamicResourceAllocation: {Default: false, PreRelease: featuregate.Alpha},
+
+	TrainJobWorkloadAwareScheduling: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 // Enabled is helper for `utilfeature.DefaultFeatureGate.Enabled()`

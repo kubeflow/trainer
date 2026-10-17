@@ -36,6 +36,7 @@ from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.trainer_v1alpha1_job_set_template_spec import TrainerV1alpha1JobSetTemplateSpec
 from kubeflow_trainer_api.models.trainer_v1alpha1_ml_policy import TrainerV1alpha1MLPolicy
 from kubeflow_trainer_api.models.trainer_v1alpha1_pod_group_policy import TrainerV1alpha1PodGroupPolicy
+from kubeflow_trainer_api.models.trainer_v1alpha1_training_runtime_scheduling import TrainerV1alpha1TrainingRuntimeScheduling
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -45,8 +46,9 @@ class TrainerV1alpha1TrainingRuntimeSpec(BaseModel):
     """ # noqa: E501
     ml_policy: Optional[TrainerV1alpha1MLPolicy] = Field(default=None, description="mlPolicy provides the ML-specific parameters for the model training.", alias="mlPolicy")
     pod_group_policy: Optional[TrainerV1alpha1PodGroupPolicy] = Field(default=None, description="podGroupPolicy defines the configuration for the PodGroup to enable gang-scheduling via supported plugins.", alias="podGroupPolicy")
+    scheduling: Optional[TrainerV1alpha1TrainingRuntimeScheduling] = Field(default=None, description="scheduling defines the Workload-Aware Scheduling configuration for TrainJobs which reference this runtime. When set, the TrainJob controller creates a Workload and the corresponding PodGroups for every TrainJob. When nil, no scheduling objects are created and TrainJob behavior is unchanged. This field is mutually exclusive with podGroupPolicy. This is an alpha feature and requires enabling the TrainJobWorkloadAwareScheduling feature gate. This field embeds upstream scheduling.k8s.io/v1alpha3 types and is excluded from the Trainer API stability guarantees until the upstream scheduling APIs graduate. More info: https://github.com/kubeflow/trainer/tree/master/proposals/3015-workload-aware-scheduling")
     template: Optional[TrainerV1alpha1JobSetTemplateSpec] = Field(default=None, description="template for the JobSet which will be used by TrainJob.")
-    __properties: ClassVar[List[str]] = ["mlPolicy", "podGroupPolicy", "template"]
+    __properties: ClassVar[List[str]] = ["mlPolicy", "podGroupPolicy", "scheduling", "template"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -93,6 +95,9 @@ class TrainerV1alpha1TrainingRuntimeSpec(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of pod_group_policy
         if self.pod_group_policy:
             _dict['podGroupPolicy'] = self.pod_group_policy.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of scheduling
+        if self.scheduling:
+            _dict['scheduling'] = self.scheduling.to_dict()
         # override the default output from pydantic by calling `to_dict()` of template
         if self.template:
             _dict['template'] = self.template.to_dict()
@@ -110,6 +115,7 @@ class TrainerV1alpha1TrainingRuntimeSpec(BaseModel):
         _obj = cls.model_validate({
             "mlPolicy": TrainerV1alpha1MLPolicy.from_dict(obj["mlPolicy"]) if obj.get("mlPolicy") is not None else None,
             "podGroupPolicy": TrainerV1alpha1PodGroupPolicy.from_dict(obj["podGroupPolicy"]) if obj.get("podGroupPolicy") is not None else None,
+            "scheduling": TrainerV1alpha1TrainingRuntimeScheduling.from_dict(obj["scheduling"]) if obj.get("scheduling") is not None else None,
             "template": TrainerV1alpha1JobSetTemplateSpec.from_dict(obj["template"]) if obj.get("template") is not None else None
         })
         return _obj

@@ -33,6 +33,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/features"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
 // +kubebuilder:webhook:path=/mutate-trainer-kubeflow-org-v1alpha1-trainjob,mutating=true,failurePolicy=fail,sideEffects=None,groups=trainer.kubeflow.org,resources=trainjobs,verbs=create;update,versions=v1alpha1,name=defaulter.trainjob.trainer.kubeflow.org,admissionReviewVersions=v1
@@ -152,85 +153,15 @@ func (w *TrainJobValidator) ValidateDelete(ctx context.Context, obj *trainer.Tra
 
 // usesDRA reports whether the TrainJob references any DRA fields.
 func usesDRA(trainJob *trainer.TrainJob) bool {
-	if trainJob.Spec.Trainer != nil && len(trainJob.Spec.Trainer.ResourceClaimsPerNode) > 0 {
-		return true
-	}
-	for _, patch := range trainJob.Spec.RuntimePatches {
-		if patch.TrainingRuntimeSpec == nil || patch.TrainingRuntimeSpec.Template == nil ||
-			patch.TrainingRuntimeSpec.Template.Spec == nil {
-			continue
-		}
-		for _, rJob := range patch.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs {
-			if rJob.Template == nil || rJob.Template.Spec == nil ||
-				rJob.Template.Spec.Template == nil || rJob.Template.Spec.Template.Spec == nil {
-				continue
-			}
-			podSpec := rJob.Template.Spec.Template.Spec
-			if len(podSpec.ResourceClaims) > 0 {
-				return true
-			}
-			for _, c := range podSpec.Containers {
-				if c.Resources != nil && len(c.Resources.Claims) > 0 {
-					return true
-				}
-			}
-			for _, c := range podSpec.InitContainers {
-				if c.Resources != nil && len(c.Resources.Claims) > 0 {
-					return true
-				}
-			}
-		}
-	}
-	return false
+	return len(trainjob.ResourceClaimsPaths(trainJob)) > 0 || len(trainjob.ContainerResourceClaimsPaths(trainJob)) > 0
 }
 
 // draFieldPaths returns field.Forbidden errors for every DRA field set on the TrainJob.
 func draFieldPaths(trainJob *trainer.TrainJob) field.ErrorList {
 	var allErrs field.ErrorList
-	specPath := field.NewPath("spec")
 	msg := "TrainJobDynamicResourceAllocation feature gate is disabled"
-
-	if trainJob.Spec.Trainer != nil && len(trainJob.Spec.Trainer.ResourceClaimsPerNode) > 0 {
-		allErrs = append(allErrs, field.Forbidden(
-			specPath.Child("trainer", "resourceClaimsPerNode"), msg,
-		))
-	}
-
-	for i, patch := range trainJob.Spec.RuntimePatches {
-		if patch.TrainingRuntimeSpec == nil || patch.TrainingRuntimeSpec.Template == nil ||
-			patch.TrainingRuntimeSpec.Template.Spec == nil {
-			continue
-		}
-		for j, rJob := range patch.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs {
-			if rJob.Template == nil || rJob.Template.Spec == nil ||
-				rJob.Template.Spec.Template == nil || rJob.Template.Spec.Template.Spec == nil {
-				continue
-			}
-			podSpec := rJob.Template.Spec.Template.Spec
-			rJobPath := specPath.Child("runtimePatches").Index(i).
-				Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(j).
-				Child("template", "spec", "template", "spec")
-
-			if len(podSpec.ResourceClaims) > 0 {
-				allErrs = append(allErrs, field.Forbidden(
-					rJobPath.Child("resourceClaims"), msg,
-				))
-			}
-			for k, c := range podSpec.Containers {
-				if c.Resources != nil && len(c.Resources.Claims) > 0 {
-					allErrs = append(allErrs, field.Forbidden(
-						rJobPath.Child("containers").Index(k).Child("resources", "claims"), msg,
-					))
-				}
-			}
-			for k, c := range podSpec.InitContainers {
-				if c.Resources != nil && len(c.Resources.Claims) > 0 {
-					allErrs = append(allErrs, field.Forbidden(
-						rJobPath.Child("initContainers").Index(k).Child("resources", "claims"), msg,
-					))
-				}
-			}
-		}
+	for _, path := range append(trainjob.ResourceClaimsPaths(trainJob), trainjob.ContainerResourceClaimsPaths(trainJob)...) {
+		allErrs = append(allErrs, field.Forbidden(path, msg))
 	}
 	return allErrs
 }

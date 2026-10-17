@@ -49,7 +49,7 @@ type Info struct {
 type RuntimePolicy struct {
 	MLPolicySource *trainer.MLPolicySource
 	PodGroupPolicy *trainer.PodGroupPolicy
-	//FluxPolicySource *trainer.FluxMLPolicySource
+	Scheduling     *trainer.TrainingRuntimeScheduling
 }
 
 type TemplateSpec struct {
@@ -69,24 +69,27 @@ type PodSet struct {
 	Name string
 	// Ancestor is built by `trainer.kubeflow.org/trainjob-ancestor-step` label value
 	// in Runtime CRDs.
-	Ancestor       *string
-	Count          *int32
-	InitContainers []Container
-	Containers     []Container
-	Volumes        []corev1ac.VolumeApplyConfiguration
-	Endpoints      iter.Seq[string]
+	Ancestor        *string
+	Count           *int32
+	InitContainers  []Container
+	Containers      []Container
+	Volumes         []corev1ac.VolumeApplyConfiguration
+	SchedulingGroup *corev1ac.PodSchedulingGroupApplyConfiguration
+	ResourceClaims  []corev1ac.PodResourceClaimApplyConfiguration
+	Endpoints       iter.Seq[string]
 	// The total PodSet requests can be calculated with
 	// SinglePodRequests x Count.
 	SinglePodRequests corev1.ResourceList
 }
 
 type Container struct {
-	Name         string
-	Image        string
-	Command      []string
-	Env          []corev1ac.EnvVarApplyConfiguration
-	Ports        []corev1ac.ContainerPortApplyConfiguration
-	VolumeMounts []corev1ac.VolumeMountApplyConfiguration
+	Name           string
+	Image          string
+	Command        []string
+	Env            []corev1ac.EnvVarApplyConfiguration
+	Ports          []corev1ac.ContainerPortApplyConfiguration
+	VolumeMounts   []corev1ac.VolumeMountApplyConfiguration
+	ResourceClaims []corev1ac.ResourceClaimApplyConfiguration
 }
 
 // TODO (andreyvelich): Potentially, we can add ScheduleTimeoutSeconds to the Scheduler for consistency.
@@ -132,6 +135,12 @@ func WithPodGroupPolicy(pgPolicy *trainer.PodGroupPolicy) InfoOption {
 	}
 }
 
+func WithScheduling(scheduling *trainer.TrainingRuntimeScheduling) InfoOption {
+	return func(o *InfoOptions) {
+		o.runtimePolicy.Scheduling = scheduling
+	}
+}
+
 func WithTemplateSpecObjApply(objApply any) InfoOption {
 	return func(o *InfoOptions) {
 		o.templateSpec.ObjApply = objApply
@@ -149,6 +158,8 @@ func WithPodSet(
 			Ancestor:          ancestor,
 			Count:             ptr.To(max(count, 1)),
 			Volumes:           podSpecApply.Volumes,
+			SchedulingGroup:   podSpecApply.SchedulingGroup,
+			ResourceClaims:    podSpecApply.ResourceClaims,
 			SinglePodRequests: resourcehelpers.PodRequests(&corev1.Pod{Spec: typedPodSpec}, resourcehelpers.PodResourcesOptions{}),
 			InitContainers:    slices.Collect(toPodSetContainer(podSpecApply.InitContainers...)),
 			Containers:        slices.Collect(toPodSetContainer(podSpecApply.Containers...)),
@@ -167,6 +178,9 @@ func toPodSetContainer(containerApply ...corev1ac.ContainerApplyConfiguration) i
 				Env:          cApply.Env,
 				Ports:        cApply.Ports,
 				VolumeMounts: cApply.VolumeMounts,
+			}
+			if cApply.Resources != nil {
+				container.ResourceClaims = cApply.Resources.Claims
 			}
 			if !yield(container) {
 				return
@@ -247,6 +261,14 @@ func (i *Info) FindContainerByPodSetName(psName, containerName string) *Containe
 // `trainer.kubeflow.org/trainjob-ancestor-step` label value.
 func (ps PodSets) FindByAncestor(ancestor string) *PodSet {
 	if idx := slices.IndexFunc(ps, func(p PodSet) bool { return ptr.Equal(p.Ancestor, &ancestor) }); idx != -1 {
+		return &ps[idx]
+	}
+	return nil
+}
+
+// FindByName finds the PodSet with the given name, which is the name of its ReplicatedJob.
+func (ps PodSets) FindByName(name string) *PodSet {
+	if idx := slices.IndexFunc(ps, func(p PodSet) bool { return p.Name == name }); idx != -1 {
 		return &ps[idx]
 	}
 	return nil
