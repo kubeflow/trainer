@@ -36,9 +36,13 @@ import (
 )
 
 func TestClusterTrainingRuntimeValidateCreate(t *testing.T) {
+	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
 	cases := map[string]struct {
-		labels   map[string]string
-		warnings admission.Warnings
+		labels     map[string]string
+		scheduling *trainer.TrainingRuntimeScheduling
+		warnings   admission.Warnings
+		wantError  field.ErrorList
 	}{
 		"no deprecation label": {
 			labels:   nil,
@@ -48,6 +52,15 @@ func TestClusterTrainingRuntimeValidateCreate(t *testing.T) {
 			labels: map[string]string{constants.LabelSupport: constants.SupportDeprecated},
 			warnings: admission.Warnings{
 				"ClusterTrainingRuntime \"test-runtime\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: " + constants.RuntimeDeprecationPolicyURL,
+			},
+		},
+		"scheduling leaving a ReplicatedJob untargeted is rejected": {
+			scheduling: &trainer.TrainingRuntimeScheduling{
+				ReplicatedJobs: []trainer.ReplicatedJobScheduling{{TargetReplicatedJobs: []string{constants.Node}}},
+			},
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "template", "spec", "replicatedJobs").Index(0).Child("name"), constants.DatasetInitializer, ""),
+				field.Invalid(field.NewPath("spec", "template", "spec", "replicatedJobs").Index(1).Child("name"), constants.ModelInitializer, ""),
 			},
 		},
 	}
@@ -72,11 +85,12 @@ func TestClusterTrainingRuntimeValidateCreate(t *testing.T) {
 			if len(tc.labels) != 0 {
 				obj.Labels = tc.labels
 			}
+			obj.Spec.Scheduling = tc.scheduling
 
 			validator := &ClusterTrainingRuntimeValidator{}
 			warnings, err := validator.ValidateCreate(ctx, obj)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			if diff := cmp.Diff(tc.wantError.ToAggregate(), err, cmpopts.IgnoreFields(field.Error{}, "Detail")); len(diff) != 0 {
+				t.Errorf("Unexpected error from ValidateCreate (-want, +got): %s", diff)
 			}
 			if diff := cmp.Diff(tc.warnings, warnings); diff != "" {
 				t.Fatalf("unexpected warnings (-want, +got): %s", diff)
@@ -86,6 +100,8 @@ func TestClusterTrainingRuntimeValidateCreate(t *testing.T) {
 }
 
 func TestClusterTrainingRuntimeValidateUpdate(t *testing.T) {
+	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
 	cases := map[string]struct {
 		oldObj    *trainer.ClusterTrainingRuntime
 		newObj    *trainer.ClusterTrainingRuntime
@@ -144,6 +160,30 @@ func TestClusterTrainingRuntimeValidateUpdate(t *testing.T) {
 					},
 				}).Obj(),
 		},
+		"leaving a ReplicatedJob untargeted is rejected": {
+			oldObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj().Spec).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					Scheduling(&trainer.TrainingRuntimeScheduling{
+						ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+							{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer, constants.Node}},
+						},
+					}).
+					Obj()).
+				Obj(),
+			newObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj().Spec).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					Scheduling(&trainer.TrainingRuntimeScheduling{
+						ReplicatedJobs: []trainer.ReplicatedJobScheduling{{TargetReplicatedJobs: []string{constants.Node}}},
+					}).
+					Obj()).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "template", "spec", "replicatedJobs").Index(0).Child("name"), constants.DatasetInitializer, ""),
+				field.Invalid(field.NewPath("spec", "template", "spec", "replicatedJobs").Index(1).Child("name"), constants.ModelInitializer, ""),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -174,66 +214,5 @@ func TestClusterTrainingRuntimeValidateDelete(t *testing.T) {
 	}
 	if len(warnings) != 0 {
 		t.Errorf("ValidateDelete() warnings = %v, want nil", warnings)
-	}
-}
-
-func TestClusterTrainingRuntimeValidateScheduling(t *testing.T) {
-	newRuntime := func(scheduling *trainer.TrainingRuntimeScheduling) *trainer.ClusterTrainingRuntime {
-		return testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
-			RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj().Spec).
-				Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
-				Scheduling(scheduling).
-				Obj()).
-			Obj()
-	}
-	scheduling := &trainer.TrainingRuntimeScheduling{
-		ReplicatedJobs: []trainer.ReplicatedJobScheduling{
-			{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer, constants.Node}},
-		},
-	}
-	cases := map[string]struct {
-		enableWAS bool
-		oldObj    *trainer.ClusterTrainingRuntime
-		newObj    *trainer.ClusterTrainingRuntime
-		wantErr   bool
-	}{
-		"create is rejected when the feature gate is disabled": {
-			newObj:  newRuntime(scheduling),
-			wantErr: true,
-		},
-		"create is accepted when the feature gate is enabled": {
-			enableWAS: true,
-			newObj:    newRuntime(scheduling),
-		},
-		"update adding scheduling is rejected when the feature gate is disabled": {
-			oldObj:  newRuntime(nil),
-			newObj:  newRuntime(scheduling),
-			wantErr: true,
-		},
-		"update leaving a ReplicatedJob untargeted is rejected when the feature gate is enabled": {
-			enableWAS: true,
-			oldObj:    newRuntime(scheduling),
-			newObj: newRuntime(&trainer.TrainingRuntimeScheduling{
-				ReplicatedJobs: []trainer.ReplicatedJobScheduling{{TargetReplicatedJobs: []string{constants.Node}}},
-			}),
-			wantErr: true,
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, tc.enableWAS)
-			_, ctx := ktesting.NewTestContext(t)
-			validator := &ClusterTrainingRuntimeValidator{}
-			var err error
-			if tc.oldObj == nil {
-				_, err = validator.ValidateCreate(ctx, tc.newObj)
-			} else {
-				_, err = validator.ValidateUpdate(ctx, tc.oldObj, tc.newObj)
-			}
-			if gotErr := err != nil; gotErr != tc.wantErr {
-				t.Errorf("unexpected error: got %v, wantErr %v", err, tc.wantErr)
-			}
-		})
 	}
 }

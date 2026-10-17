@@ -2710,6 +2710,8 @@ func TestNewRuntimeInfoScheduling(t *testing.T) {
 }
 
 func TestTrainingRuntimeValidateObjects(t *testing.T) {
+	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
 	validRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj()
 
 	cases := map[string]struct {
@@ -2797,6 +2799,35 @@ func TestTrainingRuntimeValidateObjects(t *testing.T) {
 				Obj(),
 			existingRuntime: validRuntime,
 			wantErrs:        nil,
+		},
+		"returns field error when TrainJob sets resourceClaimsPerNode and runtime sets Job-level resourceClaims": {
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(testingutil.MakeTrainJobTrainerWrapper().
+					ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "gpu-template"}).
+					Obj()).
+				Obj(),
+			existingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+				RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj().Spec).
+					Scheduling(&trainer.TrainingRuntimeScheduling{
+						ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+							{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+							{
+								TargetReplicatedJobs: []string{constants.Node},
+								Job: &trainer.JobScheduling{
+									ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
+										Name:                      "tpu-slice",
+										ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+									}},
+								},
+							},
+						},
+					}).
+					Obj()).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "trainer", "resourceClaimsPerNode"), ""),
+			},
 		},
 	}
 
@@ -3022,50 +3053,5 @@ func TestToApplyConfig(t *testing.T) {
 				t.Errorf("Unexpected apply configuration (-want,+got):\n%s", diff)
 			}
 		})
-	}
-}
-
-func TestTrainingRuntimeValidateObjectsScheduling(t *testing.T) {
-	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-
-	baseRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime")
-	existingRuntime := baseRuntime.RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-		Scheduling(&trainer.TrainingRuntimeScheduling{
-			ReplicatedJobs: []trainer.ReplicatedJobScheduling{
-				{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
-				{
-					TargetReplicatedJobs: []string{constants.Node},
-					Job: &trainer.JobScheduling{
-						ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
-							Name:                      "tpu-slice",
-							ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
-						}},
-					},
-				},
-			},
-		}).
-		Obj()).
-		Obj()
-	trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-		RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-		Trainer(testingutil.MakeTrainJobTrainerWrapper().
-			ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "gpu-template"}).
-			Obj()).
-		Obj()
-
-	clientBuilder := testingutil.NewClientBuilder().WithObjects(existingRuntime)
-	trainingRuntime, err := NewTrainingRuntime(ctx, clientBuilder.Build(), testingutil.AsIndex(clientBuilder), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, fieldErrors := trainingRuntime.ValidateObjects(ctx, nil, trainJob)
-	wantErrs := field.ErrorList{
-		field.Forbidden(field.NewPath("spec", "trainer", "resourceClaimsPerNode"), ""),
-	}
-	if diff := cmp.Diff(wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail")); diff != "" {
-		t.Errorf("Unexpected field errors (-want,+got):\n%s", diff)
 	}
 }

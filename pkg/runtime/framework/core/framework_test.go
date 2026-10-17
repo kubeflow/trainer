@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -32,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
@@ -2875,27 +2873,58 @@ func TestRunPreComponentBuilderPlugins(t *testing.T) {
 func TestRunEnforceSchedulingPlugins(t *testing.T) {
 	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
-	newInfo := func() *runtime.Info {
-		return runtime.NewInfo(
-			runtime.WithScheduling(&trainer.TrainingRuntimeScheduling{}),
-			runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec()),
-		)
-	}
 	cases := map[string]struct {
-		registry            fwkplugins.Registry
-		runtimeInfo         *runtime.Info
-		wantSchedulingGroup bool
+		registry        fwkplugins.Registry
+		runtimeInfo     *runtime.Info
+		trainJob        *trainer.TrainJob
+		wantRuntimeInfo *runtime.Info
 	}{
 		"workload plugin is applied to runtime.Info": {
-			registry:            fwkplugins.NewRegistry(),
-			runtimeInfo:         newInfo(),
-			wantSchedulingGroup: true,
+			registry: fwkplugins.NewRegistry(),
+			runtimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](1)}},
+				},
+			},
+			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault, UID: "uid"}},
+			wantRuntimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:            constants.Node,
+						Count:           ptr.To[int32](1),
+						SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-b6ff97ef4e"),
+					}},
+				},
+			},
 		},
 		"an empty registry": {
-			runtimeInfo: newInfo(),
+			runtimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](1)}},
+				},
+			},
+			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault, UID: "uid"}},
+			wantRuntimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](1)}},
+				},
+			},
 		},
 		"runtime.Info is nil": {
 			registry: fwkplugins.NewRegistry(),
+			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault, UID: "uid"}},
 		},
 	}
 	for name, tc := range cases {
@@ -2908,24 +2937,11 @@ func TestRunEnforceSchedulingPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj()
-			if err := fwk.RunEnforceSchedulingPlugins(tc.runtimeInfo, trainJob); err != nil {
+			if err = fwk.RunEnforceSchedulingPlugins(tc.runtimeInfo, tc.trainJob); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if tc.runtimeInfo == nil {
-				return
-			}
-			for _, ps := range tc.runtimeInfo.TemplateSpec.PodSets {
-				if !tc.wantSchedulingGroup {
-					if ps.SchedulingGroup != nil {
-						t.Errorf("Expected no SchedulingGroup for PodSet %q, got %v", ps.Name, ps.SchedulingGroup)
-					}
-					continue
-				}
-				podGroupName := ptr.Deref(ptr.Deref(ps.SchedulingGroup, corev1ac.PodSchedulingGroupApplyConfiguration{}).PodGroupName, "")
-				if !strings.HasPrefix(podGroupName, "test-job-") || len(validation.IsDNS1123Label(podGroupName)) != 0 {
-					t.Errorf("Expected PodSet %q to reference a PodGroup of the TrainJob, got %q", ps.Name, podGroupName)
-				}
+			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo); len(diff) != 0 {
+				t.Errorf("Unexpected runtime.Info (-want,+got): %s", diff)
 			}
 		})
 	}

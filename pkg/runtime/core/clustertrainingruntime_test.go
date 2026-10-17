@@ -293,6 +293,8 @@ func TestClusterTrainingRuntimeDeleteObjects(t *testing.T) {
 }
 
 func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
+	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
 	validRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj()
 
 	deprecatedRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("deprecated-runtime").Obj()
@@ -338,6 +340,35 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 				`Referenced ClusterTrainingRuntime "deprecated-runtime" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: ` + constants.RuntimeDeprecationPolicyURL,
 			},
 		},
+		"returns field error when TrainJob sets resourceClaimsPerNode and runtime sets Job-level resourceClaims": {
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Trainer(testingutil.MakeTrainJobTrainerWrapper().
+					ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "gpu-template"}).
+					Obj()).
+				Obj(),
+			existingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj().Spec).
+					Scheduling(&trainer.TrainingRuntimeScheduling{
+						ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+							{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+							{
+								TargetReplicatedJobs: []string{constants.Node},
+								Job: &trainer.JobScheduling{
+									ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
+										Name:                      "tpu-slice",
+										ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+									}},
+								},
+							},
+						},
+					}).
+					Obj()).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "trainer", "resourceClaimsPerNode"), ""),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -372,60 +403,5 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 				t.Errorf("Unexpected warnings (-want,+got):\n%s", diff)
 			}
 		})
-	}
-}
-
-func TestClusterTrainingRuntimeValidateObjectsScheduling(t *testing.T) {
-	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-
-	baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime")
-	existingRuntime := baseRuntime.RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-		Scheduling(&trainer.TrainingRuntimeScheduling{
-			ReplicatedJobs: []trainer.ReplicatedJobScheduling{
-				{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
-				{
-					TargetReplicatedJobs: []string{constants.Node},
-					Job: &trainer.JobScheduling{
-						ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
-							Name:                      "tpu-slice",
-							ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
-						}},
-					},
-				},
-			},
-		}).
-		Obj()).
-		Obj()
-	trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-		RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
-		Trainer(testingutil.MakeTrainJobTrainerWrapper().
-			ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "gpu-template"}).
-			Obj()).
-		Obj()
-
-	clientBuilder := testingutil.NewClientBuilder().WithObjects(existingRuntime)
-	c := clientBuilder.Build()
-	trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var ok bool
-	trainingRuntimeFactory, ok = trainingRuntime.(*TrainingRuntime)
-	if !ok {
-		t.Fatal("Failed type assertion from Runtime interface to TrainingRuntime")
-	}
-	clTrainingRuntime, err := NewClusterTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, fieldErrors := clTrainingRuntime.ValidateObjects(ctx, nil, trainJob)
-	wantErrs := field.ErrorList{
-		field.Forbidden(field.NewPath("spec", "trainer", "resourceClaimsPerNode"), ""),
-	}
-	if diff := cmp.Diff(wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail")); diff != "" {
-		t.Errorf("Unexpected field errors (-want,+got):\n%s", diff)
 	}
 }
