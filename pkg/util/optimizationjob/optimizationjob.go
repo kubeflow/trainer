@@ -17,6 +17,8 @@ limitations under the License.
 package optimizationjob
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -32,12 +34,17 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
+// GetAlgorithmServiceName returns the name of the search algorithm Deployment and Service.
+// A name too long to keep whole is cut and given a hash of the full name, so OptimizationJobs
+// whose names share a prefix do not share an algorithm service.
 func GetAlgorithmServiceName(optJob *trainer.OptimizationJob) string {
 	const suffix = "-search-algorithm"
 	maxPrefix := 63 - len(suffix)
 	prefix := optJob.Name
 	if len(prefix) > maxPrefix {
-		prefix = strings.TrimRight(prefix[:maxPrefix], "-")
+		hash := sha256.Sum256([]byte(optJob.Name))
+		shortHash := hex.EncodeToString(hash[:])[:8]
+		prefix = strings.TrimRight(prefix[:maxPrefix-len(shortHash)-1], "-") + "-" + shortHash
 	}
 	return fmt.Sprintf("%s%s", prefix, suffix)
 }
