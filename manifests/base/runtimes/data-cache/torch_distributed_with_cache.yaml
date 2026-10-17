@@ -36,9 +36,23 @@ spec:
             template:
               spec:
                 serviceAccountName: kubeflow-trainer-cache-initializer
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 1000
+                  seccompProfile:
+                    type: RuntimeDefault
                 containers:
                   - name: dataset-initializer
                     image: ghcr.io/kubeflow/trainer/dataset-initializer
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                        drop:
+                          - ALL
+                      runAsNonRoot: true
+                      runAsUser: 1000
+                      seccompProfile:
+                        type: RuntimeDefault
                     env:
                       - name: CACHE_IMAGE
                         value: "ghcr.io/kubeflow/trainer/data-cache:latest"
@@ -58,12 +72,35 @@ spec:
           spec:
             template:
               spec:
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 1000
+                  seccompProfile:
+                    type: RuntimeDefault
                 containers:
                   - name: node
                     image: pytorch/pytorch:2.13.0-cuda13.0-cudnn9-runtime
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                        drop:
+                          - ALL
+                      runAsNonRoot: true
+                      runAsUser: 1000
+                      seccompProfile:
+                        type: RuntimeDefault
+                    volumeMounts:
+                      - name: workspace
+                        mountPath: /workspace
                     env:
                       - name: TRAIN_JOB_NAME
                         valueFrom:
                           fieldRef:
                             apiVersion: v1
                             fieldPath: metadata.labels['jobset.sigs.k8s.io/jobset-name']
+                # The default image runs as root and owns /workspace, so the non-root
+                # trainer cannot write there. The emptyDir keeps the working directory
+                # writable without changing the image's configured WORKDIR.
+                volumes:
+                  - name: workspace
+                    emptyDir: {}
