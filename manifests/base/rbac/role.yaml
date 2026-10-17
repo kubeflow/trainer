@@ -159,6 +159,7 @@ rules:
   - trainer.kubeflow.org
   resources:
   - clustertrainingruntimes/finalizers
+  - optimizationjobs/finalizers
   - optimizationjobs/status
   - trainingruntimes/finalizers
   - trainjobs/finalizers
