@@ -326,10 +326,10 @@ impl FlightService for WorkerService {
         )
         .await
         .map_err(|e| Status::internal(format!("Failed to create data loader: {}", e)))?;
-        let _ = data_loader
+        data_loader
             .load_data(&self.ctx.clone(), "memtable", start_index)
             .await
-            .map_err(|e| Status::internal(format!("failed to load dataset: {}", e)));
+            .map_err(|e| Status::internal(format!("failed to load dataset: {}", e)))?;
         let df = self
             .ctx
             .sql(
