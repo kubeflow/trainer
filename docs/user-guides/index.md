@@ -118,6 +118,20 @@ Monitor training progress and custom metrics in TrainJob status
 
 :::::
 
+## Hyperparameter Optimization
+
+:::::{grid} 1 1 2 2
+:gutter: 3
+
+::::{grid-item-card} Hyperparameter Optimization
+:link: optimizationjob
+:link-type: doc
+
+Tune TrainJob hyperparameters with OptimizationJob
+::::
+
+:::::
+
 ## Local Development
 
 :::::{grid} 1 1 2 2
@@ -169,6 +183,7 @@ xgboost
 megatron
 flux
 trainjob-progress
+optimizationjob
 data-cache
 builtin-trainer/index
 local-execution/index
