@@ -111,7 +111,7 @@ The key design principles are:
 | Keep initializers out of the trainer gang                      | A `replicatedJobs` entry gives the initializers a Basic policy and the trainer a Gang policy, for lazily load data initialization. |
 | Constrain trainer placement to one topology domain             | `schedulingConstraints` on the trainer's `replicatedJobs` entry requests coordinated placement.                                    |
 | Keep existing TrainJobs unchanged                              | A runtime without `spec.scheduling` creates no WAS resources.                                                                      |
-| Share a DRA claim across a Job's Pods                          | A `resourceClaims` entry is copied to the generated PodGroup, and every Pod in the group references the shared claim.              |
+| Share a DRA claim across a Job's Pods                          | A `resourceClaims` entry is copied to the generated PodGroup, and the Pods that declare a matching claim share it.                 |
 | Run a TPU multi-slice workload                                 | A `replicatedJobs` entry sets `job`, so each replica becomes its own gang with its own topology request and slice-scoped claim.    |
 | Combine a TrainJob-wide policy with per-ReplicatedJob policies | Requires the `TrainJobCompositePodGroup` feature gate and `CompositePodGroup`; rejected at admission otherwise.                    |
 
@@ -644,12 +644,20 @@ spec:
             spec:
               template:
                 spec:
+                  resourceClaims:
+                    - name: tpu-slice
+                      resourceClaimTemplateName: tpu-slice-template
                   containers:
                     - name: node
                       image: ghcr.io/kubeflow/trainer/torch-runtime
+                      resources:
+                        claims:
+                          - name: tpu-slice
 ```
 
 The TrainJob controller will create one `Workload` and multiple `PodGroups` per Replica in `node` ReplicatedJob.
+The Pod template declares the `tpu-slice` claim, so every Pod of a replica uses the claim
+generated for its `PodGroup`.
 
 This story is not supported in the initial implementation: level 3 requires the targeted
 ReplicatedJob to have at most 1 replica, as described in [Validation](#validation). Supporting it
@@ -961,6 +969,12 @@ The TrainingRuntime and ClusterTrainingRuntime validation enforces that:
   The validation logic mirrors the controller's `minCount` computation; if that computation
   changes, the validation must be updated accordingly. This restriction will be lifted when
   elastic TrainJob support is defined.
+- Every `scheduling.replicatedJobs[].job.resourceClaims` entry must have a Pod `resourceClaims`
+  entry with the same `name`, `resourceClaimName`, and `resourceClaimTemplateName` in the Pod
+  template of the targeted ReplicatedJob. A Pod uses a `PodGroup` ResourceClaim only when it
+  declares such a matching claim, so a `PodGroup` claim without it is allocated but never used.
+  This check is in the runtime validation webhook, since CEL can't traverse the embedded JobSet
+  template within the cost budget.
 - Setting `trainJob.spec.trainer.resourceClaimsPerNode` or Pod resource claims via
   `trainJob.spec.runtimePatches` is rejected when the resolved runtime sets
   `scheduling.replicatedJobs[].job.resourceClaims`. TrainJob and runtime are managed by different
@@ -1090,8 +1104,9 @@ type EnforceSchedulingPlugin interface {
 `RunEnforceSchedulingPlugins` runs after `RunEnforceMLPolicyPlugins` and
 `RunEnforcePodGroupPolicyPlugins` and before `RunEnforcePodSpecPlugins`, so the PodSet counts that
 Gang `minCount` is derived from are final by the time this plugin runs. The plugin sets the
-`SchedulingGroup` of every PodSet, and the Pod and container `ResourceClaims` of the PodSets
-targeted by `job.resourceClaims`. The JobSet plugin propagates them to the Pod spec:
+`SchedulingGroup` of every PodSet, which the JobSet plugin propagates to the Pod spec. Like JobSet,
+the plugin doesn't inject the Pod and container claims for `job.resourceClaims`: runtime authors
+declare them in the Pod template, which lets them choose the containers that use the claim:
 
 ```yaml
 spec:
@@ -1241,6 +1256,8 @@ In `pkg/webhooks`:
 - `job` combined with the same entry's level 2 fields, or with more than one target, is rejected
   without `TrainJobCompositePodGroup` and accepted with it.
 - An explicit `gang.minCount` is rejected.
+- A `job.resourceClaims` entry without a matching Pod resource claim in the targeted ReplicatedJob
+  is rejected.
 - A level 1 Gang policy, explicit or defaulted, is rejected when a ReplicatedJob sets `dependsOn`,
   and a Basic level 1 policy is accepted.
 - A configuration resolving to more than 8 `PodGroupTemplates` is rejected.

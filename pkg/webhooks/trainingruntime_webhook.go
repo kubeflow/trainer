@@ -19,12 +19,14 @@ package webhooks
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
@@ -45,6 +47,7 @@ const (
 	schedulingTargetNotFoundErrorMsg   = "must reference a replicatedJob in spec.template.spec.replicatedJobs"
 	schedulingUntargetedErrorMsg       = "must be targeted by a spec.scheduling.replicatedJobs entry when spec.scheduling.replicatedJobs is set"
 	schedulingJobReplicasErrorMsg      = "must target a ReplicatedJob with at most 1 replica; a PodGroup per replica is not supported yet"
+	schedulingJobClaimErrorMsg         = "must have a Pod resourceClaim with the same name, resourceClaimName, and resourceClaimTemplateName in the targeted ReplicatedJob"
 	schedulingTrainJobPriorityErrorMsg = "must match %q of the other ReplicatedJobs sharing the TrainJob-level PodGroup"
 	schedulingGroupPriorityErrorMsg    = "priorityClassName %q must match %q of the other ReplicatedJobs sharing this PodGroup"
 )
@@ -187,9 +190,11 @@ func validateScheduling(ctx context.Context, newSpec, oldSpec *trainer.TrainingR
 
 	replicas := make(map[string]int32, len(rJobs))
 	priorityClassNames := make(map[string]string, len(rJobs))
+	podClaims := make(map[string][]corev1.PodResourceClaim, len(rJobs))
 	for _, rJob := range rJobs {
 		replicas[rJob.Name] = rJob.Replicas
 		priorityClassNames[rJob.Name] = rJob.Template.Spec.Template.Spec.PriorityClassName
+		podClaims[rJob.Name] = rJob.Template.Spec.Template.Spec.ResourceClaims
 	}
 	targeted := sets.New[string]()
 	for i, entry := range scheduling.ReplicatedJobs {
@@ -206,6 +211,20 @@ func validateScheduling(ctx context.Context, newSpec, oldSpec *trainer.TrainingR
 		if entry.Job != nil && len(entry.TargetReplicatedJobs) == 1 && replicas[entry.TargetReplicatedJobs[0]] > 1 {
 			allErrs = append(allErrs, field.Invalid(schedulingPath.Child("replicatedJobs").Index(i).Child("job"),
 				replicas[entry.TargetReplicatedJobs[0]], schedulingJobReplicasErrorMsg))
+		}
+		// A Pod uses a PodGroup ResourceClaim only when it declares a Pod resourceClaim referencing the
+		// same claim, so every Job-level claim must be declared in the Pod template of its target.
+		if entry.Job != nil && len(entry.TargetReplicatedJobs) == 1 {
+			for k, claim := range entry.Job.ResourceClaims {
+				if !slices.ContainsFunc(podClaims[entry.TargetReplicatedJobs[0]], func(podClaim corev1.PodResourceClaim) bool {
+					return podClaim.Name == claim.Name &&
+						ptr.Equal(podClaim.ResourceClaimName, claim.ResourceClaimName) &&
+						ptr.Equal(podClaim.ResourceClaimTemplateName, claim.ResourceClaimTemplateName)
+				}) {
+					allErrs = append(allErrs, field.Invalid(schedulingPath.Child("replicatedJobs").Index(i).Child("job", "resourceClaims").Index(k),
+						claim.Name, schedulingJobClaimErrorMsg))
+				}
+			}
 		}
 		// The targets of a per-ReplicatedJob (level 2) entry share a PodGroup, which has a single priority.
 		if entry.Job == nil {

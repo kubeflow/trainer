@@ -592,6 +592,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
 					return baseRuntime.
 						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							PodResourceClaims(constants.Node, corev1.PodResourceClaim{Name: "tpu-slice", ResourceClaimTemplateName: ptr.To("tpu-slice-template")}).
 							Scheduling(&trainer.TrainingRuntimeScheduling{
 								ReplicatedJobs: []trainer.ReplicatedJobScheduling{
 									{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
@@ -613,6 +614,30 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 						Obj()
 				},
 				gomega.Succeed(),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with Job-level resourceClaims without a matching Pod resourceClaim",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainingRuntimeScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+									{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+									{
+										TargetReplicatedJobs: []string{constants.Node},
+										Job: &trainer.JobScheduling{
+											ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
+												Name:                      "tpu-slice",
+												ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+											}},
+										},
+									},
+								},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("must have a Pod resourceClaim with the same name")),
 			),
 			ginkgo.Entry("Should fail to create trainingRuntime with Job-level scheduling targeting more than one ReplicatedJob",
 				func() *trainer.TrainingRuntime {

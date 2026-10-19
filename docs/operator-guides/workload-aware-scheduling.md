@@ -227,6 +227,38 @@ single Job of the `node` ReplicatedJob. The PodGroup uses the gang policy with `
 `topology.kubernetes.io/zone` topology constraint.
 
 The Job level also supports `resourceClaims`, which are shared by all Pods of the Job's PodGroup.
+A Pod uses the shared claim only when it declares a matching claim, so add the same claim to the
+Pod `resourceClaims` of the targeted ReplicatedJob, and reference it from the containers that use
+the devices:
+
+```yaml
+spec:
+  scheduling:
+    replicatedJobs:
+      - targetReplicatedJobs:
+          - node
+        job:
+          resourceClaims:
+            - name: tpu-slice
+              resourceClaimTemplateName: tpu-slice-template
+  template:
+    spec:
+      replicatedJobs:
+        - name: node
+          template:
+            spec:
+              template:
+                spec:
+                  resourceClaims:
+                    - name: tpu-slice
+                      resourceClaimTemplateName: tpu-slice-template
+                  containers:
+                    - name: node
+                      resources:
+                        claims:
+                          - name: tpu-slice
+```
+
 TrainJobs that reference such a runtime can't set their own Pod `resourceClaims`.
 
 :::{important}
@@ -244,6 +276,8 @@ Kubeflow Trainer rejects runtimes that:
 - Target a ReplicatedJob that doesn't exist, target a ReplicatedJob from multiple entries, or
   leave a ReplicatedJob untargeted.
 - Use different `priorityClassName` values for the ReplicatedJobs that share a PodGroup.
+- Set Job-level `resourceClaims` without a matching Pod `resourceClaims` entry in the targeted
+  ReplicatedJob.
 
 ## Next Steps
 

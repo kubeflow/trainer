@@ -910,6 +910,7 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 		ginkgo.BeforeEach(func() {
 			baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "testing-was")
 			wasRuntime := baseRuntime.RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+				PodResourceClaims(constants.Node, corev1.PodResourceClaim{Name: "tpu-slice", ResourceClaimTemplateName: ptr.To("tpu-slice-template")}).
 				Scheduling(&trainer.TrainingRuntimeScheduling{
 					ReplicatedJobs: []trainer.ReplicatedJobScheduling{
 						{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},

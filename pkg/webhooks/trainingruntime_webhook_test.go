@@ -464,6 +464,68 @@ func TestValidateScheduling(t *testing.T) {
 				return spec
 			}(),
 		},
+		"Job-level resourceClaims with a matching Pod resourceClaim": {
+			enableWAS: true,
+			newSpec: func() *trainer.TrainingRuntimeSpec {
+				spec := runtimeSpec(&trainer.TrainingRuntimeScheduling{
+					ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+						{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+						{TargetReplicatedJobs: []string{constants.Node}, Job: &trainer.JobScheduling{
+							ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
+								Name:                      "tpu-slice",
+								ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+							}},
+						}},
+					},
+				})
+				spec.Template.Spec.ReplicatedJobs[2].Template.Spec.Template.Spec.ResourceClaims = []corev1.PodResourceClaim{{
+					Name:                      "tpu-slice",
+					ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+				}}
+				return spec
+			}(),
+		},
+		"Job-level resourceClaims without a matching Pod resourceClaim": {
+			enableWAS: true,
+			newSpec: runtimeSpec(&trainer.TrainingRuntimeScheduling{
+				ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+					{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+					{TargetReplicatedJobs: []string{constants.Node}, Job: &trainer.JobScheduling{
+						ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
+							Name:                      "tpu-slice",
+							ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+						}},
+					}},
+				},
+			}),
+			wantError: field.ErrorList{
+				field.Invalid(schedulingPath.Child("replicatedJobs").Index(1).Child("job", "resourceClaims").Index(0), "", ""),
+			},
+		},
+		"Job-level resourceClaims with a Pod resourceClaim referencing a different ResourceClaimTemplate": {
+			enableWAS: true,
+			newSpec: func() *trainer.TrainingRuntimeSpec {
+				spec := runtimeSpec(&trainer.TrainingRuntimeScheduling{
+					ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+						{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+						{TargetReplicatedJobs: []string{constants.Node}, Job: &trainer.JobScheduling{
+							ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
+								Name:                      "tpu-slice",
+								ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+							}},
+						}},
+					},
+				})
+				spec.Template.Spec.ReplicatedJobs[2].Template.Spec.Template.Spec.ResourceClaims = []corev1.PodResourceClaim{{
+					Name:                      "tpu-slice",
+					ResourceClaimTemplateName: ptr.To("other-template"),
+				}}
+				return spec
+			}(),
+			wantError: field.ErrorList{
+				field.Invalid(schedulingPath.Child("replicatedJobs").Index(1).Child("job", "resourceClaims").Index(0), "", ""),
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
