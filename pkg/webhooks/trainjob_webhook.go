@@ -22,8 +22,10 @@ import (
 	"fmt"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -124,7 +126,7 @@ func (w *TrainJobValidator) ValidateCreate(ctx context.Context, obj *trainer.Tra
 		return nil, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 	}
 	warnings, errors := runtime.ValidateObjects(ctx, nil, obj)
-	return warnings, errors.ToAggregate()
+	return warnings, append(validatePodFields(obj), errors...).ToAggregate()
 }
 
 func (w *TrainJobValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.TrainJob) (admission.Warnings, error) {
@@ -144,6 +146,11 @@ func (w *TrainJobValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *
 		return nil, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 	}
 	warnings, errors := runtime.ValidateObjects(ctx, oldObj, newObj)
+	// Only reject the update when it introduces invalid pod fields, so a TrainJob admitted
+	// before this check existed stays updatable (e.g. suspend or delete its finalizers).
+	if len(validatePodFields(oldObj)) == 0 {
+		errors = append(validatePodFields(newObj), errors...)
+	}
 	return warnings, errors.ToAggregate()
 }
 
@@ -162,6 +169,84 @@ func draFieldPaths(trainJob *trainer.TrainJob) field.ErrorList {
 	msg := "TrainJobDynamicResourceAllocation feature gate is disabled"
 	for _, path := range append(trainjob.ResourceClaimsPaths(trainJob), trainjob.ContainerResourceClaimsPaths(trainJob)...) {
 		allErrs = append(allErrs, field.Forbidden(path, msg))
+	}
+	return allErrs
+}
+
+// validatePodFields rejects env names and resource requirements that the API server would
+// reject on the Pods. Without this check the TrainJob is admitted, but JobSet fails to create
+// its Jobs and the TrainJob never starts.
+func validatePodFields(trainJob *trainer.TrainJob) field.ErrorList {
+	var allErrs field.ErrorList
+	specPath := field.NewPath("spec")
+
+	if trainJob.Spec.Trainer != nil {
+		trainerPath := specPath.Child("trainer")
+		allErrs = append(allErrs, validateEnvNames(trainJob.Spec.Trainer.Env, trainerPath.Child("env"))...)
+		allErrs = append(allErrs, validateRequestsWithinLimits(trainJob.Spec.Trainer.ResourcesPerNode, trainerPath.Child("resourcesPerNode"))...)
+	}
+	if trainJob.Spec.Initializer != nil {
+		initializerPath := specPath.Child("initializer")
+		if trainJob.Spec.Initializer.Dataset != nil {
+			allErrs = append(allErrs, validateEnvNames(trainJob.Spec.Initializer.Dataset.Env, initializerPath.Child("dataset", "env"))...)
+		}
+		if trainJob.Spec.Initializer.Model != nil {
+			allErrs = append(allErrs, validateEnvNames(trainJob.Spec.Initializer.Model.Env, initializerPath.Child("model", "env"))...)
+		}
+	}
+
+	for i, patch := range trainJob.Spec.RuntimePatches {
+		if patch.TrainingRuntimeSpec == nil || patch.TrainingRuntimeSpec.Template == nil ||
+			patch.TrainingRuntimeSpec.Template.Spec == nil {
+			continue
+		}
+		for j, rJob := range patch.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs {
+			if rJob.Template == nil || rJob.Template.Spec == nil ||
+				rJob.Template.Spec.Template == nil || rJob.Template.Spec.Template.Spec == nil {
+				continue
+			}
+			podSpec := rJob.Template.Spec.Template.Spec
+			rJobPath := specPath.Child("runtimePatches").Index(i).
+				Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(j).
+				Child("template", "spec", "template", "spec")
+
+			for k, c := range podSpec.Containers {
+				containerPath := rJobPath.Child("containers").Index(k)
+				allErrs = append(allErrs, validateEnvNames(c.Env, containerPath.Child("env"))...)
+				allErrs = append(allErrs, validateRequestsWithinLimits(c.Resources, containerPath.Child("resources"))...)
+			}
+			for k, c := range podSpec.InitContainers {
+				containerPath := rJobPath.Child("initContainers").Index(k)
+				allErrs = append(allErrs, validateEnvNames(c.Env, containerPath.Child("env"))...)
+				allErrs = append(allErrs, validateRequestsWithinLimits(c.Resources, containerPath.Child("resources"))...)
+			}
+		}
+	}
+	return allErrs
+}
+
+// validateEnvNames uses the relaxed env name rule, so it only rejects names that are invalid
+// on every supported Kubernetes version.
+func validateEnvNames(envs []corev1.EnvVar, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for i, env := range envs {
+		for _, msg := range validation.IsRelaxedEnvVarName(env.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), env.Name, msg))
+		}
+	}
+	return allErrs
+}
+
+func validateRequestsWithinLimits(resources *corev1.ResourceRequirements, fldPath *field.Path) field.ErrorList {
+	if resources == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+	for name, limit := range resources.Limits {
+		if request, ok := resources.Requests[name]; ok && request.Cmp(limit) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("requests").Key(string(name)), request.String(),
+				fmt.Sprintf("must be less than or equal to %s limit of %s", name, limit.String())))
+		}
 	}
 	return allErrs
 }

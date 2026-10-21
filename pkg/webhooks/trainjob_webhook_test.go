@@ -26,6 +26,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -345,6 +346,68 @@ func TestValidateCreate(t *testing.T) {
 				}).Obj(),
 			enableFeatureGates: []featuregate.Feature{features.TrainJobDynamicResourceAllocation},
 		},
+		"env names and resources the Pods would reject are rejected": {
+			obj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Initializer(&trainer.Initializer{
+					Dataset: &trainer.DatasetInitializer{Env: []corev1.EnvVar{{Name: "A=B"}}},
+					Model:   &trainer.ModelInitializer{Env: []corev1.EnvVar{{Name: ""}}},
+				}).
+				Trainer(&trainer.Trainer{
+					Env: []corev1.EnvVar{{Name: "VALID"}, {Name: "my.config-1"}, {Name: "A=B"}},
+					ResourcesPerNode: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+						Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+					},
+				}).
+				RuntimePatches([]trainer.RuntimePatch{sidecarPatch("test.io/manager",
+					[]corev1.EnvVar{{Name: "X=Y"}},
+					&corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:   corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("1Gi")},
+					},
+				)}).
+				Obj(),
+			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
+					},
+				}).Obj(),
+			wantError: func() field.ErrorList {
+				sidecarPath := field.NewPath("spec", "runtimePatches").Index(0).
+					Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).
+					Child("template", "spec", "template", "spec", "containers").Index(0)
+				return field.ErrorList{
+					field.Invalid(field.NewPath("spec", "trainer", "env").Index(2).Child("name"), "A=B", ""),
+					field.Invalid(field.NewPath("spec", "trainer", "resourcesPerNode", "requests").Key("cpu"), "2", ""),
+					field.Invalid(field.NewPath("spec", "initializer", "dataset", "env").Index(0).Child("name"), "A=B", ""),
+					field.Invalid(field.NewPath("spec", "initializer", "model", "env").Index(0).Child("name"), "", ""),
+					field.Invalid(sidecarPath.Child("env").Index(0).Child("name"), "X=Y", ""),
+					field.Invalid(sidecarPath.Child("resources", "requests").Key("memory"), "2Gi", ""),
+				}
+			}(),
+		},
+		"requests equal to limits and requests without limits are accepted": {
+			obj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Trainer(&trainer.Trainer{
+					ResourcesPerNode: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1000m"),
+							corev1.ResourceMemory: resource.MustParse("4Gi"),
+						},
+						Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+					},
+				}).
+				Obj(),
+			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
+					},
+				}).Obj(),
+		},
 		"valid trainjob name compliant with RFC 1035": {
 			obj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
@@ -529,6 +592,34 @@ func TestValidateUpdate(t *testing.T) {
 		wantWarnings       admission.Warnings
 		enableFeatureGates []featuregate.Feature
 	}{
+		"update adds a runtime patch with an invalid env name: invalid": {
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "runtimePatches").Index(0).
+					Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).
+					Child("template", "spec", "template", "spec", "containers").Index(0).
+					Child("env").Index(0).Child("name"), "A=B", ""),
+			},
+			oldObj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Suspend(true).
+				Obj(),
+			newObj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Suspend(true).
+				RuntimePatches([]trainer.RuntimePatch{sidecarPatch("test.io/manager", []corev1.EnvVar{{Name: "A=B"}}, nil)}).
+				Obj(),
+		},
+		"update of a TrainJob admitted with an invalid env name before the check existed: passes": {
+			oldObj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Trainer(&trainer.Trainer{Env: []corev1.EnvVar{{Name: "A=B"}}}).
+				Obj(),
+			newObj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Trainer(&trainer.Trainer{Env: []corev1.EnvVar{{Name: "A=B"}}}).
+				Suspend(true).
+				Obj(),
+		},
 		"update adds a feature-gated field while the gate is disabled: forbidden": {
 			wantError: field.ErrorList{
 				field.Forbidden(field.NewPath("spec", "trainer", "resourceClaimsPerNode"), ""),
@@ -601,5 +692,34 @@ func TestValidateUpdate(t *testing.T) {
 				t.Errorf("Unexpected error from ValidateUpdate (-want, +got): %s", diff)
 			}
 		})
+	}
+}
+
+// sidecarPatch returns a RuntimePatch that sets env and resources on the "sidecar" container of the node job.
+func sidecarPatch(manager string, env []corev1.EnvVar, resources *corev1.ResourceRequirements) trainer.RuntimePatch {
+	return trainer.RuntimePatch{
+		Manager: manager,
+		TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+			Template: &trainer.JobSetTemplatePatch{
+				Spec: &trainer.JobSetSpecPatch{
+					ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+						Name: constants.Node,
+						Template: &trainer.JobTemplatePatch{
+							Spec: &trainer.JobSpecPatch{
+								Template: &trainer.PodTemplatePatch{
+									Spec: &trainer.PodSpecPatch{
+										Containers: []trainer.ContainerPatch{{
+											Name:      "sidecar",
+											Env:       env,
+											Resources: resources,
+										}},
+									},
+								},
+							},
+						},
+					}},
+				},
+			},
+		},
 	}
 }
