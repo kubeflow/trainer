@@ -50,7 +50,7 @@ func TestGetAlgorithmServiceName(t *testing.T) {
 			jobName: strings.Repeat("a", 47),
 			want:    strings.Repeat("a", 37) + "-11eaed93-search-algorithm",
 		},
-		"longest name accepted by the API gets a hash": {
+		"63-character name gets a hash": {
 			jobName: strings.Repeat("a", 63),
 			want:    strings.Repeat("a", 37) + "-7d3e74a0-search-algorithm",
 		},

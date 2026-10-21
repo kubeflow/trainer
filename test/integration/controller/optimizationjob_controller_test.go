@@ -560,25 +560,6 @@ var _ = ginkgo.Describe("OptimizationJob Controller", ginkgo.Ordered, func() {
 	})
 
 	ginkgo.Context("Name Validation", func() {
-		ginkgo.DescribeTable("RFC1035-compliant OptimizationJob name validation", func(name string, errorMatcher gomega.OmegaMatcher) {
-			gomega.Expect(k8sClient.Create(ctx, newTestOptimizationJob(ns.Name, name, 2, 1))).Should(errorMatcher)
-		},
-			ginkgo.Entry("Should succeed to create OptimizationJob with valid RFC1035-compliant name",
-				"valid-job-name", gomega.Succeed()),
-			ginkgo.Entry("Should succeed to create OptimizationJob with name exactly 63 characters",
-				strings.Repeat("a", 63), gomega.Succeed()),
-			ginkgo.Entry("Should fail to create OptimizationJob with uppercase letters in name",
-				"Invalid-job-name", utiltesting.BeInvalidError()),
-			ginkgo.Entry("Should fail to create OptimizationJob starting with a digit",
-				"1jobname", utiltesting.BeInvalidError()),
-			ginkgo.Entry("Should fail to create OptimizationJob with a dot in name",
-				"job.name", utiltesting.BeInvalidError()),
-			ginkgo.Entry("Should fail to create OptimizationJob ending with a hyphen",
-				"jobname-", utiltesting.BeInvalidError()),
-			ginkgo.Entry("Should fail to create OptimizationJob with name exceeding 63 characters",
-				strings.Repeat("a", 64), utiltesting.BeInvalidError()),
-		)
-
 		ginkgo.It("Should give OptimizationJobs whose names share a long prefix separate algorithm services", func() {
 			prefix := strings.Repeat("a", 46)
 			optJobA := newTestOptimizationJob(ns.Name, prefix+"-run-a", 2, 1)

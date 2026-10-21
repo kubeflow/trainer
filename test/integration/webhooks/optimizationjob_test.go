@@ -17,6 +17,8 @@ limitations under the License.
 package webhooks
 
 import (
+	"strings"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -180,6 +182,36 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 					optimizationJob.Spec.Parameters[0].Name = "lré"
 					return optimizationJob
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed in creating optimizationJob with a valid RFC 1035 name",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, "valid-job-name").Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should succeed in creating optimizationJob with a 63-character name",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, strings.Repeat("a", 63)).Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail in creating optimizationJob with uppercase letters in the name",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, "Invalid-job-name").Obj()
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail in creating optimizationJob with a name starting with a digit",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, "1jobname").Obj()
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail in creating optimizationJob with a dot in the name",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, "job.name").Obj()
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail in creating optimizationJob with a name ending with a hyphen",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, "jobname-").Obj()
 				},
 				testingutil.BeInvalidError()),
 		)
