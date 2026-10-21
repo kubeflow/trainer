@@ -573,6 +573,8 @@ var _ = ginkgo.Describe("OptimizationJob Controller", ginkgo.Ordered, func() {
 				"1jobname", utiltesting.BeInvalidError()),
 			ginkgo.Entry("Should fail to create OptimizationJob with a dot in name",
 				"job.name", utiltesting.BeInvalidError()),
+			ginkgo.Entry("Should fail to create OptimizationJob ending with a hyphen",
+				"jobname-", utiltesting.BeInvalidError()),
 			ginkgo.Entry("Should fail to create OptimizationJob with name exceeding 63 characters",
 				strings.Repeat("a", 64), utiltesting.BeInvalidError()),
 		)
@@ -601,6 +603,16 @@ var _ = ginkgo.Describe("OptimizationJob Controller", ginkgo.Ordered, func() {
 					g.Expect(svc.OwnerReferences[0].UID).Should(gomega.Equal(optJob.UID))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			}
+
+			ginkgo.By("Checking that two distinct Deployments and Services exist")
+			gomega.Eventually(func(g gomega.Gomega) {
+				deploys := &appsv1.DeploymentList{}
+				g.Expect(k8sClient.List(ctx, deploys, client.InNamespace(ns.Name))).Should(gomega.Succeed())
+				g.Expect(deploys.Items).Should(gomega.HaveLen(2))
+				svcs := &corev1.ServiceList{}
+				g.Expect(k8sClient.List(ctx, svcs, client.InNamespace(ns.Name))).Should(gomega.Succeed())
+				g.Expect(svcs.Items).Should(gomega.HaveLen(2))
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
 		})
 	})
 })

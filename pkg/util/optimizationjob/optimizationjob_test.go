@@ -46,6 +46,14 @@ func TestGetAlgorithmServiceName(t *testing.T) {
 			jobName: strings.Repeat("a", 46),
 			want:    strings.Repeat("a", 46) + "-search-algorithm",
 		},
+		"shortest name that gets a hash": {
+			jobName: strings.Repeat("a", 47),
+			want:    strings.Repeat("a", 37) + "-11eaed93-search-algorithm",
+		},
+		"longest name accepted by the API gets a hash": {
+			jobName: strings.Repeat("a", 63),
+			want:    strings.Repeat("a", 37) + "-7d3e74a0-search-algorithm",
+		},
 		"long name gets truncated to 63 chars with a hash of the full name": {
 			jobName: strings.Repeat("a", 60),
 			want:    strings.Repeat("a", 37) + "-11ee3912-search-algorithm",
