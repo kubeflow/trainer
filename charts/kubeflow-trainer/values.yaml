@@ -174,8 +174,7 @@ manager:
     featureGates: {}
 
   # -- PodDisruptionBudget for manager pods. Disabled by default (no behavior change).
-  # Enabling this with `manager.replicas` less than 2 fails the chart: a PDB on a single
-  # replica blocks voluntary node drains and evictions indefinitely.
+  # Use it with `manager.replicas` of 2 or more, since a PDB on a single replica blocks node drains.
   podDisruptionBudget:
     enabled: false
     # -- Minimum number of manager pods that must remain available during a voluntary disruption.

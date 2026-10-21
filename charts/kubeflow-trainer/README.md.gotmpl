@@ -176,9 +176,8 @@ more than one replica:
             app.kubernetes.io/component: manager
   ```
 
-- `manager.podDisruptionBudget` is disabled by default. Enabling it with `manager.replicas` less
-  than 2 fails the chart, since a PodDisruptionBudget on a single replica blocks voluntary node
-  drains indefinitely:
+- `manager.podDisruptionBudget` is disabled by default. Use it with `manager.replicas` of 2 or
+  more, since a PodDisruptionBudget on a single replica blocks voluntary node drains:
 
   ```yaml
   manager:

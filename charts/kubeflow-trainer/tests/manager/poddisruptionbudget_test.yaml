@@ -34,17 +34,7 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: Should fail when enabled with `manager.replicas` less than 2
-    set:
-      manager:
-        replicas: 1
-        podDisruptionBudget:
-          enabled: true
-    asserts:
-      - failedTemplate:
-          errorMessage: "manager.podDisruptionBudget.enabled is true but manager.replicas is 1: a PodDisruptionBudget on a single replica blocks voluntary node drains and evictions indefinitely. Set manager.replicas to 2 or more, or disable manager.podDisruptionBudget."
-
-  - it: Should render a PodDisruptionBudget when enabled with `manager.replicas` of 2 or more
+  - it: Should render a PodDisruptionBudget when enabled
     set:
       manager:
         replicas: 2

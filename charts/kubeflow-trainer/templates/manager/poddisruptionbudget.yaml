@@ -15,9 +15,6 @@ limitations under the License.
 */ -}}
 
 {{- if .Values.manager.podDisruptionBudget.enabled }}
-{{- if lt (.Values.manager.replicas | int) 2 }}
-{{- fail (printf "manager.podDisruptionBudget.enabled is true but manager.replicas is %d: a PodDisruptionBudget on a single replica blocks voluntary node drains and evictions indefinitely. Set manager.replicas to 2 or more, or disable manager.podDisruptionBudget." (.Values.manager.replicas | int)) }}
-{{- end }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
