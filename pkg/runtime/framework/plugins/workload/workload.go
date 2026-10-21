@@ -38,6 +38,7 @@ import (
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	schedulingv1beta1ac "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
 	"k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -75,9 +76,10 @@ type Workload struct {
 var _ framework.CustomValidationPlugin = (*Workload)(nil)
 var _ framework.EnforceSchedulingPlugin = (*Workload)(nil)
 var _ framework.ComponentBuilderPlugin = (*Workload)(nil)
+var _ framework.ComponentDeleterPlugin = (*Workload)(nil)
 var _ framework.WatchExtensionPlugin = (*Workload)(nil)
 
-// +kubebuilder:rbac:groups=scheduling.k8s.io,resources=workloads;podgroups,verbs=create;get;list;watch;patch
+// +kubebuilder:rbac:groups=scheduling.k8s.io,resources=workloads;podgroups,verbs=create;get;list;watch;patch;delete
 
 func New(ctx context.Context, c client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
 	return &Workload{
@@ -156,7 +158,8 @@ func (w *Workload) EnforceScheduling(info *runtime.Info, trainJob *trainer.Train
 // Build builds the Workload and the PodGroups of the TrainJob. The Workload and the PodGroups are
 // never updated once created, so only the missing objects are built.
 func (w *Workload) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
-	if info == nil || trainJob == nil || info.RuntimePolicy.Scheduling == nil {
+	// Delete() removes the Workload and PodGroups while suspended, so do not recreate them here.
+	if info == nil || trainJob == nil || info.RuntimePolicy.Scheduling == nil || ptr.Deref(trainJob.Spec.Suspend, false) {
 		return nil, nil
 	}
 	workload, err := buildWorkload(info, trainJob)
@@ -209,6 +212,33 @@ func (w *Workload) Build(ctx context.Context, info *runtime.Info, trainJob *trai
 					WithBlockOwnerDeletion(true)).
 				WithSpec(spec))
 		}
+	}
+	return objects, nil
+}
+
+// Delete returns the Workload and PodGroups of a suspended, complete, or failed TrainJob.
+func (w *Workload) Delete(ctx context.Context, trainJob *trainer.TrainJob) ([]client.Object, error) {
+	if trainJob == nil || (!trainjob.IsTrainJobFinished(trainJob) && !ptr.Deref(trainJob.Spec.Suspend, false)) {
+		return nil, nil
+	}
+
+	var objects []client.Object
+	podGroups := &schedulingv1beta1.PodGroupList{}
+	if err := w.client.List(ctx, podGroups, client.InNamespace(trainJob.Namespace)); err != nil {
+		return nil, err
+	}
+	for i := range podGroups.Items {
+		if metav1.IsControlledBy(&podGroups.Items[i], trainJob) {
+			objects = append(objects, &podGroups.Items[i])
+		}
+	}
+	workload := &schedulingv1beta1.Workload{}
+	if err := w.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: workloadName(trainJob)}, workload); err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return nil, err
+		}
+	} else if metav1.IsControlledBy(workload, trainJob) {
+		objects = append(objects, workload)
 	}
 	return objects, nil
 }

@@ -130,6 +130,7 @@ rules:
   - workloads
   verbs:
   - create
+  - delete
   - get
   - list
   - patch

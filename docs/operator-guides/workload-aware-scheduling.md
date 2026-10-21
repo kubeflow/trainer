@@ -266,6 +266,13 @@ Currently, the targeted ReplicatedJob must have at most 1 replica, since Kuberne
 assign a distinct PodGroup to the Pods of each replica.
 :::
 
+## Workload Lifecycle
+
+Kubeflow Trainer creates the Workload and PodGroups when the TrainJob starts. It deletes them when
+the TrainJob is suspended, complete, or failed, so they stop reserving scheduling capacity, and
+recreates them when a suspended TrainJob is resumed. When the TrainJob is deleted, Kubernetes
+garbage collects them through their owner references.
+
 ## Validation Rules
 
 Kubeflow Trainer rejects runtimes that:

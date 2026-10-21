@@ -1117,7 +1117,15 @@ spec:
 #### Build Phase
 
 The plugin implements the `ComponentBuilder` interface to build the `Workload` and `PodGroup`
-objects.
+objects. It doesn't build them while the TrainJob is suspended, so they are recreated only when the
+TrainJob is resumed.
+
+#### Delete Phase
+
+The plugin implements the `ComponentDeleter` interface to delete the `Workload` and `PodGroups`
+when the TrainJob is suspended, complete, or failed, so they stop reserving scheduling capacity.
+The plugin returns the `PodGroups` controlled by the TrainJob before the `Workload` they reference,
+and the TrainJob controller deletes them.
 
 #### WatchExtension Phase
 
@@ -1127,9 +1135,9 @@ TrainJob and trigger reconciliation on status changes.
 The TrainJob controller requires additional RBAC permissions:
 
 ```go
-// +kubebuilder:rbac:groups=scheduling.k8s.io,resources=workloads,verbs=get;list;watch;create;patch
+// +kubebuilder:rbac:groups=scheduling.k8s.io,resources=workloads,verbs=get;list;watch;create;patch;delete
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=workloads/status,verbs=get
-// +kubebuilder:rbac:groups=scheduling.k8s.io,resources=podgroups,verbs=get;list;watch;create;patch
+// +kubebuilder:rbac:groups=scheduling.k8s.io,resources=podgroups,verbs=get;list;watch;create;patch;delete
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=podgroups/status,verbs=get
 ```
 
@@ -1168,8 +1176,8 @@ avoiding orphaned Pods with a stale `PodGroup` reference.
 | ---------------------------------------- | ------------------------------------------------------------------------------------ |
 | Scheduling configured and gate enabled   | Create one Workload and its PodGroups.                                               |
 | No scheduling configuration              | Create no WAS resources.                                                             |
-| Suspend                                  | Delete the Workload and PodGroups                                                    |
-| Resume                                   | Recreated the Workload and PodGroups                                                 |
+| Suspend, Failed, or Complete             | Delete the Workload and PodGroups.                                                   |
+| Resume                                   | Recreate the Workload and PodGroups.                                                 |
 | Runtime mutated                          | Retain scheduling resources; the new configuration applies to new TrainJobs.         |
 | `numNodes` updated with gang scheduling  | Reject at admission, since `minCount` is immutable.                                  |
 | Restart                                  | Discover scheduling resources by reference; recreated Pods receive the same mapping. |
@@ -1278,8 +1286,8 @@ In `pkg/webhooks`:
   `PodGroup` uses Gang.
 - Level 3: one `PodGroup` per replica, each with its own `resourceClaims`, and distinct generated
   names after truncation for long ReplicatedJob names.
-- Suspended TrainJob: Pods deleted but `Workload`/`PodGroup` preserved; on resume, the same
-  `PodGroup` is reused.
+- Suspended, complete, or failed TrainJob: the `Workload` and `PodGroups` are deleted; on resume,
+  they are recreated.
 - Feature gate disabled: no scheduling objects are created and reconciliation is skipped even if
   a runtime already stores `spec.scheduling` from an earlier admission.
 

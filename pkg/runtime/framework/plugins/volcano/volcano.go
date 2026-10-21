@@ -142,12 +142,8 @@ func (v *Volcano) EnforcePodGroupPolicy(info *runtime.Info, trainJob *trainer.Tr
 }
 
 func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
-	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || info.RuntimePolicy.PodGroupPolicy.Volcano == nil || trainJob == nil {
-		return nil, nil
-	}
-
 	// Delete() removes the PodGroup while suspended, so do not recreate it here.
-	if ptr.Deref(trainJob.Spec.Suspend, false) {
+	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || info.RuntimePolicy.PodGroupPolicy.Volcano == nil || trainJob == nil || ptr.Deref(trainJob.Spec.Suspend, false) {
 		return nil, nil
 	}
 

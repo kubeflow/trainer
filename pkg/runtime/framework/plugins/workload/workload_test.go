@@ -94,6 +94,33 @@ func TestWorkload(t *testing.T) {
 				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
 			},
 		},
+		"no Workload and PodGroups are built when the TrainJob is suspended": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Suspend(true).Obj(),
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(1).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+					),
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](2)}},
+				},
+			},
+			expectInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{Scheduling: &trainer.TrainingRuntimeScheduling{}},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+						jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(1).
+							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
+					),
+					PodSets: []runtime.PodSet{{
+						Name:            constants.Node,
+						Count:           ptr.To[int32](2),
+						SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-b6ff97ef4e"),
+					}},
+				},
+			},
+		},
 		"TrainJob-level gang scheduling builds one Workload and PodGroup for every Pod": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj(),
 			info: &runtime.Info{
@@ -702,6 +729,309 @@ func TestWorkload(t *testing.T) {
 			}
 			if diff := cmp.Diff(c.expectObjs, typedObjs); len(diff) != 0 {
 				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestDelete(t *testing.T) {
+	errorListPodGroups := errors.New("error when listing PodGroups")
+	cases := map[string]struct {
+		trainJob  *trainer.TrainJob
+		objs      []client.Object
+		listError error
+		wantObjs  []client.Object
+		wantError error
+	}{
+		"no objects are deleted when trainJob is nil": {
+			objs: []client.Object{
+				&schedulingv1beta1.Workload{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+			},
+		},
+		"no objects are deleted when the TrainJob is running": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Obj(),
+			objs: []client.Object{
+				&schedulingv1beta1.Workload{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+			},
+		},
+		"Workload and PodGroups are deleted when the TrainJob is complete": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				Conditions(metav1.Condition{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue}).
+				Obj(),
+			objs: []client.Object{
+				&schedulingv1beta1.Workload{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+				&schedulingv1beta1.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b-b6ff97ef4e",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+			},
+			wantObjs: []client.Object{
+				&schedulingv1beta1.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b-b6ff97ef4e",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+				&schedulingv1beta1.Workload{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+			},
+		},
+		"Workload and PodGroups are deleted when the TrainJob is failed": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				Conditions(metav1.Condition{Type: trainer.TrainJobFailed, Status: metav1.ConditionTrue}).
+				Obj(),
+			objs: []client.Object{
+				&schedulingv1beta1.Workload{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+				&schedulingv1beta1.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b-0-node-b408b826df",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+				&schedulingv1beta1.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b-1-launcher-78bf98d2d9",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+			},
+			wantObjs: []client.Object{
+				&schedulingv1beta1.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b-0-node-b408b826df",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+				&schedulingv1beta1.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b-1-launcher-78bf98d2d9",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+				&schedulingv1beta1.Workload{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+			},
+		},
+		"Workload is deleted when the TrainJob is suspended": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Suspend(true).Obj(),
+			objs: []client.Object{
+				&schedulingv1beta1.Workload{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+			},
+			wantObjs: []client.Object{
+				&schedulingv1beta1.Workload{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job-e2577dd78b",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "test-job",
+							UID:                "uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+			},
+		},
+		"no objects are deleted when they are already deleted": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Suspend(true).Obj(),
+		},
+		"Workload and PodGroups not controlled by the TrainJob are not deleted": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Suspend(true).Obj(),
+			objs: []client.Object{
+				&schedulingv1beta1.Workload{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-job-e2577dd78b", Namespace: metav1.NamespaceDefault},
+				},
+				&schedulingv1beta1.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "other-job-a1b2c3d4e5-b6ff97ef4e",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion:         trainer.GroupVersion.String(),
+							Kind:               trainer.TrainJobKind,
+							Name:               "other-job",
+							UID:                "other-uid",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						}},
+					},
+				},
+			},
+		},
+		"error from listing PodGroups is propagated": {
+			trainJob:  utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").UID("uid").Suspend(true).Obj(),
+			listError: errorListPodGroups,
+			wantError: errorListPodGroups,
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			clientBuilder := utiltesting.NewClientBuilder().WithObjects(c.objs...)
+			if c.listError != nil {
+				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					List: func(context.Context, client.WithWatch, client.ObjectList, ...client.ListOption) error {
+						return c.listError
+					},
+				})
+			}
+			cli := clientBuilder.Build()
+			plugin, err := New(ctx, cli, utiltesting.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize Workload plugin: %v", err)
+			}
+
+			objs, err := plugin.(framework.ComponentDeleterPlugin).Delete(ctx, c.trainJob)
+			if diff := cmp.Diff(c.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from Delete (-want, +got): %s", diff)
+			}
+			if diff := cmp.Diff(c.wantObjs, objs, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion")); len(diff) != 0 {
+				t.Errorf("Unexpected objects from Delete (-want, +got): %s", diff)
 			}
 		})
 	}
