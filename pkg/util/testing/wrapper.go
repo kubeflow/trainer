@@ -718,6 +718,12 @@ func (o *OptimizationJobWrapper) TrainJobTemplate(template trainer.TrainJobTempl
 	return o
 }
 
+// TrainJobTemplateTrainer sets the trainer of the template used to create trial TrainJobs.
+func (o *OptimizationJobWrapper) TrainJobTemplateTrainer(trainer *trainer.Trainer) *OptimizationJobWrapper {
+	o.Spec.TrainJobTemplate.Spec.Trainer = trainer
+	return o
+}
+
 // Obj returns the constructed OptimizationJob.
 func (o *OptimizationJobWrapper) Obj() *trainer.OptimizationJob {
 	return &o.OptimizationJob
