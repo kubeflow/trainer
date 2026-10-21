@@ -434,7 +434,7 @@ spec:
                           items:
                             maxLength: 253
                             type: string
-                          maxItems: 8
+                          maxItems: 50
                           minItems: 1
                           type: array
                           x-kubernetes-list-type: set

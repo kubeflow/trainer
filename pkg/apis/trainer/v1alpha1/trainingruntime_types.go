@@ -256,7 +256,7 @@ type ReplicatedJobScheduling struct {
 	// replicatedJobs entries.
 	// +listType=set
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=8
+	// +kubebuilder:validation:MaxItems=50
 	// +kubebuilder:validation:items:MaxLength=253
 	// +required
 	TargetReplicatedJobs []string `json:"targetReplicatedJobs,omitempty"`
