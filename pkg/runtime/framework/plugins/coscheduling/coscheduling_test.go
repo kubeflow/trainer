@@ -601,6 +601,15 @@ func TestBuildDoesNotMutatePodSetRequests(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse("512Mi"),
 		},
 	}
+	// Quantity.Mul only aliases when the value is stored as inf.Dec. Integer-backed
+	// amounts such as 1Gi are copied by the range loop, so convert to Dec to pin
+	// the mutation that repeated Build would otherwise miss.
+	for i := range wantRequests {
+		for name, q := range wantRequests[i] {
+			q.ToDec()
+			wantRequests[i][name] = q
+		}
+	}
 	info := &runtime.Info{
 		Scheduler: &runtime.Scheduler{},
 		RuntimePolicy: runtime.RuntimePolicy{
@@ -632,6 +641,12 @@ func TestBuildDoesNotMutatePodSetRequests(t *testing.T) {
 				},
 			},
 		},
+	}
+	for i := range info.TemplateSpec.PodSets {
+		for name, q := range info.TemplateSpec.PodSets[i].SinglePodRequests {
+			q.ToDec()
+			info.TemplateSpec.PodSets[i].SinglePodRequests[name] = q
+		}
 	}
 	trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
 		UID("trainJob").
