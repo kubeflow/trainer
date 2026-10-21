@@ -118,10 +118,29 @@ the webhooks default to `failurePolicy: Fail`, any moment with no Ready manager 
 TrainJob and TrainingRuntime creates and updates, so the following settings matter once you run
 more than one replica:
 
-- `manager.affinity` defaults to a soft (preferred) pod anti-affinity that spreads replicas
-  across nodes by hostname. This is a scheduling preference only: it never blocks a pod from
-  being scheduled, including on a single-node cluster. Setting your own `manager.affinity`
-  fully replaces this default.
+- `manager.affinity` is empty by default. To spread replicas across nodes, set a soft
+  (preferred) pod anti-affinity. It is a scheduling preference only, so it never blocks a pod
+  from being scheduled, including on a single-node cluster:
+
+```yaml
+  manager:
+    replicas: 2
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: kubeflow-trainer
+                  app.kubernetes.io/instance: <release-name>
+                  app.kubernetes.io/component: manager
+```
+
+  Replace `<release-name>` with your Helm release name, so the rule only matches this
+  release's manager pods.
+
 - `manager.topologySpreadConstraints` is empty by default. Use it for stricter control over how
   replicas spread across nodes or zones, for example:
 
@@ -135,6 +154,7 @@ more than one replica:
         labelSelector:
           matchLabels:
             app.kubernetes.io/name: kubeflow-trainer
+            app.kubernetes.io/instance: <release-name>
             app.kubernetes.io/component: manager
   ```
 
@@ -177,8 +197,8 @@ more than one replica:
 | manager.labels | object | `{}` | Extra labels for manager resources (including the Deployment and pods). |
 | manager.volumes | list | `[]` | Volumes for manager pods. |
 | manager.nodeSelector | object | `{}` | Node selector for manager pods. |
-| manager.affinity | object | `{}` | Affinity for manager pods. Empty by default, which falls back to a soft (preferred) pod anti-affinity that spreads manager replicas across different nodes by hostname (see `trainer.manager.defaultAffinity` in templates/manager/_helpers.tpl). This is a scheduling preference only: it never blocks a pod from being scheduled, including on a single-node cluster. Setting any value here fully replaces the default (it is not merged with it), so your own affinity is used exactly as given. |
-| manager.topologySpreadConstraints | list | `[]` | Topology spread constraints for manager pods. Empty by default (no behavior change). Useful for spreading replicas across zones/regions in addition to the default host-level anti-affinity above. See the chart README for an example. |
+| manager.affinity | object | `{}` | Affinity for manager pods. See the chart README for a recommended anti-affinity when running multiple replicas. |
+| manager.topologySpreadConstraints | list | `[]` | Topology spread constraints for manager pods. Empty by default (no behavior change). See the chart README for an example. |
 | manager.tolerations | list | `[]` | List of node taints to tolerate for manager pods. |
 | manager.priorityClassName | string | `""` | Priority class name for manager pods. Empty by default: no PriorityClass is created by this chart, so the named class must already exist in the cluster. |
 | manager.env | list | `[]` | Environment variables for manager containers. |

@@ -82,17 +82,11 @@ manager:
   # -- Node selector for manager pods.
   nodeSelector: {}
 
-  # -- Affinity for manager pods. Empty by default, which falls back to a soft (preferred)
-  # pod anti-affinity that spreads manager replicas across different nodes by hostname
-  # (see `trainer.manager.defaultAffinity` in templates/manager/_helpers.tpl). This is a
-  # scheduling preference only: it never blocks a pod from being scheduled, including on a
-  # single-node cluster. Setting any value here fully replaces the default (it is not
-  # merged with it), so your own affinity is used exactly as given.
+  # -- Affinity for manager pods. See the chart README for a recommended anti-affinity when running multiple replicas.
   affinity: {}
 
   # -- Topology spread constraints for manager pods. Empty by default (no behavior change).
-  # Useful for spreading replicas across zones/regions in addition to the default
-  # host-level anti-affinity above. See the chart README for an example.
+  # See the chart README for an example.
   topologySpreadConstraints: []
 
   # -- List of node taints to tolerate for manager pods.

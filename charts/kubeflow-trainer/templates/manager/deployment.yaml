@@ -132,12 +132,9 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.manager.affinity }}
+      {{- with .Values.manager.affinity }}
       affinity:
-        {{- toYaml .Values.manager.affinity | nindent 8 }}
-      {{- else }}
-      affinity:
-        {{- include "trainer.manager.defaultAffinity" . | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- with .Values.manager.topologySpreadConstraints }}
       topologySpreadConstraints:

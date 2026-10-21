@@ -136,10 +136,29 @@ the webhooks default to `failurePolicy: Fail`, any moment with no Ready manager 
 TrainJob and TrainingRuntime creates and updates, so the following settings matter once you run
 more than one replica:
 
-- `manager.affinity` defaults to a soft (preferred) pod anti-affinity that spreads replicas
-  across nodes by hostname. This is a scheduling preference only: it never blocks a pod from
-  being scheduled, including on a single-node cluster. Setting your own `manager.affinity`
-  fully replaces this default.
+- `manager.affinity` is empty by default. To spread replicas across nodes, set a soft
+  (preferred) pod anti-affinity. It is a scheduling preference only, so it never blocks a pod
+  from being scheduled, including on a single-node cluster:
+
+```yaml
+  manager:
+    replicas: 2
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: kubeflow-trainer
+                  app.kubernetes.io/instance: <release-name>
+                  app.kubernetes.io/component: manager
+```
+
+  Replace `<release-name>` with your Helm release name, so the rule only matches this
+  release's manager pods.
+
 - `manager.topologySpreadConstraints` is empty by default. Use it for stricter control over how
   replicas spread across nodes or zones, for example:
 
@@ -153,6 +172,7 @@ more than one replica:
         labelSelector:
           matchLabels:
             app.kubernetes.io/name: kubeflow-trainer
+            app.kubernetes.io/instance: <release-name>
             app.kubernetes.io/component: manager
   ```
 
