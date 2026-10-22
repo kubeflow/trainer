@@ -53,6 +53,155 @@ const (
 //go:embed testdata/status_update.py
 var statusUpdateScript string
 
+var _ = ginkgo.Describe("TrainJob lifecycle", func() {
+	var ns *corev1.Namespace
+	var trainingRuntime *trainer.TrainingRuntime
+	const trainingScript = `import time
+weight = 0.0
+samples = [(1.0, 2.0), (2.0, 4.0), (3.0, 6.0)]
+for step in range(100):
+    gradient = sum(2 * x * (weight * x - y) for x, y in samples) / len(samples)
+    weight -= 0.05 * gradient
+assert abs(weight - 2.0) < 0.001, weight
+print("trained weight:", weight, flush=True)
+`
+
+	ginkgo.BeforeEach(func() {
+		ns = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "lifecycle-e2e-"}}
+		gomega.Expect(k8sClient.Create(ctx, ns)).Should(gomega.Succeed())
+		trainingRuntime = &trainer.TrainingRuntime{
+			ObjectMeta: metav1.ObjectMeta{Name: "lifecycle", Namespace: ns.Name},
+			Spec: trainer.TrainingRuntimeSpec{Template: trainer.JobSetTemplateSpec{Spec: jobsetv1alpha2.JobSetSpec{
+				Network:       &jobsetv1alpha2.Network{EnableDNSHostnames: ptr.To(true)},
+				FailurePolicy: &jobsetv1alpha2.FailurePolicy{MaxRestarts: 1},
+				ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{{
+					Name: constants.Node, Replicas: 1,
+					Template: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}},
+						Spec: batchv1.JobSpec{
+							BackoffLimit: ptr.To[int32](0),
+							Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+								RestartPolicy: corev1.RestartPolicyNever,
+								Containers: []corev1.Container{{
+									Name: constants.Node, Image: "python:3.13-alpine",
+									Command: []string{"python", "-u", "-c", trainingScript},
+								}},
+							}},
+						},
+					},
+				}},
+			}}},
+		}
+	})
+
+	ginkgo.AfterEach(func() {
+		gomega.Expect(k8sClient.Delete(ctx, ns)).Should(gomega.Succeed())
+	})
+
+	assertChildrenDeleted := func() {
+		gomega.Eventually(func(g gomega.Gomega) {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: ns.Name, Name: "lifecycle"}, &jobsetv1alpha2.JobSet{})).Should(testingutil.BeNotFoundError())
+			jobs := &batchv1.JobList{}
+			g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(ns.Name))).Should(gomega.Succeed())
+			g.Expect(jobs.Items).Should(gomega.BeEmpty())
+			pods := &corev1.PodList{}
+			g.Expect(k8sClient.List(ctx, pods, client.InNamespace(ns.Name))).Should(gomega.Succeed())
+			g.Expect(pods.Items).Should(gomega.BeEmpty())
+			services := &corev1.ServiceList{}
+			g.Expect(k8sClient.List(ctx, services, client.InNamespace(ns.Name))).Should(gomega.Succeed())
+			g.Expect(services.Items).Should(gomega.BeEmpty())
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), &trainer.TrainingRuntime{})).Should(gomega.Succeed())
+		}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+	}
+
+	ginkgo.DescribeTable("cleans up a finished training workload after TTL", func(fail bool) {
+		if fail {
+			trainingRuntime.Spec.Template.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec.Containers[0].Command[3] += "raise RuntimeError('training failed after fitting')\n"
+		}
+		gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+		job := testingutil.MakeTrainJobWrapper(ns.Name, "lifecycle").
+			RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), trainingRuntime.Name).
+			Obj()
+		job.Spec.TTLSecondsAfterFinished = ptr.To[int32](10)
+		gomega.Expect(k8sClient.Create(ctx, job)).Should(gomega.Succeed())
+		key := client.ObjectKeyFromObject(job)
+		conditionType := trainer.TrainJobComplete
+		if fail {
+			conditionType = trainer.TrainJobFailed
+		}
+		gomega.Eventually(func(g gomega.Gomega) {
+			got := &trainer.TrainJob{}
+			g.Expect(k8sClient.Get(ctx, key, got)).Should(gomega.Succeed())
+			g.Expect(meta.IsStatusConditionTrue(got.Status.Conditions, conditionType)).Should(gomega.BeTrue())
+			jobSet := &jobsetv1alpha2.JobSet{}
+			g.Expect(k8sClient.Get(ctx, key, jobSet)).Should(gomega.Succeed())
+			if fail {
+				g.Expect(jobSet.Status.Restarts).Should(gomega.Equal(int32(1)))
+			}
+		}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+		gomega.Consistently(func(g gomega.Gomega) {
+			got := &trainer.TrainJob{}
+			g.Expect(k8sClient.Get(ctx, key, got)).Should(gomega.Succeed())
+			g.Expect(meta.IsStatusConditionTrue(got.Status.Conditions, conditionType)).Should(gomega.BeTrue())
+		}, 2*time.Second, util.Interval).Should(gomega.Succeed())
+		gomega.Eventually(func(g gomega.Gomega) {
+			g.Expect(k8sClient.Get(ctx, key, &trainer.TrainJob{})).Should(testingutil.BeNotFoundError())
+		}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+		assertChildrenDeleted()
+		gomega.Eventually(func(g gomega.Gomega) {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: ns.Name, Name: job.Name + "-runtime-snapshot"}, &corev1.ConfigMap{})).Should(testingutil.BeNotFoundError())
+		}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+		gomega.Consistently(func(g gomega.Gomega) {
+			g.Expect(k8sClient.Get(ctx, key, &jobsetv1alpha2.JobSet{})).Should(testingutil.BeNotFoundError())
+		}, util.ConsistentDuration, util.Interval).Should(gomega.Succeed())
+	},
+		ginkgo.Entry("after successful completion", false),
+		ginkgo.Entry("after exhausting JobSet maxRestarts", true),
+	)
+
+	ginkgo.It("terminates active training at its deadline without leaving child resources", func() {
+		imagePreload := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "image-preload", Namespace: ns.Name},
+			Spec: corev1.PodSpec{
+				RestartPolicy: corev1.RestartPolicyNever,
+				Containers: []corev1.Container{{
+					Name: constants.Node, Image: trainingRuntime.Spec.Template.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec.Containers[0].Image,
+					Command: []string{"python", "-c", "pass"},
+				}},
+			},
+		}
+		gomega.Expect(k8sClient.Create(ctx, imagePreload)).Should(gomega.Succeed())
+		gomega.Eventually(func(g gomega.Gomega) {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(imagePreload), imagePreload)).Should(gomega.Succeed())
+			g.Expect(imagePreload.Status.Phase).Should(gomega.Equal(corev1.PodSucceeded))
+		}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+		gomega.Expect(k8sClient.Delete(ctx, imagePreload)).Should(gomega.Succeed())
+
+		trainingRuntime.Spec.Template.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec.Containers[0].Command[3] += "while True:\n    time.sleep(0.1)\n"
+		gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+		job := testingutil.MakeTrainJobWrapper(ns.Name, "lifecycle").
+			RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), trainingRuntime.Name).
+			ActiveDeadlineSeconds(30).
+			Obj()
+		gomega.Expect(k8sClient.Create(ctx, job)).Should(gomega.Succeed())
+		key := client.ObjectKeyFromObject(job)
+		gomega.Eventually(func(g gomega.Gomega) {
+			pods := &corev1.PodList{}
+			g.Expect(k8sClient.List(ctx, pods, client.InNamespace(ns.Name))).Should(gomega.Succeed())
+			g.Expect(pods.Items).Should(gomega.ContainElement(gomega.HaveField("Status.Phase", corev1.PodRunning)))
+		}, 25*time.Second, util.Interval).Should(gomega.Succeed())
+		gomega.Eventually(func(g gomega.Gomega) {
+			got := &trainer.TrainJob{}
+			g.Expect(k8sClient.Get(ctx, key, got)).Should(gomega.Succeed())
+			condition := meta.FindStatusCondition(got.Status.Conditions, trainer.TrainJobFailed)
+			g.Expect(condition).ShouldNot(gomega.BeNil())
+			g.Expect(condition.Status).Should(gomega.Equal(metav1.ConditionTrue))
+			g.Expect(condition.Reason).Should(gomega.Equal(trainer.TrainJobDeadlineExceededReason))
+		}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+		assertChildrenDeleted()
+	})
+})
+
 var _ = ginkgo.Describe("TrainJob e2e", func() {
 	// Each test runs in a separate namespace.
 	var ns *corev1.Namespace
