@@ -74,6 +74,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RandomAlgorithm":                  schema_pkg_apis_trainer_v1alpha1_RandomAlgorithm(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ReplicatedJobPatch":               schema_pkg_apis_trainer_v1alpha1_ReplicatedJobPatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Result":                           schema_pkg_apis_trainer_v1alpha1_Result(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RunPolicy":                        schema_pkg_apis_trainer_v1alpha1_RunPolicy(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimePatch":                     schema_pkg_apis_trainer_v1alpha1_RuntimePatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimeRef":                       schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SearchAlgorithm":                  schema_pkg_apis_trainer_v1alpha1_SearchAlgorithm(ref),
@@ -2075,6 +2076,33 @@ func schema_pkg_apis_trainer_v1alpha1_Result(ref common.ReferenceCallback) commo
 	}
 }
 
+func schema_pkg_apis_trainer_v1alpha1_RunPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "RunPolicy holds mutable lifecycle defaults captured in runtime snapshots. Explicit TrainJob values override their matching defaults.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"activeDeadlineSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "activeDeadlineSeconds is the default maximum active duration in seconds.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"ttlSecondsAfterFinished": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ttlSecondsAfterFinished is the default retention after completion or failure. Ignored for OptimizationJob trials.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_pkg_apis_trainer_v1alpha1_RuntimePatch(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -2389,6 +2417,13 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 							Format:      "int64",
 						},
 					},
+					"ttlSecondsAfterFinished": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ttlSecondsAfterFinished is the retention after the TrainJob becomes Complete or Failed. Ignored for OptimizationJob trials. Zero makes the TrainJob eligible for immediate deletion. This field is mutable and overrides the runtime snapshot default; if unset, that default applies.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"managedBy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "managedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.",
@@ -2433,6 +2468,12 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobStatus(ref common.ReferenceCallbac
 							},
 						},
 					},
+					"startTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "startTime records when the TrainJob becomes active. It is cleared on suspension and reset on resume.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
 					"jobsStatus": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
@@ -2464,7 +2505,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobStatus(ref common.ReferenceCallbac
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobStatus", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerStatus", metav1.Condition{}.OpenAPIModelName()},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobStatus", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerStatus", metav1.Condition{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -2813,6 +2854,12 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref common.ReferenceCa
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicy"),
 						},
 					},
+					"runPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "runPolicy defines lifecycle defaults that referencing TrainJobs can override.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RunPolicy"),
+						},
+					},
 					"template": {
 						SchemaProps: spec.SchemaProps{
 							Description: "template for the JobSet which will be used by TrainJob.",
@@ -2824,7 +2871,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetTemplateSpec", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicy", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicy"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetTemplateSpec", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicy", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicy", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RunPolicy"},
 	}
 }
 

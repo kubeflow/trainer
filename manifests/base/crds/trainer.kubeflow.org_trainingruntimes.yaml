@@ -213,6 +213,23 @@ spec:
                 - message: at most one of the fields in [coscheduling volcano] may
                     be set
                   rule: (has(self.coscheduling)?1:0)+(has(self.volcano)?1:0) <= 1
+              runPolicy:
+                description: runPolicy defines lifecycle defaults that referencing
+                  TrainJobs can override.
+                properties:
+                  activeDeadlineSeconds:
+                    description: activeDeadlineSeconds is the default maximum active
+                      duration in seconds.
+                    format: int64
+                    minimum: 1
+                    type: integer
+                  ttlSecondsAfterFinished:
+                    description: ttlSecondsAfterFinished is the default retention
+                      after completion or failure. Ignored for OptimizationJob trials.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                type: object
               template:
                 description: template for the JobSet which will be used by TrainJob.
                 minProperties: 1
@@ -9483,6 +9500,23 @@ spec:
                         !has(rj.dependsOn) || size(rj.dependsOn) == 0)))'
                 type: object
             type: object
+            x-kubernetes-validations:
+            - message: template.spec.ttlSecondsAfterFinished must be unset; use runPolicy
+                instead
+              rule: '!has(self.template) || !has(self.template.spec) || !has(self.template.spec.ttlSecondsAfterFinished)'
+            - message: Job ttlSecondsAfterFinished must be unset; use runPolicy instead
+              rule: '!has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs)
+                || self.template.spec.replicatedJobs.all(rj, !has(rj.template) ||
+                !has(rj.template.spec) || !has(rj.template.spec.ttlSecondsAfterFinished))'
+            - message: Job activeDeadlineSeconds must be unset; use runPolicy instead
+              rule: '!has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs)
+                || self.template.spec.replicatedJobs.all(rj, !has(rj.template) ||
+                !has(rj.template.spec) || !has(rj.template.spec.activeDeadlineSeconds))'
+            - message: Pod activeDeadlineSeconds must be unset; use runPolicy instead
+              rule: '!has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs)
+                || self.template.spec.replicatedJobs.all(rj, !has(rj.template) ||
+                !has(rj.template.spec) || !has(rj.template.spec.template) || !has(rj.template.spec.template.spec)
+                || !has(rj.template.spec.template.spec.activeDeadlineSeconds))'
         type: object
     served: true
     storage: true

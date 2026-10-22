@@ -39,7 +39,12 @@ type TrainJobSpecApplyConfiguration struct {
 	// before the system tries to terminate it. Value must be a positive integer.
 	// Once reached, all running Pods are terminated and the TrainJob status becomes
 	// Failed with reason: DeadlineExceeded.
+	// TODO(beta): replace with *int64 to match batch/v1.JobSpec.
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
+	// ttlSecondsAfterFinished is the retention after the TrainJob becomes Complete or Failed. Ignored for OptimizationJob trials.
+	// Zero makes the TrainJob eligible for immediate deletion. This field is mutable and overrides
+	// the runtime snapshot default; if unset, that default applies.
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
 	// managedBy is used to indicate the controller or entity that manages a TrainJob.
 	// The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or
 	// `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which
@@ -105,6 +110,14 @@ func (b *TrainJobSpecApplyConfiguration) WithSuspend(value bool) *TrainJobSpecAp
 // If called multiple times, the ActiveDeadlineSeconds field is set to the value of the last call.
 func (b *TrainJobSpecApplyConfiguration) WithActiveDeadlineSeconds(value int64) *TrainJobSpecApplyConfiguration {
 	b.ActiveDeadlineSeconds = &value
+	return b
+}
+
+// WithTTLSecondsAfterFinished sets the TTLSecondsAfterFinished field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TTLSecondsAfterFinished field is set to the value of the last call.
+func (b *TrainJobSpecApplyConfiguration) WithTTLSecondsAfterFinished(value int32) *TrainJobSpecApplyConfiguration {
+	b.TTLSecondsAfterFinished = &value
 	return b
 }
 

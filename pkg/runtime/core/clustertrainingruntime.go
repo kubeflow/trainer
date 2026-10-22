@@ -92,6 +92,18 @@ func (r *ClusterTrainingRuntime) TrainJobStatus(ctx context.Context, trainJob *t
 	return r.TrainingRuntime.TrainJobStatus(ctx, trainJob)
 }
 
+func (r *ClusterTrainingRuntime) RunPolicy(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.RunPolicy, error) {
+	var clusterTrainingRuntime trainer.ClusterTrainingRuntime
+	if err := getRuntimeSnapshot(ctx, r.client, trainJob, &clusterTrainingRuntime); err != nil {
+		// Jobs without a captured runtime have no inherited lifecycle defaults.
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return clusterTrainingRuntime.Spec.RunPolicy, nil
+}
+
 func (r *ClusterTrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {
 	return nil
 }

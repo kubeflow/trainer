@@ -39,6 +39,7 @@ type Runtime interface {
 	DeleteObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]client.Object, error)
 	RuntimeInfo(trainJob *trainer.TrainJob, runtimeTemplateSpec any, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy) (*Info, error)
 	TrainJobStatus(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error)
+	RunPolicy(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.RunPolicy, error)
 	EventHandlerRegistrars() []ReconcilerBuilder
 	ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList)
 }

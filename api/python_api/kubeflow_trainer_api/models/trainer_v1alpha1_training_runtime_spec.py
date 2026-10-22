@@ -36,6 +36,7 @@ from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.trainer_v1alpha1_job_set_template_spec import TrainerV1alpha1JobSetTemplateSpec
 from kubeflow_trainer_api.models.trainer_v1alpha1_ml_policy import TrainerV1alpha1MLPolicy
 from kubeflow_trainer_api.models.trainer_v1alpha1_pod_group_policy import TrainerV1alpha1PodGroupPolicy
+from kubeflow_trainer_api.models.trainer_v1alpha1_run_policy import TrainerV1alpha1RunPolicy
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -45,8 +46,9 @@ class TrainerV1alpha1TrainingRuntimeSpec(BaseModel):
     """ # noqa: E501
     ml_policy: Optional[TrainerV1alpha1MLPolicy] = Field(default=None, description="mlPolicy provides the ML-specific parameters for the model training.", alias="mlPolicy")
     pod_group_policy: Optional[TrainerV1alpha1PodGroupPolicy] = Field(default=None, description="podGroupPolicy defines the configuration for the PodGroup to enable gang-scheduling via supported plugins.", alias="podGroupPolicy")
+    run_policy: Optional[TrainerV1alpha1RunPolicy] = Field(default=None, description="runPolicy defines lifecycle defaults that referencing TrainJobs can override.", alias="runPolicy")
     template: Optional[TrainerV1alpha1JobSetTemplateSpec] = Field(default=None, description="template for the JobSet which will be used by TrainJob.")
-    __properties: ClassVar[List[str]] = ["mlPolicy", "podGroupPolicy", "template"]
+    __properties: ClassVar[List[str]] = ["mlPolicy", "podGroupPolicy", "runPolicy", "template"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -93,6 +95,9 @@ class TrainerV1alpha1TrainingRuntimeSpec(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of pod_group_policy
         if self.pod_group_policy:
             _dict['podGroupPolicy'] = self.pod_group_policy.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of run_policy
+        if self.run_policy:
+            _dict['runPolicy'] = self.run_policy.to_dict()
         # override the default output from pydantic by calling `to_dict()` of template
         if self.template:
             _dict['template'] = self.template.to_dict()
@@ -110,6 +115,7 @@ class TrainerV1alpha1TrainingRuntimeSpec(BaseModel):
         _obj = cls.model_validate({
             "mlPolicy": TrainerV1alpha1MLPolicy.from_dict(obj["mlPolicy"]) if obj.get("mlPolicy") is not None else None,
             "podGroupPolicy": TrainerV1alpha1PodGroupPolicy.from_dict(obj["podGroupPolicy"]) if obj.get("podGroupPolicy") is not None else None,
+            "runPolicy": TrainerV1alpha1RunPolicy.from_dict(obj["runPolicy"]) if obj.get("runPolicy") is not None else None,
             "template": TrainerV1alpha1JobSetTemplateSpec.from_dict(obj["template"]) if obj.get("template") is not None else None
         })
         return _obj

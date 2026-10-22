@@ -6586,6 +6586,13 @@ spec:
                         x-kubernetes-validations:
                         - message: field is immutable
                           rule: self == oldSelf
+                      ttlSecondsAfterFinished:
+                        description: ttlSecondsAfterFinished is the retention after
+                          the TrainJob becomes Complete or Failed. Ignored for OptimizationJob
+                          trials.
+                        format: int32
+                        minimum: 0
+                        type: integer
                     required:
                     - runtimeRef
                     type: object

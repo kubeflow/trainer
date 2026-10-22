@@ -23,6 +23,7 @@ import (
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -85,6 +86,76 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 		gomega.Expect(k8sClient.DeleteAllOf(ctx, &trainer.TrainJob{}, client.InNamespace(ns.Name))).To(gomega.Succeed())
 		gomega.Expect(k8sClient.DeleteAllOf(ctx, &trainer.TrainingRuntime{}, client.InNamespace(ns.Name))).To(gomega.Succeed())
 		gomega.Expect(k8sClient.DeleteAllOf(ctx, &trainer.ClusterTrainingRuntime{})).To(gomega.Succeed())
+	})
+
+	ginkgo.When("Configuring TrainJob lifecycle", func() {
+		ginkgo.DescribeTable("Validates TTL on creation", func(ttl *int32, errorMatcher gomega.OmegaMatcher) {
+			job := testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+				RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+				Obj()
+			job.Spec.TTLSecondsAfterFinished = ttl
+			gomega.Expect(k8sClient.Create(ctx, job)).Should(errorMatcher)
+			if ttl == nil || *ttl >= 0 {
+				gomega.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(job), job)).Should(gomega.Succeed())
+				gomega.Expect(job.Spec.TTLSecondsAfterFinished).Should(gomega.Equal(ttl))
+			}
+		},
+			ginkgo.Entry("accepts an unset TTL", nil, gomega.Succeed()),
+			ginkgo.Entry("accepts zero TTL", ptr.To[int32](0), gomega.Succeed()),
+			ginkgo.Entry("accepts positive TTL", ptr.To[int32](60), gomega.Succeed()),
+			ginkgo.Entry("rejects negative TTL", ptr.To[int32](-1), testingutil.BeInvalidError()),
+		)
+
+		ginkgo.DescribeTable("Validates an explicitly supplied deadline", func(deadline int64, errorMatcher gomega.OmegaMatcher) {
+			job := &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": trainer.GroupVersion.String(),
+				"kind":       trainer.TrainJobKind,
+				"metadata":   map[string]interface{}{"name": jobName, "namespace": ns.Name},
+				"spec": map[string]interface{}{
+					"runtimeRef":            map[string]interface{}{"name": runtimeName, "kind": trainer.TrainingRuntimeKind},
+					"activeDeadlineSeconds": deadline,
+				},
+			}}
+			gomega.Expect(k8sClient.Create(ctx, job)).Should(errorMatcher)
+		},
+			ginkgo.Entry("accepts a positive deadline", int64(1), gomega.Succeed()),
+			ginkgo.Entry("rejects zero deadline", int64(0), testingutil.BeInvalidError()),
+			ginkgo.Entry("rejects negative deadline", int64(-1), testingutil.BeInvalidError()),
+		)
+
+		ginkgo.DescribeTable("Allows changing TTL after finishing", func(ttl *int32, errorMatcher gomega.OmegaMatcher) {
+			job := testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+				RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+				Obj()
+			job.Spec.TTLSecondsAfterFinished = ptr.To[int32](60)
+			gomega.Expect(k8sClient.Create(ctx, job)).Should(gomega.Succeed())
+			job.Status.StartTime = ptr.To(metav1.Now())
+			job.Status.Conditions = []metav1.Condition{{
+				Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue,
+				Reason: "Completed", Message: "Training completed", LastTransitionTime: metav1.Now(),
+			}}
+			gomega.Expect(k8sClient.Status().Update(ctx, job)).Should(gomega.Succeed())
+			gomega.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(job), job)).Should(gomega.Succeed())
+			gomega.Expect(job.Status.StartTime).ShouldNot(gomega.BeNil())
+			job.Spec.TTLSecondsAfterFinished = ttl
+			gomega.Expect(k8sClient.Update(ctx, job)).Should(errorMatcher)
+		},
+			ginkgo.Entry("extends TTL", ptr.To[int32](120), gomega.Succeed()),
+			ginkgo.Entry("shortens TTL", ptr.To[int32](1), gomega.Succeed()),
+			ginkgo.Entry("sets immediate cleanup eligibility", ptr.To[int32](0), gomega.Succeed()),
+			ginkgo.Entry("clears TTL", nil, gomega.Succeed()),
+			ginkgo.Entry("rejects negative updated TTL", ptr.To[int32](-1), testingutil.BeInvalidError()),
+		)
+
+		ginkgo.It("keeps the TrainJob deadline immutable", func() {
+			job := testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+				RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+				ActiveDeadlineSeconds(60).
+				Obj()
+			gomega.Expect(k8sClient.Create(ctx, job)).Should(gomega.Succeed())
+			job.Spec.ActiveDeadlineSeconds = 120
+			gomega.Expect(k8sClient.Update(ctx, job)).Should(testingutil.BeInvalidError())
+		})
 	})
 
 	ginkgo.When("Creating TrainJob", func() {

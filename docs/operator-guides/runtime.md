@@ -5,6 +5,9 @@ This guide gives an overview for TrainingRuntime and ClusterTrainingRuntime.
 Runtimes are template configurations or blueprints that are managed by platform administrators and
 used by TrainJob to launch the desired training job.
 
+See [Configure Runtime Defaults](../user-guides/trainjob-lifecycle.md#configure-runtime-defaults)
+to set default execution deadlines and retention for finished TrainJobs.
+
 ## What is ClusterTrainingRuntime
 
 The ClusterTrainingRuntime is a cluster-scoped API that allows platform administrators to manage

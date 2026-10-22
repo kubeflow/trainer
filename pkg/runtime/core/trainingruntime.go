@@ -297,6 +297,18 @@ func (r *TrainingRuntime) TrainJobStatus(ctx context.Context, trainJob *trainer.
 	return r.framework.RunTrainJobStatusPlugin(ctx, trainJob)
 }
 
+func (r *TrainingRuntime) RunPolicy(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.RunPolicy, error) {
+	var trainingRuntime trainer.TrainingRuntime
+	if err := getRuntimeSnapshot(ctx, r.client, trainJob, &trainingRuntime); err != nil {
+		// Jobs without a captured runtime have no inherited lifecycle defaults.
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return trainingRuntime.Spec.RunPolicy, nil
+}
+
 func (r *TrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {
 	var builders []runtime.ReconcilerBuilder
 	for _, ex := range r.framework.WatchExtensionPlugins() {
