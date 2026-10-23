@@ -63,5 +63,13 @@ func validate(cfg *configapi.Configuration) field.ErrorList {
 		}
 	}
 
+	if policy := cfg.NetworkPolicy; policy != nil {
+		if len(policy.Ingress) > 128 {
+			allErrs = append(allErrs, field.TooMany(field.NewPath("networkPolicy", "ingress"), len(policy.Ingress), 128))
+		}
+		if len(policy.Egress) > 128 {
+			allErrs = append(allErrs, field.TooMany(field.NewPath("networkPolicy", "egress"), len(policy.Egress), 128))
+		}
+	}
 	return allErrs
 }

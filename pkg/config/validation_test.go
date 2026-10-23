@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 
@@ -362,6 +363,20 @@ func TestValidateClientConnection(t *testing.T) {
 			errs := validate(tc.cfg)
 			if diff := cmp.Diff(tc.wantErr, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")); diff != "" {
 				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestNetworkPolicyRuleLimits(t *testing.T) {
+	for name, cfg := range map[string]*configapi.NetworkPolicyConfig{
+		"ingress": {Ingress: make([]networkingv1.NetworkPolicyIngressRule, 129)},
+		"egress":  {Egress: make([]networkingv1.NetworkPolicyEgressRule, 129)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			errs := validate(&configapi.Configuration{NetworkPolicy: cfg})
+			if len(errs) != 1 || errs[0].Field != "networkPolicy."+name {
+				t.Fatalf("unexpected errors: %v", errs)
 			}
 		})
 	}

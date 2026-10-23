@@ -1050,3 +1050,33 @@ tls:
 		})
 	}
 }
+
+func TestNetworkPolicyConfigLoad(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := configapi.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	filename := filepath.Join(t.TempDir(), "network-policy.yaml")
+	data := []byte(`apiVersion: config.trainer.kubeflow.org/v1alpha1
+kind: Configuration
+networkPolicy:
+  enabled: true
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 192.0.2.0/24
+      ports:
+        - protocol: TCP
+          port: 443
+`)
+	if err := os.WriteFile(filename, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	_, cfg, err := Load(scheme, filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.NetworkPolicy == nil || !ptr.Deref(cfg.NetworkPolicy.Enabled, false) || cfg.NetworkPolicy.Egress[0].To[0].IPBlock.CIDR != "192.0.2.0/24" {
+		t.Fatalf("unexpected policy config: %#v", cfg.NetworkPolicy)
+	}
+}

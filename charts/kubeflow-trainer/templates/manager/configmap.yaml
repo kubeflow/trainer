@@ -29,6 +29,9 @@ data:
   controller_manager_config.yaml: |
     apiVersion: config.trainer.kubeflow.org/v1alpha1
     kind: Configuration
+    {{- with .Values.manager.config.networkPolicy }}
+    networkPolicy: {{ toYaml . | nindent 6 }}
+    {{- end }}
     # Health configuration
     health:
       healthProbeBindAddress: {{ .Values.manager.config.health.healthProbeBindAddress | default ":8081" }}

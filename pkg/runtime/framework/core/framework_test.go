@@ -58,6 +58,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/networkpolicy"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
@@ -83,15 +84,16 @@ func TestNew(t *testing.T) {
 			wantFramework: &Framework{
 				registry: fwkplugins.NewRegistry(),
 				plugins: map[string]framework.Plugin{
-					coscheduling.Name: &coscheduling.CoScheduling{},
-					flux.Name:         &flux.Flux{},
-					volcano.Name:      &volcano.Volcano{},
-					mpi.Name:          &mpi.MPI{},
-					plainml.Name:      &plainml.PlainML{},
-					torch.Name:        &torch.Torch{},
-					jobset.Name:       &jobset.JobSet{},
-					jax.Name:          &jax.Jax{},
-					xgboost.Name:      &xgboost.XGBoost{},
+					coscheduling.Name:  &coscheduling.CoScheduling{},
+					flux.Name:          &flux.Flux{},
+					volcano.Name:       &volcano.Volcano{},
+					mpi.Name:           &mpi.MPI{},
+					plainml.Name:       &plainml.PlainML{},
+					networkpolicy.Name: &networkpolicy.NetworkPolicy{},
+					torch.Name:         &torch.Torch{},
+					jobset.Name:        &jobset.JobSet{},
+					jax.Name:           &jax.Jax{},
+					xgboost.Name:       &xgboost.XGBoost{},
 				},
 				enforceMLPlugins: []framework.EnforceMLPolicyPlugin{
 					&flux.Flux{},
@@ -115,6 +117,7 @@ func TestNew(t *testing.T) {
 					&xgboost.XGBoost{},
 				},
 				watchExtensionPlugins: []framework.WatchExtensionPlugin{
+					&networkpolicy.NetworkPolicy{},
 					&flux.Flux{},
 					&coscheduling.CoScheduling{},
 					&volcano.Volcano{},
@@ -125,6 +128,7 @@ func TestNew(t *testing.T) {
 					&jobset.JobSet{},
 				},
 				componentBuilderPlugins: []framework.ComponentBuilderPlugin{
+					&networkpolicy.NetworkPolicy{},
 					&flux.Flux{},
 					&coscheduling.CoScheduling{},
 					&volcano.Volcano{},
@@ -132,6 +136,7 @@ func TestNew(t *testing.T) {
 					&mpi.MPI{},
 				},
 				componentDeleterPlugins: []framework.ComponentDeleterPlugin{
+					&networkpolicy.NetworkPolicy{},
 					&volcano.Volcano{},
 				},
 				trainJobStatusPlugin: &jobset.JobSet{},
@@ -154,7 +159,7 @@ func TestNew(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmp.AllowUnexported(Framework{}),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, flux.Flux{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}, xgboost.XGBoost{}),
+		cmpopts.IgnoreUnexported(networkpolicy.NetworkPolicy{}, coscheduling.CoScheduling{}, flux.Flux{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}, xgboost.XGBoost{}),
 		cmpopts.IgnoreFields(flux.Flux{}, "client", "scheme"),
 		cmpopts.IgnoreFields(coscheduling.CoScheduling{}, "client"),
 		cmpopts.IgnoreFields(volcano.Volcano{}, "client"),
@@ -2472,6 +2477,7 @@ func TestWatchExtensionPlugins(t *testing.T) {
 		"coscheduling, jobset, and mpi are performed": {
 			registry: fwkplugins.NewRegistry(),
 			wantPlugins: []framework.WatchExtensionPlugin{
+				&networkpolicy.NetworkPolicy{},
 				&flux.Flux{},
 				&coscheduling.CoScheduling{},
 				&volcano.Volcano{},
@@ -2485,7 +2491,7 @@ func TestWatchExtensionPlugins(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmpopts.SortSlices(func(a, b framework.Plugin) bool { return a.Name() < b.Name() }),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, jobset.JobSet{}, mpi.MPI{}, flux.Flux{}),
+		cmpopts.IgnoreUnexported(networkpolicy.NetworkPolicy{}, coscheduling.CoScheduling{}, volcano.Volcano{}, jobset.JobSet{}, mpi.MPI{}, flux.Flux{}),
 		cmpopts.IgnoreFields(flux.Flux{}, "client", "scheme"),
 	}
 	for name, tc := range cases {

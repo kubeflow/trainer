@@ -151,3 +151,18 @@ tests:
       - matchRegex:
           path: data["controller_manager_config.yaml"]
           pattern: "FeatOn: true"
+
+  - it: should render the network policy opt-in and administrator rules
+    set:
+      manager.config.networkPolicy.enabled: true
+      manager.config.networkPolicy.egress:
+        - to:
+            - ipBlock:
+                cidr: 192.0.2.0/24
+    asserts:
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: 'networkPolicy:'
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: 'cidr: 192.0.2.0/24'
