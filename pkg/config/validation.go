@@ -69,5 +69,13 @@ func validate(cfg *configapi.Configuration) field.ErrorList {
 	// instead of silently ignoring the unrecognized values.
 	allErrs = append(allErrs, tlsconfig.Validate(cfg.TLS, field.NewPath("tls"))...)
 
+	if policy := cfg.NetworkPolicy; policy != nil {
+		if len(policy.Ingress) > 128 {
+			allErrs = append(allErrs, field.TooMany(field.NewPath("networkPolicy", "ingress"), len(policy.Ingress), 128))
+		}
+		if len(policy.Egress) > 128 {
+			allErrs = append(allErrs, field.TooMany(field.NewPath("networkPolicy", "egress"), len(policy.Egress), 128))
+		}
+	}
 	return allErrs
 }
