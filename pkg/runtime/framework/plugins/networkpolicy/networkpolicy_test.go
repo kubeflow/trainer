@@ -25,8 +25,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -54,7 +52,7 @@ func TestBuild(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			job := &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: tc.jobName, Namespace: "team-a", UID: types.UID("job-uid")}}
+			job := &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: tc.jobName, Namespace: "team-a", UID: "job-uid"}}
 			objects, err := plugin.(*NetworkPolicy).Build(context.Background(), nil, job)
 			if err != nil {
 				t.Fatal(err)
@@ -66,37 +64,24 @@ func TestBuild(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			peers := []networkingv1.NetworkPolicyPeer{
+				{PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{jobset.JobSetNameKey: job.Name}}},
+			}
+			if tc.count == 2 {
+				peers = append(peers, networkingv1.NetworkPolicyPeer{PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{cacheNameLabel: job.Name + "-cache"}}})
+			}
 			for i, object := range typed {
 				policy := object.(*networkingv1.NetworkPolicy)
-				if !metav1.IsControlledBy(policy, job) {
-					t.Fatal("policy lacks TrainJob owner")
+				if !metav1.IsControlledBy(policy, job) || policy.Namespace != job.Namespace {
+					t.Fatal("policy has incorrect ownership or namespace")
 				}
-				if policy.Namespace != job.Namespace {
-					t.Fatal("policy is in the wrong namespace")
+				want := networkingv1.NetworkPolicySpec{
+					PodSelector: *peers[i].PodSelector,
+					PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress},
+					Ingress:     []networkingv1.NetworkPolicyIngressRule{{From: peers}},
+					Egress:      []networkingv1.NetworkPolicyEgressRule{{To: peers}},
 				}
-				if diff := cmp.Diff([]networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress}, policy.Spec.PolicyTypes); diff != "" {
-					t.Fatal(diff)
-				}
-				selector, err := metav1.LabelSelectorAsSelector(&policy.Spec.PodSelector)
-				if err != nil {
-					t.Fatal(err)
-				}
-				key, value := jobset.JobSetNameKey, job.Name
-				if i == 1 {
-					key, value = cacheNameLabel, job.Name+"-cache"
-				}
-				if !selector.Matches(labels.Set{key: value}) || selector.Matches(labels.Set{key: "other"}) || selector.Matches(labels.Set{}) {
-					t.Fatal("selector does not isolate the intended pods")
-				}
-				if len(policy.Spec.Ingress) != 1 || len(policy.Spec.Egress) != 1 {
-					t.Fatal("unexpected default allowances")
-				}
-				for _, peer := range policy.Spec.Egress[0].To {
-					if peer.PodSelector == nil || peer.NamespaceSelector != nil || peer.IPBlock != nil {
-						t.Fatal("default peer can escape the job namespace")
-					}
-				}
-				if diff := cmp.Diff(policy.Spec.Ingress[0].From, policy.Spec.Egress[0].To); diff != "" {
+				if diff := cmp.Diff(want, policy.Spec); diff != "" {
 					t.Fatal(diff)
 				}
 			}

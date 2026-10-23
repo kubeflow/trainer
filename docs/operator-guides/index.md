@@ -103,7 +103,6 @@ ml-policy
 job-template
 runtime-patches
 dynamic-resource-allocation
-network-policies
 extension-framework
 job-scheduling/index
 ```

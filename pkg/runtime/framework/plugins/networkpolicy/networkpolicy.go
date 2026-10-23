@@ -100,8 +100,7 @@ func (p *NetworkPolicy) Build(ctx context.Context, _ *runtime.Info, trainJob *tr
 			TypeMeta: metav1.TypeMeta{APIVersion: networkingv1.SchemeGroupVersion.String(), Kind: "NetworkPolicy"},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name, Namespace: trainJob.Namespace,
-				OwnerReferences: []metav1.OwnerReference{{APIVersion: trainer.GroupVersion.String(), Kind: trainer.TrainJobKind,
-					Name: trainJob.Name, UID: trainJob.UID, Controller: ptr.To(true), BlockOwnerDeletion: ptr.To(true)}},
+				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(trainJob, trainer.GroupVersion.WithKind(trainer.TrainJobKind))},
 			},
 			Spec: networkingv1.NetworkPolicySpec{
 				PodSelector: *peers[i].PodSelector.DeepCopy(),
