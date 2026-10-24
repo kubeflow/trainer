@@ -17,6 +17,7 @@ limitations under the License.
 package jobset
 
 import (
+	"k8s.io/apimachinery/pkg/util/sets"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
@@ -160,15 +161,25 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 
 // TODO: Supporting merge labels would be great.
 
-func (b *Builder) PodLabels(labels map[string]string) *Builder {
+// PodLabels adds the labels to the Pod templates of the target ReplicatedJobs.
+// If targets is nil, the labels are added to all ReplicatedJobs.
+func (b *Builder) PodLabels(labels map[string]string, targets sets.Set[string]) *Builder {
 	for i := range b.Spec.ReplicatedJobs {
+		if targets != nil && !targets.Has(ptr.Deref(b.Spec.ReplicatedJobs[i].Name, "")) {
+			continue
+		}
 		b.Spec.ReplicatedJobs[i].Template.Spec.Template.WithLabels(labels)
 	}
 	return b
 }
 
-func (b *Builder) PodAnnotations(annotations map[string]string) *Builder {
+// PodAnnotations adds the annotations to the Pod templates of the target ReplicatedJobs.
+// If targets is nil, the annotations are added to all ReplicatedJobs.
+func (b *Builder) PodAnnotations(annotations map[string]string, targets sets.Set[string]) *Builder {
 	for i := range b.Spec.ReplicatedJobs {
+		if targets != nil && !targets.Has(ptr.Deref(b.Spec.ReplicatedJobs[i].Name, "")) {
+			continue
+		}
 		b.Spec.ReplicatedJobs[i].Template.Spec.Template.WithAnnotations(annotations)
 	}
 	return b

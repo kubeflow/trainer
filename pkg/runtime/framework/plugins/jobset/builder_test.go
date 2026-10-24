@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
@@ -911,8 +912,65 @@ func TestBuilderPodLabels(t *testing.T) {
 	cases := map[string]struct {
 		jobSet     *jobsetv1alpha2ac.JobSetApplyConfiguration
 		labels     map[string]string
+		targets    sets.Set[string]
 		wantJobSet *jobsetv1alpha2ac.JobSetApplyConfiguration
 	}{
+		"labels applied only to target replicated jobs": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{},
+								},
+							},
+							Name: ptr.To("dataset-initializer"),
+						},
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{},
+								},
+							},
+							Name: ptr.To("node"),
+						},
+					},
+				},
+			},
+			labels: map[string]string{
+				"scheduling.x-k8s.io/pod-group": "test-job",
+			},
+			targets: sets.New("node"),
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{},
+								},
+							},
+							Name: ptr.To("dataset-initializer"),
+						},
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+											Labels: map[string]string{
+												"scheduling.x-k8s.io/pod-group": "test-job",
+											},
+										},
+									},
+								},
+							},
+							Name: ptr.To("node"),
+						},
+					},
+				},
+			},
+		},
 		"labels applied to all replicated jobs": {
 			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
 				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
@@ -1022,7 +1080,7 @@ func TestBuilderPodLabels(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			builder := NewBuilder(tc.jobSet)
-			got := builder.PodLabels(tc.labels).Build()
+			got := builder.PodLabels(tc.labels, tc.targets).Build()
 			if diff := cmp.Diff(tc.wantJobSet, got); len(diff) != 0 {
 				t.Errorf("Unexpected JobSet from PodLabels (-want,+got):\n%s", diff)
 			}
@@ -1034,8 +1092,65 @@ func TestBuilderPodAnnotations(t *testing.T) {
 	cases := map[string]struct {
 		jobSet      *jobsetv1alpha2ac.JobSetApplyConfiguration
 		annotations map[string]string
+		targets     sets.Set[string]
 		wantJobSet  *jobsetv1alpha2ac.JobSetApplyConfiguration
 	}{
+		"annotations applied only to target replicated jobs": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{},
+								},
+							},
+							Name: ptr.To("dataset-initializer"),
+						},
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{},
+								},
+							},
+							Name: ptr.To("node"),
+						},
+					},
+				},
+			},
+			annotations: map[string]string{
+				"scheduling.k8s.io/group-name": "test-job",
+			},
+			targets: sets.New("node"),
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{},
+								},
+							},
+							Name: ptr.To("dataset-initializer"),
+						},
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+											Annotations: map[string]string{
+												"scheduling.k8s.io/group-name": "test-job",
+											},
+										},
+									},
+								},
+							},
+							Name: ptr.To("node"),
+						},
+					},
+				},
+			},
+		},
 		"annotations applied to all replicated jobs": {
 			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
 				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
@@ -1140,7 +1255,7 @@ func TestBuilderPodAnnotations(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			builder := NewBuilder(tc.jobSet)
-			got := builder.PodAnnotations(tc.annotations).Build()
+			got := builder.PodAnnotations(tc.annotations, tc.targets).Build()
 			if diff := cmp.Diff(tc.wantJobSet, got); len(diff) != 0 {
 				t.Errorf("Unexpected JobSet from PodAnnotations (-want,+got):\n%s", diff)
 			}

@@ -500,8 +500,8 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 	jobSet := jobSetBuilder.
 		Initializer(trainJob).
 		Trainer(info, trainJob).
-		PodLabels(info.Scheduler.PodLabels).
-		PodAnnotations(info.Scheduler.PodAnnotations).
+		PodLabels(info.Scheduler.PodLabels, info.Scheduler.TargetReplicatedJobs).
+		PodAnnotations(info.Scheduler.PodAnnotations, info.Scheduler.TargetReplicatedJobs).
 		Suspend(trainJob.Spec.Suspend).
 		Build().
 		WithOwnerReferences(metav1ac.OwnerReference().
