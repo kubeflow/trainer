@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	resourcehelpers "k8s.io/component-helpers/resource"
 	"k8s.io/utils/ptr"
@@ -93,6 +94,9 @@ type Container struct {
 type Scheduler struct {
 	PodLabels      map[string]string
 	PodAnnotations map[string]string
+	// TargetReplicatedJobs limits PodLabels and PodAnnotations to the named ReplicatedJobs.
+	// If nil, they are added to all ReplicatedJobs.
+	TargetReplicatedJobs sets.Set[string]
 }
 
 type InfoOptions struct {
@@ -241,6 +245,45 @@ func (i *Info) FindContainerByPodSetName(psName, containerName string) *Containe
 		return &ps.InitContainers[idx]
 	}
 	return nil
+}
+
+// PodGroupPodSets returns the PodSets participating in the PodGroup.
+// All PodSets participate unless the PodGroupPolicy sets targetReplicatedJobs.
+func (i *Info) PodGroupPodSets() iter.Seq[PodSet] {
+	return func(yield func(PodSet) bool) {
+		var targets sets.Set[string]
+		if i.RuntimePolicy.PodGroupPolicy != nil && i.RuntimePolicy.PodGroupPolicy.TargetReplicatedJobs != nil {
+			targets = sets.New(i.RuntimePolicy.PodGroupPolicy.TargetReplicatedJobs...)
+		}
+		for _, ps := range i.TemplateSpec.PodSets {
+			if targets != nil && !targets.Has(ps.Name) {
+				continue
+			}
+			if !yield(ps) {
+				return
+			}
+		}
+	}
+}
+
+// PodGroupRequests returns the total number of Pods and the total resource requests
+// of the PodSets participating in the PodGroup.
+func (i *Info) PodGroupRequests() (int32, corev1.ResourceList) {
+	var totalMembers int32
+	totalResources := make(corev1.ResourceList)
+	for ps := range i.PodGroupPodSets() {
+		count := *ps.Count
+		totalMembers += count
+		for resName, singlePodQuantity := range ps.SinglePodRequests {
+			// Copy the Quantity since Mul can mutate the shared value of the PodSet requests.
+			quantity := singlePodQuantity.DeepCopy()
+			quantity.Mul(int64(count))
+			current := totalResources[resName]
+			current.Add(quantity)
+			totalResources[resName] = current
+		}
+	}
+	return totalMembers, totalResources
 }
 
 // FindByAncestor finds the PodSet built from the given
