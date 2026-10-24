@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -87,6 +88,9 @@ func (c *CoScheduling) EnforcePodGroupPolicy(info *runtime.Info, trainJob *train
 		info.Scheduler.PodLabels = make(map[string]string, 1)
 	}
 	info.Scheduler.PodLabels[schedulerpluginsv1alpha1.PodGroupLabel] = trainJob.Name
+	if targets := info.RuntimePolicy.PodGroupPolicy.TargetReplicatedJobs; targets != nil {
+		info.Scheduler.TargetReplicatedJobs = sets.New(targets...)
+	}
 	return nil
 }
 
@@ -107,18 +111,8 @@ func (c *CoScheduling) Build(ctx context.Context, info *runtime.Info, trainJob *
 		return nil, nil
 	}
 
-	var totalMembers int32
-	totalResources := make(corev1.ResourceList)
-	for _, ps := range info.TemplateSpec.PodSets {
-		count := *ps.Count
-		totalMembers += count
-		for resName, quantity := range ps.SinglePodRequests {
-			quantity.Mul(int64(count))
-			current := totalResources[resName]
-			current.Add(quantity)
-			totalResources[resName] = current
-		}
-	}
+	// Aggregate pod resource requests of the ReplicatedJobs participating in the PodGroup.
+	totalMembers, totalResources := info.PodGroupRequests()
 
 	podGroup := schedulerpluginsv1alpha1ac.PodGroup(trainJob.Name, trainJob.Namespace)
 

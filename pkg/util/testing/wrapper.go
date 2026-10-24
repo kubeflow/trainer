@@ -1413,6 +1413,14 @@ func (s *TrainingRuntimeSpecWrapper) PodGroupPolicyCoschedulingSchedulingTimeout
 	return s
 }
 
+func (s *TrainingRuntimeSpecWrapper) PodGroupPolicyTargetReplicatedJobs(targets ...string) *TrainingRuntimeSpecWrapper {
+	if s.PodGroupPolicy == nil {
+		s.PodGroupPolicy = &trainer.PodGroupPolicy{}
+	}
+	s.PodGroupPolicy.TargetReplicatedJobs = targets
+	return s
+}
+
 func (s *TrainingRuntimeSpecWrapper) Obj() trainer.TrainingRuntimeSpec {
 	return s.TrainingRuntimeSpec
 }

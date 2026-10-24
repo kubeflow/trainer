@@ -34,6 +34,7 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
@@ -310,6 +311,74 @@ func TestVolcano(t *testing.T) {
 			// whose PodGroup was already removed (e.g. by Delete()) must not have it
 			// recreated on the next reconcile while still suspended.
 			expectObjs:                 nil,
+			expectEnforcePodGroupError: nil,
+			expectBuildError:           nil,
+		},
+		"PodGroup is built only from targetReplicatedJobs": {
+			trainJob: &trainer.TrainJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "job-targets", Namespace: "test-ns", UID: "6"},
+			},
+			info: &runtime.Info{
+				TemplateSpec: createBaseInfo.TemplateSpec,
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						TargetReplicatedJobs: []string{"worker"},
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{},
+			},
+			objs: nil,
+			expectInfo: &runtime.Info{
+				TemplateSpec: createBaseInfo.TemplateSpec,
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						TargetReplicatedJobs: []string{"worker"},
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{
+					PodAnnotations: map[string]string{
+						volcanov1beta1.KubeGroupNameAnnotationKey: "job-targets",
+					},
+					TargetReplicatedJobs: sets.New("worker"),
+				},
+			},
+			// The launcher is not a target, so neither its Pod nor its priorityClassName
+			// contribute to the PodGroup.
+			expectObjs: []apiruntime.Object{
+				&volcanov1beta1.PodGroup{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: volcanov1beta1.SchemeGroupVersion.String(),
+						Kind:       "PodGroup",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "job-targets",
+						Namespace: "test-ns",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion:         trainer.GroupVersion.String(),
+								Kind:               trainer.TrainJobKind,
+								Name:               "job-targets",
+								UID:                types.UID(strconv.Itoa(6)),
+								Controller:         ptr.To(true),
+								BlockOwnerDeletion: ptr.To(true),
+							},
+						},
+					},
+					Spec: volcanov1beta1.PodGroupSpec{
+						MinMember: 4,
+						MinResources: &corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("2"),
+							corev1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
 			expectEnforcePodGroupError: nil,
 			expectBuildError:           nil,
 		},

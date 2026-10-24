@@ -145,6 +145,9 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 	resRequests := corev1.ResourceList{
 		corev1.ResourceCPU: resource.MustParse("1"),
 	}
+	trainerResRequests := corev1.ResourceList{
+		corev1.ResourceCPU: resource.MustParse("2"),
+	}
 
 	// TODO (andreyvelich): Add more test cases.
 	cases := map[string]struct {
@@ -217,6 +220,120 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					}).
 					SchedulingTimeout(120).
 					Obj(),
+			},
+		},
+		"succeeded to build Coscheduling PodGroup only from targetReplicatedJobs with NumNodes and resources from the TrainJob.": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+				RuntimeSpec(
+					testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+						WithMLPolicy(
+							testingutil.MakeMLPolicyWrapper().
+								WithNumNodes(100).
+								Obj(),
+						).
+						PodGroupPolicyCoschedulingSchedulingTimeout(120).
+						PodGroupPolicyTargetReplicatedJobs(constants.Node).
+						Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Obj(),
+				).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						NumNodes(30).
+						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, trainerResRequests).
+						Obj(),
+				).
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					PodLabelForJobs(schedulerpluginsv1alpha1.PodGroupLabel, "test-job", constants.Node).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+					NumNodes(30).
+					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, trainerResRequests).
+					Obj(),
+				testingutil.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					MinMember(30). // Only the 30 Trainer nodes; the initializers are not targets.
+					MinResources(corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("60"),
+					}).
+					SchedulingTimeout(120).
+					Obj(),
+			},
+		},
+		"succeeded to build Volcano PodGroup only from targetReplicatedJobs with NumNodes and resources from the TrainJob.": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+				RuntimeSpec(
+					testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+						WithMLPolicy(
+							testingutil.MakeMLPolicyWrapper().
+								WithNumNodes(100).
+								Obj(),
+						).
+						PodGroupPolicyVolcano(&trainer.VolcanoPodGroupPolicySource{}).
+						PodGroupPolicyTargetReplicatedJobs(constants.Node).
+						Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Obj(),
+				).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						NumNodes(30).
+						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, trainerResRequests).
+						Obj(),
+				).
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					PodAnnotationForJobs(volcanov1beta1.KubeGroupNameAnnotationKey, "test-job", constants.Node).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+					NumNodes(30).
+					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, trainerResRequests).
+					Obj(),
+				&volcanov1beta1.PodGroup{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: volcanov1beta1.SchemeGroupVersion.String(),
+						Kind:       "PodGroup",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion:         trainer.GroupVersion.String(),
+								Kind:               trainer.TrainJobKind,
+								Name:               "test-job",
+								UID:                "uid",
+								Controller:         ptr.To(true),
+								BlockOwnerDeletion: ptr.To(true),
+							},
+						},
+					},
+					Spec: volcanov1beta1.PodGroupSpec{
+						MinMember: 30, // Only the 30 Trainer nodes; the initializers are not targets.
+						MinResources: &corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("60"),
+						},
+					},
+				},
 			},
 		},
 		"succeeded to build PodGroup and JobSet with multi-slice TPU trainer.": {

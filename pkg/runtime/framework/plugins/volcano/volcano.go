@@ -19,10 +19,10 @@ package volcano
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -30,6 +30,7 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
@@ -138,6 +139,9 @@ func (v *Volcano) EnforcePodGroupPolicy(info *runtime.Info, trainJob *trainer.Tr
 		info.Scheduler.PodAnnotations = map[string]string{}
 	}
 	info.Scheduler.PodAnnotations[volcanov1beta1.KubeGroupNameAnnotationKey] = trainJob.Name
+	if targets := info.RuntimePolicy.PodGroupPolicy.TargetReplicatedJobs; targets != nil {
+		info.Scheduler.TargetReplicatedJobs = sets.New(targets...)
+	}
 	return nil
 }
 
@@ -166,19 +170,8 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 
 	volcanoSpec := info.RuntimePolicy.PodGroupPolicy.Volcano
 
-	// Aggregate pod resource requests
-	var totalMembers int32
-	totalResources := make(corev1.ResourceList)
-	for _, ps := range info.TemplateSpec.PodSets {
-		count := *ps.Count
-		totalMembers += count
-		for resName, quantity := range ps.SinglePodRequests {
-			quantity.Mul(int64(count))
-			current := totalResources[resName]
-			current.Add(quantity)
-			totalResources[resName] = current
-		}
-	}
+	// Aggregate pod resource requests of the ReplicatedJobs participating in the PodGroup.
+	totalMembers, totalResources := info.PodGroupRequests()
 	pg := volcanov1beta1ac.PodGroup(trainJob.Name, trainJob.Namespace).
 		WithSpec(volcanov1beta1ac.PodGroupSpec().
 			WithMinMember(totalMembers).
@@ -190,10 +183,13 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 		pg.Spec.WithQueue(queue)
 	}
 
-	// Configure priorityClassName from the Pod template
+	// Configure priorityClassName from the Pod template of the ReplicatedJobs participating in the PodGroup.
 	jobSetSpec, ok := runtime.TemplateSpecApply[v1alpha2.JobSetSpecApplyConfiguration](info)
 	if ok && jobSetSpec != nil {
 		for _, rj := range jobSetSpec.ReplicatedJobs {
+			if !isPodGroupTarget(info, rj.Name) {
+				continue
+			}
 			if rj.Template != nil && rj.Template.Spec != nil && rj.Template.Spec.Template != nil && rj.Template.Spec.Template.Spec != nil {
 				priorityClassName := rj.Template.Spec.Template.Spec.PriorityClassName
 				if priorityClassName != nil {
@@ -218,6 +214,12 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 		WithBlockOwnerDeletion(true))
 
 	return []apiruntime.ApplyConfiguration{pg}, nil
+}
+
+// isPodGroupTarget reports whether the ReplicatedJob participates in the PodGroup.
+func isPodGroupTarget(info *runtime.Info, rJobName *string) bool {
+	targets := info.RuntimePolicy.PodGroupPolicy.TargetReplicatedJobs
+	return targets == nil || slices.Contains(targets, ptr.Deref(rJobName, ""))
 }
 
 // Delete returns the PodGroup that should now be removed for the TrainJob, once it is no
