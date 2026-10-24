@@ -38,6 +38,34 @@ the `coscheduling` policy to create a PodGroup for gang scheduling. Kueue and KA
 different mechanisms: Kueue admits the TrainJob with its own quota and suspend mechanism, and KAI
 Scheduler creates its PodGroup with the `podgrouper` component.
 
+## Select ReplicatedJobs for the PodGroup
+
+By default, the Pods of every ReplicatedJob in the runtime join the PodGroup, and the PodGroup
+`minMember` and `minResources` are the sum of all ReplicatedJobs. For runtimes with sequential stages,
+such as dataset and model initializers that must `Complete` before the trainer starts, this counts Pods
+that never run at the same time.
+
+Set `targetReplicatedJobs` to gang-schedule only the selected ReplicatedJobs. It works with both
+the `coscheduling` and `volcano` policies:
+
+```yaml
+spec:
+  podGroupPolicy:
+    targetReplicatedJobs:
+      - node
+    volcano: {}
+```
+
+With this configuration, `minMember` and `minResources` are computed only from the `node`
+ReplicatedJob, after `trainer.numNodes` and `trainer.resourcesPerNode` from the TrainJob are applied,
+and only the `node` Pods get the PodGroup label or annotation. The other ReplicatedJobs keep their
+`schedulerName` and are scheduled independently of the trainer gang.
+
+Every entry must match the name of a ReplicatedJob in the runtime template. Only select ReplicatedJobs
+whose Pods are created at the same time. JobSet creates a ReplicatedJob with `dependsOn` only after
+its dependencies are `Ready` or `Complete`, so selecting it together with those dependencies counts Pods
+that do not exist yet, and the PodGroup may never reach `minMember`.
+
 ## Next Steps
 
 - Learn how to configure job queueing and resource management with [Kueue](https://kueue.sigs.k8s.io/docs/tasks/run/trainjobs/).
