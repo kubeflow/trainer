@@ -191,6 +191,17 @@ spec:
                         minimum: 0
                         type: integer
                     type: object
+                  targetReplicatedJobs:
+                    description: targetReplicatedJobs is the list of ReplicatedJob
+                      names whose Pods participate in the PodGroup.
+                    items:
+                      maxLength: 63
+                      minLength: 1
+                      type: string
+                    maxItems: 64
+                    minItems: 1
+                    type: array
+                    x-kubernetes-list-type: set
                   volcano:
                     description: volcano plugin for gang-scheduling.
                     properties:

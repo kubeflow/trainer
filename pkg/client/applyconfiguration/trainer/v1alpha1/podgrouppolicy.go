@@ -23,6 +23,12 @@ package v1alpha1
 //
 // PodGroupPolicy represents a PodGroup configuration for gang-scheduling.
 type PodGroupPolicyApplyConfiguration struct {
+	// targetReplicatedJobs is the list of ReplicatedJob names whose Pods participate in the PodGroup.
+	// The PodGroup minMember and minResources are calculated only from the selected ReplicatedJobs,
+	// and the PodGroup label or annotation is injected only into their Pod templates.
+	// For example, sequential initializer Jobs can be left out of the trainer gang.
+	// If unset, all ReplicatedJobs participate in the PodGroup.
+	TargetReplicatedJobs []string `json:"targetReplicatedJobs,omitempty"`
 	// Configuration for gang-scheduling using various plugins.
 	PodGroupPolicySourceApplyConfiguration `json:""`
 }
@@ -31,6 +37,16 @@ type PodGroupPolicyApplyConfiguration struct {
 // apply.
 func PodGroupPolicy() *PodGroupPolicyApplyConfiguration {
 	return &PodGroupPolicyApplyConfiguration{}
+}
+
+// WithTargetReplicatedJobs adds the given value to the TargetReplicatedJobs field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the TargetReplicatedJobs field.
+func (b *PodGroupPolicyApplyConfiguration) WithTargetReplicatedJobs(values ...string) *PodGroupPolicyApplyConfiguration {
+	for i := range values {
+		b.TargetReplicatedJobs = append(b.TargetReplicatedJobs, values[i])
+	}
+	return b
 }
 
 // WithCoscheduling sets the Coscheduling field in the declarative configuration to the given value

@@ -31,7 +31,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.trainer_v1alpha1_coscheduling_pod_group_policy_source import TrainerV1alpha1CoschedulingPodGroupPolicySource
 from kubeflow_trainer_api.models.trainer_v1alpha1_volcano_pod_group_policy_source import TrainerV1alpha1VolcanoPodGroupPolicySource
@@ -43,8 +43,9 @@ class TrainerV1alpha1PodGroupPolicy(BaseModel):
     PodGroupPolicy represents a PodGroup configuration for gang-scheduling.
     """ # noqa: E501
     coscheduling: Optional[TrainerV1alpha1CoschedulingPodGroupPolicySource] = Field(default=None, description="coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.")
+    target_replicated_jobs: Optional[List[StrictStr]] = Field(default=None, description="targetReplicatedJobs is the list of ReplicatedJob names whose Pods participate in the PodGroup. The PodGroup minMember and minResources are calculated only from the selected ReplicatedJobs, and the PodGroup label or annotation is injected only into their Pod templates. For example, sequential initializer Jobs can be left out of the trainer gang. If unset, all ReplicatedJobs participate in the PodGroup.", alias="targetReplicatedJobs")
     volcano: Optional[TrainerV1alpha1VolcanoPodGroupPolicySource] = Field(default=None, description="volcano plugin for gang-scheduling.")
-    __properties: ClassVar[List[str]] = ["coscheduling", "volcano"]
+    __properties: ClassVar[List[str]] = ["coscheduling", "targetReplicatedJobs", "volcano"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -104,6 +105,7 @@ class TrainerV1alpha1PodGroupPolicy(BaseModel):
 
         _obj = cls.model_validate({
             "coscheduling": TrainerV1alpha1CoschedulingPodGroupPolicySource.from_dict(obj["coscheduling"]) if obj.get("coscheduling") is not None else None,
+            "targetReplicatedJobs": obj.get("targetReplicatedJobs"),
             "volcano": TrainerV1alpha1VolcanoPodGroupPolicySource.from_dict(obj["volcano"]) if obj.get("volcano") is not None else None
         })
         return _obj
