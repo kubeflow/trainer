@@ -175,6 +175,44 @@ func TestValidateReplicatedJobs(t *testing.T) {
 	}
 }
 
+func TestValidatePodGroupPolicy(t *testing.T) {
+	rJobs := testingutil.MakeJobSetWrapper("ns", "valid").
+		Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+		Obj().Spec.ReplicatedJobs
+	targetsPath := field.NewPath("spec").Child("podGroupPolicy").Child("targetReplicatedJobs")
+	cases := map[string]struct {
+		podGroupPolicy *trainer.PodGroupPolicy
+		wantError      field.ErrorList
+	}{
+		"nil podGroupPolicy": {},
+		"targetReplicatedJobs is not set": {
+			podGroupPolicy: &trainer.PodGroupPolicy{},
+		},
+		"valid targetReplicatedJobs": {
+			podGroupPolicy: &trainer.PodGroupPolicy{
+				TargetReplicatedJobs: []string{constants.Node},
+			},
+		},
+		"unknown targetReplicatedJobs": {
+			podGroupPolicy: &trainer.PodGroupPolicy{
+				TargetReplicatedJobs: []string{constants.Node, "upload", "launcher"},
+			},
+			wantError: field.ErrorList{
+				field.Invalid(targetsPath.Index(1), "upload", ""),
+				field.Invalid(targetsPath.Index(2), "launcher", ""),
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			gotErr := validatePodGroupPolicy(tc.podGroupPolicy, rJobs)
+			if diff := cmp.Diff(tc.wantError, gotErr, cmpopts.IgnoreFields(field.Error{}, "Detail")); len(diff) != 0 {
+				t.Errorf("validatePodGroupPolicy() mismatch (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestTrainingRuntimeValidateUpdate(t *testing.T) {
 	cases := map[string]struct {
 		oldObj    *trainer.TrainingRuntime
