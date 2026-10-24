@@ -137,6 +137,27 @@ tests:
           path: data["controller_manager_config.yaml"]
           pattern: "burst: 400"
 
+  - it: should not render tls by default
+    asserts:
+      - notMatchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "tls:"
+
+  - it: should render tls options
+    set:
+      manager.config.tls:
+        minVersion: "1.3"
+        cipherSuites:
+          - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        nextProtos:
+          - h2
+          - http/1.1
+    asserts:
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: |
+            (?s)tls:\s+cipherSuites:\s+- TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256\s+minVersion: "1.3"\s+nextProtos:\s+- h2\s+- http/1.1
+
   - it: should set feature gates
     set:
       manager.config.featureGates.FeatOn: true
