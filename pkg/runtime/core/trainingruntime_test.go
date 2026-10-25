@@ -139,6 +139,101 @@ func wantDRATorchJobSet(requests corev1.ResourceList, numProcPerNode string) *te
 		)
 }
 
+func TestTrainingRuntimeNewObjectsMPIRuntimeNumNodes(t *testing.T) {
+	runtimeSpec := testingutil.MakeTrainingRuntimeSpecWrapper(
+		testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec,
+	).
+		WithMLPolicy(
+			testingutil.MakeMLPolicyWrapper().
+				WithNumNodes(3).
+				WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+					MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(false)).
+					Obj(),
+				).
+				Obj(),
+		).
+		LauncherReplica().
+		Replicas(1, constants.Launcher).
+		Obj()
+
+	for i := range runtimeSpec.Template.Spec.ReplicatedJobs {
+		rJob := &runtimeSpec.Template.Spec.ReplicatedJobs[i]
+		switch rJob.Name {
+		case constants.Launcher:
+			if rJob.Template.Labels == nil {
+				rJob.Template.Labels = make(map[string]string)
+			}
+			rJob.Template.Labels[constants.LabelTrainJobAncestor] = constants.AncestorTrainer
+		case constants.Node:
+			delete(rJob.Template.Labels, constants.LabelTrainJobAncestor)
+		}
+	}
+
+	trainingRuntimeObj := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+		RuntimeSpec(runtimeSpec).
+		Obj()
+
+	trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+		UID("uid").
+		RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+		Trainer(testingutil.MakeTrainJobTrainerWrapper().Obj()).
+		Obj()
+
+	_, ctx := ktesting.NewTestContext(t)
+	clientBuilder := testingutil.NewClientBuilder().WithObjects(trainingRuntimeObj)
+	c := clientBuilder.Build()
+
+	trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	objs, err := trainingRuntime.NewObjects(ctx, trainJob)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resultObjs, err := testingutil.ToObject(c.Scheme(), objs...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var jobSet *jobsetv1alpha2.JobSet
+	for _, obj := range resultObjs {
+		if js, ok := obj.(*jobsetv1alpha2.JobSet); ok {
+			jobSet = js
+			break
+		}
+	}
+	if jobSet == nil {
+		t.Fatal("JobSet was not generated")
+	}
+
+	parallelism := make(map[string]int32)
+	completions := make(map[string]int32)
+	for _, rJob := range jobSet.Spec.ReplicatedJobs {
+		if rJob.Template.Spec.Parallelism != nil {
+			parallelism[rJob.Name] = *rJob.Template.Spec.Parallelism
+		}
+		if rJob.Template.Spec.Completions != nil {
+			completions[rJob.Name] = *rJob.Template.Spec.Completions
+		}
+	}
+
+	if got := parallelism[constants.Launcher]; got != 1 {
+		t.Errorf("launcher parallelism = %d, want 1", got)
+	}
+	if got := completions[constants.Launcher]; got != 1 {
+		t.Errorf("launcher completions = %d, want 1", got)
+	}
+	if got := parallelism[constants.Node]; got != 3 {
+		t.Errorf("node parallelism = %d, want 3", got)
+	}
+	if got := completions[constants.Node]; got != 3 {
+		t.Errorf("node completions = %d, want 3", got)
+	}
+}
+
 func TestTrainingRuntimeNewObjects(t *testing.T) {
 	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobDynamicResourceAllocation, true)

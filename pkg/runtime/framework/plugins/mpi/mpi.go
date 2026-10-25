@@ -121,15 +121,33 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 		return nil
 	}
 
-	// TrainJob contains the actual information for the Trainer.
+	// Start with the runtime MLPolicy numNodes applied to the trainer ancestor PodSet.
+	numNodes := int32(1)
+	for i := range info.TemplateSpec.PodSets {
+		podSet := &info.TemplateSpec.PodSets[i]
+		if podSet.Ancestor != nil &&
+			*podSet.Ancestor == constants.AncestorTrainer &&
+			podSet.Count != nil {
+			numNodes = *podSet.Count
+			break
+		}
+	}
+
+	// TrainJob numNodes takes precedence over the runtime MLPolicy default.
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		if node := info.FindPodSetByName(constants.Node); node != nil && node.Count != nil {
-			if ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false) {
-				// When runLauncherAsNode is enabled, 1 nodes should be allocated to launcher.
-				*node.Count = max(*trainJob.Spec.Trainer.NumNodes-1, 1)
-			} else {
-				*node.Count = *trainJob.Spec.Trainer.NumNodes
-			}
+		numNodes = *trainJob.Spec.Trainer.NumNodes
+	}
+
+	// MPI runtimes use a single launcher; numNodes scales the worker node PodSet.
+	if launcher := info.FindPodSetByName(constants.Launcher); launcher != nil && launcher.Count != nil {
+		*launcher.Count = 1
+	}
+	if node := info.FindPodSetByName(constants.Node); node != nil && node.Count != nil {
+		if ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false) {
+			// When runLauncherAsNode is enabled, one node is allocated to the launcher.
+			*node.Count = max(numNodes-1, 1)
+		} else {
+			*node.Count = numNodes
 		}
 	}
 
