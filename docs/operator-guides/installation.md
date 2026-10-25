@@ -175,6 +175,68 @@ CNI-specific. Prevent tenants from spoofing controller pod labels, modifying
 operator configuration, or creating bypass policies. This is network isolation,
 not authentication, encryption, or a boundary against namespace administrators.
 
+### Network policy example
+
+Example: three TrainJobs, two namespaces, six generated policies. Each job can reach only its own workers/cache plus automatic infrastructure access and operator-wide exceptions. Monitoring ingress and the selective storage/cache allowances below are administrator rules.
+
+::::{mermaid}
+flowchart TB
+  subgraph teamA["Namespace: team-a"]
+    subgraph alphaA["TrainJob alpha / UID A"]
+      A["2 workers<br/>trainjob-A"]
+      AC["Private cache<br/>trainjob-cache-A"]
+      A <-->|"same-job traffic"| AC
+    end
+    subgraph betaA["TrainJob beta / UID B"]
+      B["2 workers<br/>trainjob-B"]
+      BC["Private cache<br/>trainjob-cache-B"]
+      B <-->|"same-job traffic"| BC
+    end
+  end
+  subgraph teamB["Namespace: team-b"]
+    subgraph alphaB["TrainJob alpha / UID C"]
+      C["2 workers<br/>trainjob-C"]
+      CC["Private cache<br/>trainjob-cache-C"]
+      C <-->|"same-job traffic"| CC
+    end
+  end
+  DNS["CoreDNS / NodeLocal DNS<br/>automatic TCP/UDP 53"]
+  MON["Monitoring<br/>operator-wide ingress exception"]
+  STORE["Approved object-store IP range"]
+  SHARED["Shared cache in namespace data<br/>separate ingress policy admits team-b/alpha"]
+  A -->|"TCP/UDP 53"| DNS
+  B -->|"TCP/UDP 53"| DNS
+  C -->|"TCP/UDP 53"| DNS
+  MON -->|"metrics port"| A
+  MON -->|"metrics port"| B
+  MON -->|"metrics port"| C
+  B -->|"TCP 443: extra admin policy selects beta"| STORE
+  C -->|"TCP 9000: extra admin policy selects team-b/alpha"| SHARED
+  A -. "BLOCKED: different job" .-> B
+  A -. "BLOCKED: same name, different namespace" .-> C
+  A -. "BLOCKED: another job's cache" .-> BC
+  A -. "BLOCKED: no storage allowance" .-> STORE
+  API["Kubernetes API<br/>discovered IPs and ports"]
+  STATUS["Trainer status service<br/>when feature enabled"]
+  A -->|"automatic"| API
+  B -->|"automatic"| API
+  C -->|"automatic"| API
+  A -->|"automatic"| STATUS
+  B -->|"automatic"| STATUS
+  C -->|"automatic"| STATUS
+  classDef workload fill:#e8f2ff,stroke:#2563eb,color:#111827
+  classDef cache fill:#ecfdf5,stroke:#059669,color:#111827
+  class A,B,C workload
+  class AC,BC,CC,SHARED cache
+  linkStyle 11,12,13,14 stroke:#dc2626,stroke-dasharray:5 5,color:#dc2626
+::::
+
+Solid arrows are allowed new connections; red dashed arrows are denied examples. Replies to allowed connections are implicit. Workers within each job can also communicate, and the same infrastructure rules and shared exceptions apply to private caches (arrows omitted for readability).
+
+The two selective storage/shared-cache allowances are **additional administrator-created Kubernetes NetworkPolicies**, illustrating Kubernetes' additive policy model. This change generates a separate job/cache policy pair with the **same operator-wide exceptions** for every job; it does not add per-job exception fields. A/B/C abbreviate real TrainJob UIDs.
+
+### Verify enforcement
+
 Run the real-network regression on a disposable cluster configured with
 `test/e2e/testdata/network-policy-values.yaml` (HTTP workloads and cache-label
 fixtures, no GPUs). Disable optional LWS for these synthetic fixtures; its admission
