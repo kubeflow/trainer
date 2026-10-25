@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubeflow Authors.
+Copyright The Kubeflow Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
-func TestBuild(t *testing.T) {
+func TestNetworkPolicyBuild(t *testing.T) {
 	for name, tc := range map[string]struct {
 		config  *configapi.Configuration
 		jobName string
@@ -89,7 +89,7 @@ func TestBuild(t *testing.T) {
 	}
 }
 
-func TestConfiguredRules(t *testing.T) {
+func TestNetworkPolicyConfiguredRules(t *testing.T) {
 	cfg := &configapi.Configuration{NetworkPolicy: &configapi.NetworkPolicyConfig{
 		Enabled: ptr.To(true),
 		Ingress: []networkingv1.NetworkPolicyIngressRule{{From: []networkingv1.NetworkPolicyPeer{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"name": "monitoring"}}}}}},
@@ -121,7 +121,7 @@ func TestConfiguredRules(t *testing.T) {
 	}
 }
 
-func TestOwnershipAndOptOut(t *testing.T) {
+func TestNetworkPolicyOwnershipAndOptOut(t *testing.T) {
 	job := &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "alpha", Namespace: "team-a", UID: "uid"}}
 	c := utiltesting.NewClientBuilder().Build()
 	enabled := &NetworkPolicy{client: c, config: configapi.NetworkPolicyConfig{Enabled: ptr.To(true)}}
@@ -153,8 +153,8 @@ func TestOwnershipAndOptOut(t *testing.T) {
 	if err := c.Update(context.Background(), foreign); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := enabled.Build(context.Background(), nil, job); err == nil {
-		t.Fatal("adopted a foreign policy")
+	if _, err := enabled.Build(context.Background(), nil, job); err == nil || err.Error() != "NetworkPolicy team-a/trainjob-uid is not owned by TrainJob alpha" {
+		t.Fatalf("unexpected ownership error: %v", err)
 	}
 	got, err = disabled.Delete(context.Background(), job)
 	if err != nil || len(got) != 1 {
@@ -168,7 +168,7 @@ func TestOwnershipAndOptOut(t *testing.T) {
 	}
 }
 
-func TestClientErrors(t *testing.T) {
+func TestNetworkPolicyClientErrors(t *testing.T) {
 	denied := errors.New("forbidden")
 	c := utiltesting.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
 		Get: func(context.Context, client.WithWatch, client.ObjectKey, client.Object, ...client.GetOption) error {

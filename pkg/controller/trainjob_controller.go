@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -28,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	networkingv1ac "k8s.io/client-go/applyconfigurations/networking/v1"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -148,12 +146,6 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 		if err != nil {
 			applyErr = err
 		}
-		// Install isolation before workload objects can start Pods; stop on any policy error.
-		sort.SliceStable(objects, func(i, j int) bool {
-			_, left := objects[i].(*networkingv1ac.NetworkPolicyApplyConfiguration)
-			_, right := objects[j].(*networkingv1ac.NetworkPolicyApplyConfiguration)
-			return left && !right
-		})
 		for _, object := range objects {
 			if err := r.client.Apply(ctx, object, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
 				applyErr = err

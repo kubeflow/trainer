@@ -461,7 +461,7 @@ func TestReconcileObjects(t *testing.T) {
 	}
 }
 
-func TestNetworkPoliciesPrecedeWorkloads(t *testing.T) {
+func TestReconcileObjectsApplyOrder(t *testing.T) {
 	for name, failPolicy := range map[string]bool{"success": false, "policy failure blocks workload creation": true} {
 		t.Run(name, func(t *testing.T) {
 			var applied []string
@@ -481,7 +481,7 @@ func TestNetworkPoliciesPrecedeWorkloads(t *testing.T) {
 			}).Build()
 			r := &TrainJobReconciler{client: c}
 			fr := &fakeRuntime{objsToApply: []apiruntime.ApplyConfiguration{
-				corev1ac.ConfigMap("workload", "team-a"), networkingv1ac.NetworkPolicy("policy", "team-a"),
+				networkingv1ac.NetworkPolicy("policy", "team-a"), corev1ac.ConfigMap("workload", "team-a"),
 			}}
 			err := r.reconcileObjects(context.Background(), fr, utiltesting.MakeTrainJobWrapper("team-a", "alpha").Obj())
 			want := []string{"policy", "workload"}

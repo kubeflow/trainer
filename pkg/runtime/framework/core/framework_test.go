@@ -200,7 +200,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestNewPluginOrderIsDeterministic(t *testing.T) {
-	// Verify the implementation detail that plugins are executed in name order.
+	// Isolation runs first; other plugins retain deterministic name order.
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	clientBuilder := testingutil.NewClientBuilder()
@@ -227,7 +227,10 @@ func TestNewPluginOrderIsDeterministic(t *testing.T) {
 	for i, p := range fwk.componentBuilderPlugins {
 		buildNames[i] = p.(framework.Plugin).Name()
 	}
-	assertSorted("componentBuilderPlugins", buildNames)
+	if len(buildNames) == 0 || buildNames[0] != networkpolicy.Name {
+		t.Fatalf("isolation must be first: %v", buildNames)
+	}
+	assertSorted("componentBuilderPlugins", buildNames[1:])
 
 	validationNames := make([]string, len(fwk.customValidationPlugins))
 	for i, p := range fwk.customValidationPlugins {

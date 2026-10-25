@@ -137,27 +137,26 @@ networkPolicy:
           port: 53
 ```
 
-This example allows CoreDNS. Add standard Kubernetes NetworkPolicy rules for
-runtime dependencies: actual API-server IPs/ports, approved storage/download
-IPs, status-server endpoints, monitoring, shared caches and service meshes.
-NodeLocal DNS and Service NAT may require different destinations. Standard
-NetworkPolicy cannot allow DNS names; allowing all TCP 443 is not API-only access.
-Shared caches need matching ingress rules if independently isolated.
+Before enabling, add administrator rules for:
 
-The controller creates two policies per job: `trainjob-<UID>` selects JobSet
-pods (`jobset.sigs.k8s.io/jobset-name: <name>`), and `trainjob-cache-<UID>` selects
-private cache pods (`leaderworkerset.sigs.k8s.io/name: <name>-cache`). Both allow
-same-namespace traffic within that job and its cache, plus administrator rules.
-A cache name longer than 63 characters cannot be a label value, so its policy
-is omitted. Exceptions apply to every job and cache; there is no tenant opt-out
-or TrainJob API/SDK change. An empty rule allows all traffic in that direction.
+- DNS: this example allows CoreDNS; NodeLocal DNS and Service NAT may need other destinations.
+- API server: allow its actual IPs and ports. Allowing all TCP 443 is not API-only access.
+- Storage/downloads, shared caches and service meshes: allow required destinations; independently isolated caches also need ingress.
+- Status-server and monitoring endpoints used by your runtimes.
 
-Policies precede new workloads; invalid rules or creation failures block new
-workloads through normal controller errors and Events. Active jobs, including
-already-running jobs, have edited/deleted policies repaired. Finished jobs keep
-existing policies until TrainJob deletion; enabling does not create policies for
-already-finished jobs. Disabling and restarting removes owned policies, including
-for finished jobs. Conflicting foreign policies are never adopted or deleted.
+Rules apply to every job and cache, with at most 128 rules per direction.
+Invalid administrator rules are rejected at controller startup.
+NetworkPolicy cannot allow DNS names; an empty rule allows all traffic in its direction.
+
+Each job gets `trainjob-<UID>` for JobSet pods and `trainjob-cache-<UID>` for
+private LWS cache pods, allowing same-namespace communication within that job
+and its cache plus administrator exceptions. Cache names exceeding the 63-character
+label limit omit the cache policy. Policies precede workloads; apply failures block
+new workloads with errors and Events. Active jobs have edited/deleted policies
+repaired. Finished jobs retain existing policies until deletion, but do not gain
+policies when enabling. Disabling and restarting removes owned policies, including
+for finished jobs; foreign policies are never adopted or deleted. No TrainJob
+API/SDK changes or tenant opt-out are introduced.
 
 Use a NetworkPolicy-capable CNI and verify allowed and denied connections.
 Policies are additive and propagation is not atomic; existing connections are
@@ -167,7 +166,8 @@ not authentication, encryption, or a boundary against namespace administrators.
 
 Run the real-network regression on a disposable cluster configured with
 `test/e2e/testdata/network-policy-values.yaml` (HTTP workloads and cache-label
-fixtures, no GPUs):
+fixtures, no GPUs). Disable optional LWS for these synthetic fixtures; its admission
+webhook requires metadata that only LWS-managed pods receive:
 
 ```sh
 TRAINER_NETWORK_POLICY_E2E=true go test ./test/e2e \

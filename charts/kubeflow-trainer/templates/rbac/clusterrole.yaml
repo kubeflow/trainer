@@ -128,7 +128,6 @@ rules:
   - get
   - list
   - patch
-  - update
   - watch
 - apiGroups:
   - node.k8s.io

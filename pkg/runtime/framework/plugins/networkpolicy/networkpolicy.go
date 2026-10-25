@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubeflow Authors.
+Copyright The Kubeflow Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ var _ framework.ComponentBuilderPlugin = (*NetworkPolicy)(nil)
 var _ framework.ComponentDeleterPlugin = (*NetworkPolicy)(nil)
 var _ framework.WatchExtensionPlugin = (*NetworkPolicy)(nil)
 
-// +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;get;list;watch;update;patch;delete
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;get;list;watch;patch;delete
 
 func New(_ context.Context, c client.Client, _ client.FieldIndexer, cfg *configapi.Configuration) (framework.Plugin, error) {
 	p := &NetworkPolicy{client: c}
