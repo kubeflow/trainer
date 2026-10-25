@@ -175,44 +175,6 @@ CNI-specific. Prevent tenants from spoofing controller pod labels, modifying
 operator configuration, or creating bypass policies. This is network isolation,
 not authentication, encryption, or a boundary against namespace administrators.
 
-### Network policy example
-
-Example: three TrainJobs, two namespaces, six generated policies. Each job can reach only its own workers/cache plus automatic infrastructure access and operator-wide exceptions. The selective storage/cache allowances below are administrator rules.
-
-::::{mermaid}
-%%{init: {"flowchart": {"diagramPadding": 64}}}%%
-flowchart TB
-  subgraph teamA["Namespace: team-a"]
-    A["alpha / UID A<br/>Workers + private cache<br/>trainjob-A + trainjob-cache-A"]
-    B["beta / UID B<br/>Workers + private cache<br/>trainjob-B + trainjob-cache-B"]
-  end
-  subgraph teamB["Namespace: team-b"]
-    C["alpha / UID C<br/>Workers + private cache<br/>trainjob-C + trainjob-cache-C"]
-  end
-  INFRA["Automatic scoped egress<br/>DNS / API / Trainer status"]
-  STORE["Approved object store"]
-  SHARED["Shared cache in namespace data<br/>matching ingress required"]
-  A --> INFRA
-  B --> INFRA
-  C --> INFRA
-  B -->|"extra admin policy: TCP 443"| STORE
-  C -->|"extra admin policy: TCP 9000"| SHARED
-  A -. "BLOCKED: other job and cache" .-> B
-  A -. "BLOCKED: other namespace" .-> C
-  A -. "BLOCKED: no allowance" .-> STORE
-  classDef workload fill:#e8f2ff,stroke:#2563eb,color:#111827
-  classDef cache fill:#ecfdf5,stroke:#059669,color:#111827
-  class A,B,C workload
-  class SHARED cache
-  linkStyle 5,6,7 stroke:#dc2626,stroke-dasharray:5 5,color:#dc2626
-::::
-
-Solid arrows are allowed new connections; red dashed arrows are denied examples. Replies to allowed connections are implicit. Each job box includes its workers and private cache, which can communicate within that job. The same infrastructure rules and shared exceptions apply to both policies.
-
-The two selective storage/shared-cache allowances are **additional administrator-created Kubernetes NetworkPolicies**, illustrating Kubernetes' additive policy model. This change generates a separate job/cache policy pair with the **same operator-wide exceptions** for every job; it does not add per-job exception fields. A/B/C abbreviate real TrainJob UIDs.
-
-### Verify enforcement
-
 Run the real-network regression on a disposable cluster configured with
 `test/e2e/testdata/network-policy-values.yaml` (HTTP workloads and cache-label
 fixtures, no GPUs). Disable optional LWS for these synthetic fixtures; its admission
