@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	rJobReplicasErrorMsg       = "always must be 1"
+	rJobReplicasErrorMsg       = "must be greater than or equal to 1"
 	rJobContainerNamesErrorMsg = "must contain the required container for the ancestor: %s"
 	rJobContainerClaimErrorMsg = "references resourceClaim %q which is not defined in the Pod's resourceClaims"
 )
@@ -104,15 +104,16 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 		validateClaims("initContainers", podSpec.InitContainers)
 		validateClaims("containers", podSpec.Containers)
 
+		// The CRD schema allows 0 replicas, which would create a JobSet without any Pods for the replicated Job.
+		if rJob.Replicas < 1 {
+			allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, rJobReplicasErrorMsg))
+		}
+
 		if rJob.Template.Labels == nil {
 			continue
 		}
 
 		if labelAncestor, ok := rJob.Template.Labels[constants.LabelTrainJobAncestor]; ok && ancestors.Has(labelAncestor) {
-			if rJob.Replicas != 1 {
-				allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, rJobReplicasErrorMsg))
-			}
-
 			// Validate replicated job contains the required containers.
 			// Mapping of the ancestor labels to the containers:
 			// 1. dataset-initializer - dataset-initializer

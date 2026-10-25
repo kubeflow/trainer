@@ -96,18 +96,24 @@ func TestValidateReplicatedJobs(t *testing.T) {
 				Replicas(2, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 				Obj().Spec.ReplicatedJobs,
 		},
-		"invalid replicas": {
+		"valid replicas greater than one": {
 			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
 				LauncherReplica().
-				Replicas(2, constants.Launcher, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
+				Replicas(2, constants.Launcher, constants.DatasetInitializer, constants.ModelInitializer).
+				Replicas(4, constants.Node).
+				Obj().Spec.ReplicatedJobs,
+		},
+		"invalid replicas: zero is not allowed": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				ReplicatedJobLabel(constants.LabelTrainJobAncestor, "user-specified", constants.ModelInitializer).
+				Replicas(1, constants.DatasetInitializer).
+				Replicas(0, constants.ModelInitializer, constants.Node).
 				Obj().Spec.ReplicatedJobs,
 			wantError: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(0).Child("replicas"),
-					"2", ""),
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("replicas"),
-					"2", ""),
-				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(3).Child("replicas"),
-					"2", ""),
+					int32(0), ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).Child("replicas"),
+					int32(0), ""),
 			},
 		},
 		"missing required container in replicatedJobs": {
@@ -190,21 +196,21 @@ func TestTrainingRuntimeValidateUpdate(t *testing.T) {
 			newObj: func() *trainer.TrainingRuntime {
 				obj := testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj()
 				for i := range obj.Spec.Template.Spec.ReplicatedJobs {
-					obj.Spec.Template.Spec.ReplicatedJobs[i].Replicas = 2
+					obj.Spec.Template.Spec.ReplicatedJobs[i].Replicas = 0
 				}
 				return obj
 			}(),
 			wantError: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(0).Child("replicas"), int32(2), ""),
-				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("replicas"), int32(2), ""),
-				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).Child("replicas"), int32(2), ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(0).Child("replicas"), int32(0), ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("replicas"), int32(0), ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).Child("replicas"), int32(0), ""),
 			},
 		},
 		"update from invalid old object succeeds": {
 			oldObj: func() *trainer.TrainingRuntime {
 				obj := testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj()
 				for i := range obj.Spec.Template.Spec.ReplicatedJobs {
-					obj.Spec.Template.Spec.ReplicatedJobs[i].Replicas = 2
+					obj.Spec.Template.Spec.ReplicatedJobs[i].Replicas = 0
 				}
 				return obj
 			}(),

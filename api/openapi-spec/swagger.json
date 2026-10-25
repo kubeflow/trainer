@@ -15546,6 +15546,10 @@
             ],
             "x-kubernetes-list-type": "map"
           },
+          "schedulerName": {
+            "description": "schedulerName patches the scheduler for the Pods in the target job templates. When omitted, the scheduler specified in the runtime template is preserved.",
+            "type": "string"
+          },
           "schedulingGates": {
             "description": "schedulingGates patches the scheduling gates for the Pods in the target job templates. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/",
             "type": "array",

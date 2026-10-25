@@ -56,6 +56,10 @@ func (x *XGBoost) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newO
 		runtimeInfo.RuntimePolicy.MLPolicySource.XGBoost == nil {
 		return nil, allErrs
 	}
+	if trainerReplicas := runtime.TrainerReplicas(runtimeInfo); trainerReplicas > 1 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "runtimeRef"), trainerReplicas,
+			"trainer replicatedJob replicas must be 1 for the XGBoost runtime"))
+	}
 	if newObj.Spec.Trainer != nil {
 		specPath := field.NewPath("spec", "trainer", "env")
 		for i, env := range newObj.Spec.Trainer.Env {

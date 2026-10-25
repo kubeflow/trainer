@@ -54,13 +54,14 @@ class TrainerV1alpha1PodSpecPatch(BaseModel):
     init_containers: Optional[List[TrainerV1alpha1ContainerPatch]] = Field(default=None, description="initContainers patches the init containers in the target job templates.", alias="initContainers")
     node_selector: Optional[Dict[str, StrictStr]] = Field(default=None, description="nodeSelector patches the node selector to place Pods on specific nodes.", alias="nodeSelector")
     resource_claims: Optional[List[IoK8sApiCoreV1PodResourceClaim]] = Field(default=None, description="resourceClaims patches the Pod's resourceClaims, typically for sidecar and init containers. Entries are merged by name with the runtime template using strategic merge patch. For a claim of the same name, spec.trainer.resourceClaimsPerNode takes precedence over this field, which takes precedence over the runtime template. Containers consume a claim by referencing its name in the container's resources.claims of this runtime patch.", alias="resourceClaims")
+    scheduler_name: Optional[StrictStr] = Field(default=None, description="schedulerName patches the scheduler for the Pods in the target job templates. When omitted, the scheduler specified in the runtime template is preserved.", alias="schedulerName")
     scheduling_gates: Optional[List[IoK8sApiCoreV1PodSchedulingGate]] = Field(default=None, description="schedulingGates patches the scheduling gates for the Pods in the target job templates. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/", alias="schedulingGates")
     security_context: Optional[IoK8sApiCoreV1PodSecurityContext] = Field(default=None, description="securityContext patches the Pod's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/", alias="securityContext")
     service_account_name: Optional[StrictStr] = Field(default=None, description="serviceAccountName patches the service account for the Pods in the target job templates.", alias="serviceAccountName")
     termination_grace_period_seconds: Optional[StrictInt] = Field(default=None, description="terminationGracePeriodSeconds patches the termination grace period for Pods in the target job templates.", alias="terminationGracePeriodSeconds")
     tolerations: Optional[List[IoK8sApiCoreV1Toleration]] = Field(default=None, description="tolerations patches the Pod's tolerations.")
     volumes: Optional[List[IoK8sApiCoreV1Volume]] = Field(default=None, description="volumes patches the Pod's volumes.")
-    __properties: ClassVar[List[str]] = ["affinity", "containers", "imagePullSecrets", "initContainers", "nodeSelector", "resourceClaims", "schedulingGates", "securityContext", "serviceAccountName", "terminationGracePeriodSeconds", "tolerations", "volumes"]
+    __properties: ClassVar[List[str]] = ["affinity", "containers", "imagePullSecrets", "initContainers", "nodeSelector", "resourceClaims", "schedulerName", "schedulingGates", "securityContext", "serviceAccountName", "terminationGracePeriodSeconds", "tolerations", "volumes"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -174,6 +175,7 @@ class TrainerV1alpha1PodSpecPatch(BaseModel):
             "initContainers": [TrainerV1alpha1ContainerPatch.from_dict(_item) for _item in obj["initContainers"]] if obj.get("initContainers") is not None else None,
             "nodeSelector": obj.get("nodeSelector"),
             "resourceClaims": [IoK8sApiCoreV1PodResourceClaim.from_dict(_item) for _item in obj["resourceClaims"]] if obj.get("resourceClaims") is not None else None,
+            "schedulerName": obj.get("schedulerName"),
             "schedulingGates": [IoK8sApiCoreV1PodSchedulingGate.from_dict(_item) for _item in obj["schedulingGates"]] if obj.get("schedulingGates") is not None else None,
             "securityContext": IoK8sApiCoreV1PodSecurityContext.from_dict(obj["securityContext"]) if obj.get("securityContext") is not None else None,
             "serviceAccountName": obj.get("serviceAccountName"),

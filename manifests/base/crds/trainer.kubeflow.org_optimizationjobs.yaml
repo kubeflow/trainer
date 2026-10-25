@@ -3463,6 +3463,19 @@ spec:
                                                                 - message: field is
                                                                     immutable
                                                                   rule: self == oldSelf
+                                                              schedulerName:
+                                                                description: schedulerName
+                                                                  patches the scheduler
+                                                                  for the Pods in
+                                                                  the target job templates.
+                                                                maxLength: 253
+                                                                minLength: 1
+                                                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                                                type: string
+                                                                x-kubernetes-validations:
+                                                                - message: field is
+                                                                    immutable
+                                                                  rule: self == oldSelf
                                                               schedulingGates:
                                                                 description: |-
                                                                   schedulingGates patches the scheduling gates for the Pods in the target job templates.

@@ -485,6 +485,15 @@ func (j *JobSetWrapper) EnvFrom(rJobName, containerName string, envFrom ...corev
 	return j
 }
 
+func (j *JobSetWrapper) SchedulerName(rJobName, schedulerName string) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.SchedulerName = schedulerName
+		}
+	}
+	return j
+}
+
 func (j *JobSetWrapper) ServiceAccountName(rJobName string, serviceAccountName string) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == rJobName {
@@ -1290,6 +1299,15 @@ func (s *TrainingRuntimeSpecWrapper) Replicas(replicas int32, rJobNames ...strin
 	for i, rJob := range s.Template.Spec.ReplicatedJobs {
 		if slices.Contains(rJobNames, rJob.Name) {
 			s.Template.Spec.ReplicatedJobs[i].Replicas = replicas
+		}
+	}
+	return s
+}
+
+func (s *TrainingRuntimeSpecWrapper) SchedulerName(rJobName, schedulerName string) *TrainingRuntimeSpecWrapper {
+	for i, rJob := range s.Template.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			s.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.SchedulerName = schedulerName
 		}
 	}
 	return s

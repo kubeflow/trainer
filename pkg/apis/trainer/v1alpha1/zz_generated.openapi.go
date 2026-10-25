@@ -1755,6 +1755,13 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecPatch(ref common.ReferenceCallback)
 				Description: "PodSpecPatch contains the Pod spec fields that managers are permitted to patch.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
+					"schedulerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulerName patches the scheduler for the Pods in the target job templates. When omitted, the scheduler specified in the runtime template is preserved.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"serviceAccountName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "serviceAccountName patches the service account for the Pods in the target job templates.",

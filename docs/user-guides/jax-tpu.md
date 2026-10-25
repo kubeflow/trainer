@@ -434,6 +434,62 @@ job_id = client.train(
 
 ---
 
+## Multi-slice TPU
+
+To train across multiple TPU slices, set `replicas` of the trainer replicated Job in the
+`ClusterTrainingRuntime` to the number of slices. Each replica of the Job runs on a single TPU slice.
+
+The `numNodes` parameter is the **total** number of nodes across all slices, and it must be
+divisible by `replicas`. For example, 2 slices with the `2x4` topology (2 hosts per slice) require
+`numNodes: 4` and `replicas: 2`. The `alpha.jobset.sigs.k8s.io/exclusive-topology` annotation
+ensures that all Pods of a single slice are placed in the same TPU node pool:
+
+```yaml
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: ClusterTrainingRuntime
+metadata:
+  name: jax-tpu-v5-8-multislice
+  labels:
+    trainer.kubeflow.org/framework: jax
+spec:
+  mlPolicy:
+    numNodes: 4
+    jax: {}
+  template:
+    metadata:
+      annotations:
+        alpha.jobset.sigs.k8s.io/exclusive-topology: cloud.google.com/gke-nodepool
+    spec:
+      replicatedJobs:
+        - name: node
+          replicas: 2
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  # Same nodeSelector, tolerations, and containers as the jax-tpu-v5-8 runtime above.
+```
+
+With multiple replicas, the Job completion index is not unique across slices, so the JAX runtime
+does not inject `JAX_NUM_PROCESSES`, `JAX_PROCESS_ID`, and `JAX_COORDINATOR_ADDRESS`. Instead, call
+`jax.distributed.initialize()` without arguments, and JAX detects the number of processes, the
+process ID, and the coordinator address from the TPU environment:
+
+```python
+import jax
+
+jax.distributed.initialize()
+```
+
+:::{note}
+Multiple trainer replicas are not supported for the PyTorch, MPI, XGBoost, and Flux runtimes.
+:::
+
+---
+
 ## Next Steps
 
 - Learn more about [JAX distributed training](https://jax.readthedocs.io/en/latest/jax.distributed.html).

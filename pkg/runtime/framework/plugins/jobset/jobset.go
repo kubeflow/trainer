@@ -18,6 +18,7 @@ package jobset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -57,6 +58,9 @@ import (
 var (
 	runtimeRefPath     = field.NewPath("spec").Child("runtimeRef")
 	runtimePatchesPath = field.NewPath("spec").Child("runtimePatches")
+
+	errorInvalidReplicas                = errors.New("replicatedJob replicas must be greater than or equal to 1")
+	errorPodCountNotDivisibleByReplicas = errors.New("replicatedJob Pod count must be divisible by replicas")
 )
 
 type JobSet struct {
@@ -236,6 +240,19 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 		}
 	}
 
+	// numNodes is the total number of nodes across all trainer replicas, so it must be
+	// divisible by replicas to have the same number of nodes in every replicated Job.
+	if trainerReplicas := runtime.TrainerReplicas(info); trainerReplicas > 1 {
+		numNodes := ptr.Deref(ptr.Deref(info.FindPodSetByAncestor(constants.AncestorTrainer), runtime.PodSet{}).Count, 1)
+		if newObj.Spec.Trainer != nil && newObj.Spec.Trainer.NumNodes != nil {
+			numNodes = *newObj.Spec.Trainer.NumNodes
+		}
+		if numNodes%trainerReplicas != 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "trainer", "numNodes"), numNodes,
+				fmt.Sprintf("must be divisible by the trainer replicatedJob replicas: %d", trainerReplicas)))
+		}
+	}
+
 	return nil, allErrs
 }
 
@@ -322,11 +339,14 @@ func (j *JobSet) syncPodNetwork(info *runtime.Info, trainJob *trainer.TrainJob) 
 		subDomain = *jobSetNet.Subdomain
 	}
 	for rJobIdx, rJob := range spec.ReplicatedJobs {
-		podCount := info.TemplateSpec.PodSets[rJobIdx].Count
 		rJobReplicas := ptr.Deref(rJob.Replicas, constants.DefaultJobReplicas)
+		perReplica, err := podsPerReplica(info.TemplateSpec.PodSets[rJobIdx].Count, rJobReplicas, ptr.Deref(rJob.Name, ""))
+		if err != nil {
+			return err
+		}
 		info.TemplateSpec.PodSets[rJobIdx].Endpoints = func(yield func(string) bool) {
-			for replicaIdx := 0; replicaIdx < int(rJobReplicas); replicaIdx++ {
-				for podIdx := range ptr.Deref(podCount, 1) {
+			for replicaIdx := range rJobReplicas {
+				for podIdx := range perReplica {
 					endpoint := fmt.Sprintf("%s-%s-%d-%d.%s", trainJob.Name, *rJob.Name, replicaIdx, podIdx, subDomain)
 					if !yield(endpoint) {
 						return
@@ -339,6 +359,8 @@ func (j *JobSet) syncPodNetwork(info *runtime.Info, trainJob *trainer.TrainJob) 
 }
 
 // SyncParallelCount propagates PodSets.Count into template-level Parallelism/Completions.
+// PodSets.Count is the total number of Pods across all replicas, so each replicated Job
+// gets PodSets.Count / replicas Pods.
 func (j *JobSet) syncParallelCount(info *runtime.Info) error {
 	if info == nil {
 		return nil
@@ -352,14 +374,32 @@ func (j *JobSet) syncParallelCount(info *runtime.Info) error {
 			continue
 		}
 		for rJobIdx := range jobSetSpec.ReplicatedJobs {
-			if jobSetSpec.ReplicatedJobs[rJobIdx].Name != nil && *jobSetSpec.ReplicatedJobs[rJobIdx].Name == ps.Name {
-				jobSetSpec.ReplicatedJobs[rJobIdx].Template.Spec.Parallelism = ps.Count
-				jobSetSpec.ReplicatedJobs[rJobIdx].Template.Spec.Completions = ps.Count
+			rJob := &jobSetSpec.ReplicatedJobs[rJobIdx]
+			if rJob.Name != nil && *rJob.Name == ps.Name {
+				count, err := podsPerReplica(ps.Count, ptr.Deref(rJob.Replicas, constants.DefaultJobReplicas), ps.Name)
+				if err != nil {
+					return err
+				}
+				rJob.Template.Spec.Parallelism = &count
+				rJob.Template.Spec.Completions = &count
 				break
 			}
 		}
 	}
 	return nil
+}
+
+// podsPerReplica returns the number of Pods in a single replicated Job, given the total
+// number of Pods across all replicas.
+func podsPerReplica(totalCount *int32, replicas int32, rJobName string) (int32, error) {
+	count := ptr.Deref(totalCount, 1)
+	if replicas < 1 {
+		return 0, fmt.Errorf("%w: replicatedJob %q has %d replicas", errorInvalidReplicas, rJobName, replicas)
+	}
+	if count%replicas != 0 {
+		return 0, fmt.Errorf("%w: replicatedJob %q has %d Pods and %d replicas", errorPodCountNotDivisibleByReplicas, rJobName, count, replicas)
+	}
+	return count / replicas, nil
 }
 
 func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
