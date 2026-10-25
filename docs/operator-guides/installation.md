@@ -19,7 +19,7 @@ If you don't have Kubernetes cluster, you can quickly create one locally using [
 kind create cluster # or minikube start
 ```
 
-:::git
+:::
 
 ## Installing the Kubeflow Trainer Controller Manager
 
