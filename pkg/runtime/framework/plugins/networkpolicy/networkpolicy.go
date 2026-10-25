@@ -81,10 +81,13 @@ func (p *NetworkPolicy) Name() string { return Name }
 func (p *NetworkPolicy) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	return []runtime.ReconcilerBuilder{
 		func(b *builder.Builder, _ client.Client, _ cache.Cache) *builder.Builder {
+			b = b.Watches(&networkingv1.NetworkPolicy{}, handler.EnqueueRequestForOwner(
+				p.client.Scheme(), p.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner()))
+			if !ptr.Deref(p.config.Enabled, false) {
+				return b
+			}
 			return b.Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(p.infrastructureChanged)).
-				Watches(&discoveryv1.EndpointSlice{}, handler.EnqueueRequestsFromMapFunc(p.infrastructureChanged)).
-				Watches(&networkingv1.NetworkPolicy{}, handler.EnqueueRequestForOwner(
-					p.client.Scheme(), p.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner()))
+				Watches(&discoveryv1.EndpointSlice{}, handler.EnqueueRequestsFromMapFunc(p.infrastructureChanged))
 		},
 	}
 }
