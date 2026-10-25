@@ -91,7 +91,8 @@ var _ = ginkgo.Describe("TrainJob network isolation", func() {
 		}
 		ginkgo.By("allow API egress without an administrator exception")
 		gomega.Eventually(func(g gomega.Gomega) {
-			output, err := networkTestExec(&workers[0][0], "wget", "-T", "5", "-qO-", "--no-check-certificate", "https://kubernetes.default.svc/version")
+			output, err := networkTestExec(&workers[0][0], "sh", "-c",
+				`wget -T 5 -qO- --no-check-certificate --header="Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" https://kubernetes.default.svc/version`)
 			g.Expect(err).NotTo(gomega.HaveOccurred(), output)
 			g.Expect(output).To(gomega.ContainSubstring("gitVersion"))
 		}, 30*time.Second, time.Second).Should(gomega.Succeed())
