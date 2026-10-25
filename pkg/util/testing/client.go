@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,6 +46,15 @@ func NewClientBuilder(addToSchemes ...func(s *runtime.Scheme) error) *fake.Clien
 	}
 	return fake.NewClientBuilder().
 		WithScheme(scm)
+}
+
+// WithVolcanoPodGroupRESTMapping makes the fake client's REST mapper know the Volcano PodGroup
+// kind, as on a cluster where the Volcano CRD is installed. Clients built without it behave
+// like a cluster without Volcano.
+func WithVolcanoPodGroupRESTMapping(b *fake.ClientBuilder) *fake.ClientBuilder {
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{volcanov1beta1.SchemeGroupVersion})
+	mapper.Add(volcanov1beta1.SchemeGroupVersion.WithKind("PodGroup"), meta.RESTScopeNamespace)
+	return b.WithRESTMapper(mapper)
 }
 
 type builderIndexer struct {

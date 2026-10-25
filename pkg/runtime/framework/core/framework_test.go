@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"testing"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
@@ -128,6 +130,9 @@ func TestNew(t *testing.T) {
 					&volcano.Volcano{},
 					&jobset.JobSet{},
 					&mpi.MPI{},
+				},
+				componentDeleterPlugins: []framework.ComponentDeleterPlugin{
+					&volcano.Volcano{},
 				},
 				trainJobStatusPlugin: &jobset.JobSet{},
 			},
@@ -933,6 +938,22 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithEnv(corev1ac.EnvVar().
 															WithName(constants.OpenMPIEnvKeyRSHArgs).
 															WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
+														).
+														WithEnv(corev1ac.EnvVar().
+															WithName(constants.PRTEEnvHostFileLocation).
+															WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+														).
+														WithEnv(corev1ac.EnvVar().
+															WithName(constants.PRTEEnvKeepFQDNHostNames).
+															WithValue("false"),
+														).
+														WithEnv(corev1ac.EnvVar().
+															WithName(constants.PRTEEnvDefaultSlots).
+															WithValue("1"),
+														).
+														WithEnv(corev1ac.EnvVar().
+															WithName(constants.PRTEEnvKeySSHArgs).
+															WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
 														),
 												).
 												WithVolumes(
@@ -1119,6 +1140,18 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										WithValue("1"),
 									*corev1ac.EnvVar().
 										WithName(constants.OpenMPIEnvKeyRSHArgs).
+										WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
+									*corev1ac.EnvVar().
+										WithName(constants.PRTEEnvHostFileLocation).
+										WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+									*corev1ac.EnvVar().
+										WithName(constants.PRTEEnvKeepFQDNHostNames).
+										WithValue("false"),
+									*corev1ac.EnvVar().
+										WithName(constants.PRTEEnvDefaultSlots).
+										WithValue("1"),
+									*corev1ac.EnvVar().
+										WithName(constants.PRTEEnvKeySSHArgs).
 										WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
 								},
 							}},
@@ -1344,6 +1377,22 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 						},
 						{
 							Name:  constants.OpenMPIEnvKeyRSHArgs,
+							Value: constants.OpenMPIEnvDefaultValueRSHArgs,
+						},
+						{
+							Name:  constants.PRTEEnvHostFileLocation,
+							Value: fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName),
+						},
+						{
+							Name:  constants.PRTEEnvKeepFQDNHostNames,
+							Value: "false",
+						},
+						{
+							Name:  constants.PRTEEnvDefaultSlots,
+							Value: "1",
+						},
+						{
+							Name:  constants.PRTEEnvKeySSHArgs,
 							Value: constants.OpenMPIEnvDefaultValueRSHArgs,
 						}}...,
 					).
@@ -2314,6 +2363,101 @@ test-job-node-0-1.test-job slots=1
 			}
 
 			if diff := cmp.Diff(tc.wantObjs, resultObjs, cmpOpts...); len(diff) != 0 {
+				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRunComponentDeleterPlugins(t *testing.T) {
+	ownedPodGroup := &volcanov1beta1.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-trainjob",
+			Namespace: metav1.NamespaceDefault,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         trainer.GroupVersion.String(),
+					Kind:               trainer.TrainJobKind,
+					Name:               "test-trainjob",
+					UID:                "1",
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+		},
+	}
+	failedTrainJob := &trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob", Namespace: metav1.NamespaceDefault, UID: "1"},
+		Status: trainer.TrainJobStatus{
+			Conditions: []metav1.Condition{
+				{Type: trainer.TrainJobFailed, Status: metav1.ConditionTrue},
+			},
+		},
+	}
+	runningTrainJob := &trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob", Namespace: metav1.NamespaceDefault, UID: "1"},
+	}
+
+	errGetPodGroup := errors.New("error when getting existing PodGroup")
+
+	cases := map[string]struct {
+		registry  fwkplugins.Registry
+		objs      []client.Object
+		trainJob  *trainer.TrainJob
+		withError bool
+		wantObjs  []client.Object
+		wantError error
+	}{
+		"empty registry returns nothing": {
+			registry: fwkplugins.Registry{},
+			trainJob: failedTrainJob,
+			wantObjs: nil,
+		},
+		"failed trainjob: volcano returns its PodGroup": {
+			registry: fwkplugins.NewRegistry(),
+			objs:     []client.Object{ownedPodGroup},
+			trainJob: failedTrainJob,
+			wantObjs: []client.Object{ownedPodGroup},
+		},
+		"running trainjob: nothing to delete": {
+			registry: fwkplugins.NewRegistry(),
+			objs:     []client.Object{ownedPodGroup},
+			trainJob: runningTrainJob,
+			wantObjs: nil,
+		},
+		"a plugin's Get error is propagated and no objects are returned": {
+			registry:  fwkplugins.NewRegistry(),
+			objs:      []client.Object{ownedPodGroup},
+			trainJob:  failedTrainJob,
+			withError: true,
+			wantObjs:  nil,
+			wantError: errGetPodGroup,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			clientBuilder := testingutil.WithVolcanoPodGroupRESTMapping(testingutil.NewClientBuilder().WithObjects(tc.objs...))
+			if tc.withError {
+				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						return errGetPodGroup
+					},
+				})
+			}
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			gotObjs, err := fwk.RunComponentDeleterPlugins(ctx, tc.trainJob)
+			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantObjs, gotObjs, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion")); len(diff) != 0 {
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
 			}
 		})

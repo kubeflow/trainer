@@ -1,5 +1,5 @@
 {{- /*
-Copyright 2025 The Kubeflow Authors.
+Copyright The Kubeflow Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,18 +54,6 @@ rules:
   - update
   - watch
 - apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - ""
   - events.k8s.io
   resources:
@@ -85,6 +73,30 @@ rules:
   - list
   - update
   - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -124,6 +136,17 @@ rules:
   - watch
 - apiGroups:
   - scheduling.volcano.sh
+  resources:
+  - podgroups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - scheduling.x-k8s.io
   resources:
   - podgroups
@@ -140,9 +163,7 @@ rules:
   - clustertrainingruntimes
   - optimizationjobs
   - trainingruntimes
-  - trainjobs
   verbs:
-  - create
   - get
   - list
   - patch
@@ -160,3 +181,14 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - trainer.kubeflow.org
+  resources:
+  - trainjobs
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch

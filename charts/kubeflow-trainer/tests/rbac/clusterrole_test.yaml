@@ -28,7 +28,39 @@ tests:
           apiVersion: rbac.authorization.k8s.io/v1
           kind: ClusterRole
           name: kubeflow-trainer-controller-manager
+      # The manager only creates TrainJobs (from the OptimizationJob controller), so
+      # `create` must not leak onto the runtime and OptimizationJob resources.
+      # The rules are generated from manifests/base/rbac/role.yaml by `make manifests`.
       - contains:
+          path: rules
+          content:
+            apiGroups:
+              - trainer.kubeflow.org
+            resources:
+              - clustertrainingruntimes
+              - optimizationjobs
+              - trainingruntimes
+            verbs:
+              - get
+              - list
+              - patch
+              - update
+              - watch
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - trainer.kubeflow.org
+            resources:
+              - trainjobs
+            verbs:
+              - create
+              - get
+              - list
+              - patch
+              - update
+              - watch
+      - notContains:
           path: rules
           content:
             apiGroups:
@@ -45,3 +77,22 @@ tests:
               - patch
               - update
               - watch
+
+  - it: Should allow metrics authentication reviews
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - authentication.k8s.io
+            resources:
+              - tokenreviews
+            verbs: ["create"]
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - authorization.k8s.io
+            resources:
+              - subjectaccessreviews
+            verbs: ["create"]

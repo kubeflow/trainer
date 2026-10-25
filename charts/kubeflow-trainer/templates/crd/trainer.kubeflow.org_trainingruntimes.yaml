@@ -23,7 +23,7 @@ metadata:
     {{- if .Values.crds.keep }}
     helm.sh/resource-policy: keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.21.0
+    controller-gen.kubebuilder.io/version: v0.23.0
   name: trainingruntimes.trainer.kubeflow.org
 spec:
   group: trainer.kubeflow.org
@@ -218,8 +218,7 @@ spec:
                 x-kubernetes-validations:
                 - message: at most one of the fields in [coscheduling volcano] may
                     be set
-                  rule: '[has(self.coscheduling),has(self.volcano)].filter(x,x==true).size()
-                    <= 1'
+                  rule: (has(self.coscheduling)?1:0)+(has(self.volcano)?1:0) <= 1
               template:
                 description: template for the JobSet which will be used by TrainJob.
                 minProperties: 1
@@ -622,6 +621,7 @@ spec:
                                                 description: |-
                                                   name uniquely identifies this resource claim inside the group.
                                                   This field is required. It must be a DNS_LABEL.
+                                                minLength: 1
                                                 type: string
                                               resourceClaimName:
                                                 description: |-
@@ -664,10 +664,12 @@ spec:
                                                     description: key specifies the
                                                       key of the node label representing
                                                       the topology domain.
+                                                    minLength: 1
                                                     type: string
                                                 required:
                                                 - key
                                                 type: object
+                                              maxItems: 1
                                               type: array
                                               x-kubernetes-list-type: atomic
                                           type: object
@@ -693,6 +695,7 @@ spec:
                                                     minCount is the minimum number of pods that must be scheduled
                                                     at the same time for the scheduler to admit the entire group.
                                                   format: int32
+                                                  minimum: 1
                                                   type: integer
                                               type: object
                                           type: object
@@ -4727,18 +4730,22 @@ spec:
                                                       name allows you to identify the responder responding to the Eviction.
 
                                                       It must be a valid domain-prefixed key (such as "acme.
+                                                    minLength: 1
                                                     type: string
                                                   priority:
                                                     description: priority for this
                                                       responder. Higher priorities
                                                       are selected first by the evictionrequest-controller.
                                                     format: int32
+                                                    maximum: 100000
+                                                    minimum: 0
                                                     type: integer
                                                 required:
                                                 - name
                                                 - priority
                                                 type: object
                                                 x-kubernetes-map-type: atomic
+                                              maxItems: 10
                                               type: array
                                               x-kubernetes-list-map-keys:
                                               - name
@@ -8792,6 +8799,7 @@ spec:
                                             description: |-
                                               name uniquely identifies this resource claim inside the group.
                                               This field is required. It must be a DNS_LABEL.
+                                            minLength: 1
                                             type: string
                                           resourceClaimName:
                                             description: |-
@@ -8828,10 +8836,12 @@ spec:
                                                 description: key specifies the key
                                                   of the node label representing the
                                                   topology domain.
+                                                minLength: 1
                                                 type: string
                                             required:
                                             - key
                                             type: object
+                                          maxItems: 1
                                           type: array
                                           x-kubernetes-list-type: atomic
                                       type: object
@@ -8854,6 +8864,7 @@ spec:
                                                 minCount is the minimum number of pods that must be scheduled
                                                 at the same time for the scheduler to admit the entire group.
                                               format: int32
+                                              minimum: 1
                                               type: integer
                                           type: object
                                       type: object
@@ -8882,10 +8893,12 @@ spec:
                                             description: key specifies the key of
                                               the node label representing the topology
                                               domain.
+                                            minLength: 1
                                             type: string
                                         required:
                                         - key
                                         type: object
+                                      maxItems: 1
                                       type: array
                                       x-kubernetes-list-type: atomic
                                   type: object
@@ -8909,6 +8922,7 @@ spec:
                                             minGroupCount is the minimum number of child groups that must be
                                             schedulable at the same time for the scheduler to admit the...
                                           format: int32
+                                          minimum: 1
                                           type: integer
                                       type: object
                                   type: object
@@ -8957,10 +8971,12 @@ spec:
                                     key:
                                       description: key specifies the key of the node
                                         label representing the topology domain.
+                                      minLength: 1
                                       type: string
                                   required:
                                   - key
                                   type: object
+                                maxItems: 1
                                 type: array
                                 x-kubernetes-list-type: atomic
                             type: object
@@ -8984,6 +9000,7 @@ spec:
                                       minGroupCount is the minimum number of child groups that must be
                                       schedulable at the same time for the scheduler to admit the...
                                     format: int32
+                                    minimum: 1
                                     type: integer
                                 type: object
                             type: object
@@ -9386,6 +9403,7 @@ spec:
                                                   description: |-
                                                     reason is a brief CamelCase machine-parseable reason.
                                                     Together with status it forms the unique identity of a condition entry.
+                                                  minLength: 1
                                                   type: string
                                                 status:
                                                   description: |-
@@ -9396,11 +9414,13 @@ spec:
                                                   - DataLoss
                                                   - Degraded
                                                   - Inaccessible
+                                                  minLength: 1
                                                   type: string
                                               required:
                                               - reason
                                               - status
                                               type: object
+                                            maxItems: 16
                                             type: array
                                             x-kubernetes-list-map-keys:
                                             - status

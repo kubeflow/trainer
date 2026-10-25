@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2/ktesting"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
@@ -77,5 +79,97 @@ func TestClusterTrainingRuntimeValidateCreate(t *testing.T) {
 				t.Fatalf("unexpected warnings (-want, +got): %s", diff)
 			}
 		})
+	}
+}
+
+func TestClusterTrainingRuntimeValidateUpdate(t *testing.T) {
+	cases := map[string]struct {
+		oldObj    *trainer.ClusterTrainingRuntime
+		newObj    *trainer.ClusterTrainingRuntime
+		wantError field.ErrorList
+	}{
+		"valid update succeeds": {
+			oldObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj(),
+			newObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: func() jobsetv1alpha2.JobSetSpec {
+							js := testingutil.MakeJobSetWrapper("", "")
+							js.Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node)
+							return js.Obj().Spec
+						}(),
+					},
+				}).Obj(),
+		},
+		"invalid update with invalid replicas fails": {
+			oldObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj(),
+			newObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: func() jobsetv1alpha2.JobSetSpec {
+							js := testingutil.MakeJobSetWrapper("", "")
+							js.Replicas(0, constants.DatasetInitializer, constants.ModelInitializer, constants.Node)
+							return js.Obj().Spec
+						}(),
+					},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(0).Child("replicas"), int32(0), ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("replicas"), int32(0), ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).Child("replicas"), int32(0), ""),
+			},
+		},
+		"update from invalid old object succeeds": {
+			oldObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: func() jobsetv1alpha2.JobSetSpec {
+							js := testingutil.MakeJobSetWrapper("", "")
+							js.Replicas(0, constants.DatasetInitializer, constants.ModelInitializer, constants.Node)
+							return js.Obj().Spec
+						}(),
+					},
+				}).Obj(),
+			newObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: func() jobsetv1alpha2.JobSetSpec {
+							js := testingutil.MakeJobSetWrapper("", "")
+							js.Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node)
+							return js.Obj().Spec
+						}(),
+					},
+				}).Obj(),
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			validator := &ClusterTrainingRuntimeValidator{}
+			warnings, err := validator.ValidateUpdate(ctx, tc.oldObj, tc.newObj)
+			if diff := cmp.Diff(tc.wantError.ToAggregate(), err, cmpopts.IgnoreFields(field.Error{}, "Detail")); len(diff) != 0 {
+				t.Errorf("Unexpected error from ValidateUpdate (-want, +got): %s", diff)
+			}
+			if len(warnings) != 0 {
+				t.Errorf("ValidateUpdate() warnings = %v, want nil", warnings)
+			}
+		})
+	}
+}
+
+func TestClusterTrainingRuntimeValidateDelete(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	validator := &ClusterTrainingRuntimeValidator{}
+	obj := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj()
+	warnings, err := validator.ValidateDelete(ctx, obj)
+	if err != nil {
+		t.Fatalf("ValidateDelete() unexpected error: %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("ValidateDelete() warnings = %v, want nil", warnings)
 	}
 }

@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -28,13 +29,17 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
+	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -209,6 +214,56 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					MinResources(corev1.ResourceList{
 						// Trainer node has 30 CPUs + 2 CPUs from 2 initializer containers.
 						corev1.ResourceCPU: resource.MustParse("32"),
+					}).
+					SchedulingTimeout(120).
+					Obj(),
+			},
+		},
+		"succeeded to build PodGroup and JobSet with multi-slice TPU trainer.": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+				RuntimeSpec(
+					testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+						WithMLPolicy(
+							testingutil.MakeMLPolicyWrapper().
+								WithNumNodes(32).
+								Obj(),
+						).
+						PodGroupPolicyCoschedulingSchedulingTimeout(120).
+						Replicas(4, constants.Node).
+						Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Obj(),
+				).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						NumNodes(32).
+						Obj(),
+				).
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Replicas(4, constants.Node).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+					Parallelism(8, constants.Node).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+					Completions(8, constants.Node).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+					NumNodes(8).
+					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
+					Obj(),
+				testingutil.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					MinMember(34). // 34 = 8 nodes × 4 slices + 1 DatasetInitializer + 1 ModelInitializer
+					MinResources(corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("34"),
 					}).
 					SchedulingTimeout(120).
 					Obj(),
@@ -2227,6 +2282,22 @@ test-job-node-0-1.test-job slots=8
 							Name:  constants.OpenMPIEnvKeyRSHArgs,
 							Value: constants.OpenMPIEnvDefaultValueRSHArgs,
 						},
+						corev1.EnvVar{
+							Name:  constants.PRTEEnvHostFileLocation,
+							Value: fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName),
+						},
+						corev1.EnvVar{
+							Name:  constants.PRTEEnvKeepFQDNHostNames,
+							Value: "false",
+						},
+						corev1.EnvVar{
+							Name:  constants.PRTEEnvDefaultSlots,
+							Value: "8",
+						},
+						corev1.EnvVar{
+							Name:  constants.PRTEEnvKeySSHArgs,
+							Value: constants.OpenMPIEnvDefaultValueRSHArgs,
+						},
 					).
 					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Obj(),
@@ -2518,6 +2589,154 @@ func TestRuntimeInfo(t *testing.T) {
 
 			if !strings.Contains(err.Error(), "unsupported runtimeTemplateSpec") {
 				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestTrainingRuntimeDeleteObjects(t *testing.T) {
+	errGetPodGroup := errors.New("failed to get the PodGroup")
+
+	failedTrainJob := func(name string) *trainer.TrainJob {
+		return testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, name).
+			UID("uid").
+			RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+			Conditions(metav1.Condition{Type: trainer.TrainJobFailed, Status: metav1.ConditionTrue}).
+			Obj()
+	}
+	runningTrainJob := func(name string) *trainer.TrainJob {
+		return testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, name).
+			UID("uid").
+			RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+			Obj()
+	}
+	ownedPodGroup := func(name string) *volcanov1beta1.PodGroup {
+		// No TypeMeta: Delete() returns whatever the fake client's Get() populates,
+		// which (like a real client) leaves TypeMeta unset on a typed object.
+		pg := testingutil.MakeVolcanoPodGroup(metav1.NamespaceDefault, name).
+			ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), name, "uid").
+			Obj()
+		pg.TypeMeta = metav1.TypeMeta{}
+		return pg
+	}
+
+	cases := map[string]struct {
+		trainJob       *trainer.TrainJob
+		podGroup       *volcanov1beta1.PodGroup
+		podGroupGetErr error
+		wantObjs       []client.Object
+		wantErr        error
+	}{
+		"failed TrainJob returns its PodGroup, without the runtime existing": {
+			trainJob: failedTrainJob("test-job"),
+			podGroup: ownedPodGroup("test-job"),
+			wantObjs: []client.Object{ownedPodGroup("test-job")},
+		},
+		"running TrainJob returns nothing": {
+			trainJob: runningTrainJob("test-job"),
+			podGroup: ownedPodGroup("test-job"),
+			wantObjs: nil,
+		},
+		"failed TrainJob without a PodGroup returns nothing": {
+			trainJob: failedTrainJob("test-job"),
+			wantObjs: nil,
+		},
+		"failed read of the PodGroup is returned so the reconcile is retried": {
+			trainJob:       failedTrainJob("test-job"),
+			podGroup:       ownedPodGroup("test-job"),
+			podGroupGetErr: errGetPodGroup,
+			wantErr:        errGetPodGroup,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			// The runtime is deliberately not created: DeleteObjects must not need it.
+			clientBuilder := testingutil.WithVolcanoPodGroupRESTMapping(testingutil.NewClientBuilder())
+			if tc.podGroup != nil {
+				clientBuilder.WithObjects(tc.podGroup)
+			}
+			if tc.podGroupGetErr != nil {
+				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, ok := obj.(*volcanov1beta1.PodGroup); ok {
+							return tc.podGroupGetErr
+						}
+						return c.Get(ctx, key, obj, opts...)
+					},
+				})
+			}
+			c := clientBuilder.Build()
+
+			rt, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gotObjs, err := rt.DeleteObjects(ctx, tc.trainJob)
+			if diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantObjs, gotObjs, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion")); len(diff) != 0 {
+				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestTrainingRuntimeValidateObjects(t *testing.T) {
+	validRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj()
+
+	cases := map[string]struct {
+		trainJob        *trainer.TrainJob
+		existingRuntime *trainer.TrainingRuntime
+		wantErrs        field.ErrorList
+	}{
+		"succeeds when runtime exists and is valid": {
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Obj(),
+			existingRuntime: validRuntime,
+			wantErrs:        nil,
+		},
+		"returns field error when runtime does not exist": {
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "nonexistent-runtime").
+				Obj(),
+			existingRuntime: nil,
+			wantErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "runtimeRef"), trainer.RuntimeRef{
+					Name:     "nonexistent-runtime",
+					APIGroup: ptr.To(trainer.GroupVersion.Group),
+					Kind:     ptr.To(trainer.TrainingRuntimeKind),
+				}, ""),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			clientBuilder := testingutil.NewClientBuilder()
+			if tc.existingRuntime != nil {
+				clientBuilder = clientBuilder.WithObjects(tc.existingRuntime)
+			}
+			c := clientBuilder.Build()
+
+			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, fieldErrors := trainingRuntime.ValidateObjects(ctx, nil, tc.trainJob)
+
+			if diff := cmp.Diff(tc.wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail")); diff != "" {
+				t.Errorf("Unexpected field errors (-want,+got):\n%s", diff)
 			}
 		})
 	}

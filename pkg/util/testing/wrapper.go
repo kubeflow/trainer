@@ -632,6 +632,7 @@ type OptimizationJobWrapper struct {
 }
 
 // MakeOptimizationJobWrapper creates an OptimizationJob with the supplied namespace and name.
+// The spec is populated with a minimal valid random search so callers only override what they test.
 func MakeOptimizationJobWrapper(namespace, name string) *OptimizationJobWrapper {
 	return &OptimizationJobWrapper{
 		OptimizationJob: trainer.OptimizationJob{
@@ -643,7 +644,29 @@ func MakeOptimizationJobWrapper(namespace, name string) *OptimizationJobWrapper 
 				Namespace: namespace,
 				Name:      name,
 			},
-			Spec: trainer.OptimizationJobSpec{},
+			Spec: trainer.OptimizationJobSpec{
+				Objectives: []trainer.Objective{{
+					Metric:    "accuracy",
+					Direction: trainer.ObjectiveDirectionMaximize,
+				}},
+				SearchAlgorithm: &trainer.SearchAlgorithm{
+					Random: &trainer.RandomAlgorithm{},
+				},
+				Parameters: []trainer.Parameter{{
+					Name: "lr",
+					SearchSpace: &trainer.SearchSpace{
+						Uniform: trainer.UniformSpace{
+							Min: "0.001",
+							Max: "0.1",
+						},
+					},
+				}},
+				TrainJobTemplate: trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						RuntimeRef: trainer.RuntimeRef{Name: "runtime"},
+					},
+				},
+			},
 		},
 	}
 }

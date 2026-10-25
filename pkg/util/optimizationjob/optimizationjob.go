@@ -109,6 +109,16 @@ func ExtractBestResult(optJob *trainer.OptimizationJob, trainJobs []trainer.Trai
 		if bestJob == nil {
 			bestJob = &trainJobs[i]
 			bestVal = val
+		} else if val == bestVal {
+			// Break ties by creation time, then by name, so the result does not
+			// depend on the order of trainJobs.
+			if trainJobs[i].CreationTimestamp.Before(&bestJob.CreationTimestamp) {
+				bestJob = &trainJobs[i]
+			} else if trainJobs[i].CreationTimestamp.Equal(&bestJob.CreationTimestamp) {
+				if trainJobs[i].Name < bestJob.Name {
+					bestJob = &trainJobs[i]
+				}
+			}
 		} else if optJob.Spec.Objectives[0].Direction == trainer.ObjectiveDirectionMaximize && val > bestVal {
 			bestJob = &trainJobs[i]
 			bestVal = val

@@ -21,6 +21,7 @@ import (
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -76,6 +77,14 @@ type PreComponentBuilderPlugin interface {
 type ComponentBuilderPlugin interface {
 	Plugin
 	Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error)
+}
+
+// ComponentDeleterPlugin returns previously created objects that should be removed for a TrainJob.
+// It runs on every reconcile regardless of the TrainJob status, so plugins must decide when objects
+// should be removed and must be idempotent. The caller performs the deletion.
+type ComponentDeleterPlugin interface {
+	Plugin
+	Delete(ctx context.Context, trainJob *trainer.TrainJob) ([]client.Object, error)
 }
 
 type TrainJobStatusPlugin interface {

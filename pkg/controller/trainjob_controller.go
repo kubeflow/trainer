@@ -106,19 +106,17 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
 	} else {
-		if !trainjob.IsTrainJobFinished(&trainJob) {
-			err = r.reconcileObjects(ctx, runtime, &trainJob)
-			if err != nil {
-				// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
-				//  the creation of the runtime resources failed and the TrainJob is backed off until
-				//  the next retry attempt.
-				// The event message is truncated to stay within the maximum length limit (1024 chars).
-				message := fmt.Sprintf("TrainJob resources reconciliation failed: %.950v", err.Error())
-				if len(err.Error()) > 950 {
-					message = fmt.Sprintf("%s ...", message)
-				}
-				r.recorder.Eventf(&trainJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "Reconciling", message)
+		err = r.reconcileObjects(ctx, runtime, &trainJob)
+		if err != nil {
+			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
+			//  the creation of the runtime resources failed and the TrainJob is backed off until
+			//  the next retry attempt.
+			// The event message is truncated to stay within the maximum length limit (1024 chars).
+			message := fmt.Sprintf("TrainJob resources reconciliation failed: %.950v", err.Error())
+			if len(err.Error()) > 950 {
+				message = fmt.Sprintf("%s ...", message)
 			}
+			r.recorder.Eventf(&trainJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "Reconciling", message)
 		}
 		if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
 			err = errors.Join(err, statusErr)
@@ -142,16 +140,33 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
-	objects, err := runtime.NewObjects(ctx, trainJob)
-	if err != nil {
-		return err
-	}
-	for _, object := range objects {
-		if err := r.client.Apply(ctx, object, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
-			return err
+	var applyErr error
+	if !trainjob.IsTrainJobFinished(trainJob) {
+		objects, err := runtime.NewObjects(ctx, trainJob)
+		if err != nil {
+			applyErr = err
+		}
+		for _, object := range objects {
+			if err := r.client.Apply(ctx, object, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
+				applyErr = err
+				break
+			}
 		}
 	}
-	return nil
+
+	// Runs even for finished TrainJobs, so plugins can clean up objects of finished or
+	// suspended TrainJobs (e.g. a gang-scheduling PodGroup, which would otherwise keep
+	// reserving scheduler queue capacity indefinitely).
+	toDelete, err := runtime.DeleteObjects(ctx, trainJob)
+	if err != nil {
+		return errors.Join(applyErr, fmt.Errorf("resolving objects to delete: %w", err))
+	}
+	for _, object := range toDelete {
+		if err := client.IgnoreNotFound(r.client.Delete(ctx, object)); err != nil {
+			return errors.Join(applyErr, fmt.Errorf("deleting %s: %w", klog.KObj(object), err))
+		}
+	}
+	return applyErr
 }
 
 func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) ctrl.Result {
@@ -174,6 +189,9 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 			"startTime", startTime,
 			"deadline", deadline)
 		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
+		// TODO(#3833): a failed JobSet delete is only logged here and never retried, since the
+		// TrainJob is already Failed on the next reconcile. Moving this deletion to a JobSet
+		// ComponentDeleterPlugin would let reconcileObjects retry it.
 		jobSet := &jobsetv1alpha2.JobSet{
 			ObjectMeta: metav1.ObjectMeta{Name: trainJob.Name, Namespace: trainJob.Namespace},
 		}

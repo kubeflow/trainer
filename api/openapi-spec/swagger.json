@@ -15622,7 +15622,7 @@
         "type": "object",
         "properties": {
           "seed": {
-            "description": "seed is the seed for the random search algorithm.",
+            "description": "seed is the seed for the random search algorithm. It must be between 0 and 4294967295.",
             "type": "integer",
             "format": "int64"
           }

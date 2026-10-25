@@ -136,6 +136,9 @@ type SearchAlgorithm struct {
 // RandomAlgorithm is the random search algorithm.
 type RandomAlgorithm struct {
 	// seed is the seed for the random search algorithm.
+	// It must be between 0 and 4294967295.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=4294967295
 	// +optional
 	Seed *int64 `json:"seed,omitempty"`
 }

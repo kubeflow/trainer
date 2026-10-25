@@ -114,6 +114,13 @@ func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.Trai
 	return r.framework.RunComponentBuilderPlugins(ctx, info, trainJob)
 }
 
+// DeleteObjects returns the previously materialized objects that should now be removed
+// for the TrainJob. It runs on every TrainJob reconcile and does not read the runtime:
+// each ComponentDeleterPlugin decides from the TrainJob state whether anything is returned.
+func (r *TrainingRuntime) DeleteObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]client.Object, error) {
+	return r.framework.RunComponentDeleterPlugins(ctx, trainJob)
+}
+
 // RuntimeInfo builds the Info object for a TrainJob and consolidates it through the
 // Build Phase extension points, in this order:
 //  1. EnforceMLPolicy, then EnforcePodGroupPolicy, for the parameters declared in the
@@ -194,13 +201,15 @@ func (r *TrainingRuntime) newRuntimeInfo(
 	}
 
 	for i, rJob := range jobSetSpecApply.ReplicatedJobs {
-		// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
+		// The PodSet count is the total number of Pods across all replicas of the replicatedJob.
+		// The JobSet plugin divides it by replicas to compute per-replica Parallelism/Completions.
 		// REF: https://github.com/kubeflow/trainer/issues/2318
-		count := ptr.Deref(rJob.Template.Spec.Parallelism, 1)
+		count := ptr.Deref(rJob.Template.Spec.Parallelism, 1) * ptr.Deref(rJob.Replicas, constants.DefaultJobReplicas)
 		var ancestor *string
 		if metadata := rJob.Template.ObjectMetaApplyConfiguration; metadata != nil && metadata.Labels != nil {
 			if labelAncestor, ok := metadata.Labels[constants.LabelTrainJobAncestor]; ok {
 				if labelAncestor == constants.AncestorTrainer && mlPolicy != nil {
+					// numNodes is the total number of nodes across all trainer replicas (e.g. TPU slices).
 					count = ptr.Deref(mlPolicy.NumNodes, 1)
 				}
 				ancestor = &labelAncestor

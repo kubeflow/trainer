@@ -36,7 +36,7 @@ LOCALBIN ?= $(PROJECT_DIR)/bin
 K8S_VERSION ?= 1.37.0
 GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
 ENVTEST_VERSION ?= release-0.22
-CONTROLLER_GEN_VERSION ?= v0.21.0
+CONTROLLER_GEN_VERSION ?= v0.23.0
 KIND_VERSION ?= $(shell go list -m -f '{{.Version}}' sigs.k8s.io/kind)
 HELM_VERSION ?= v3.18.6
 HELM_UNITTEST_VERSION ?= 1.1.1
@@ -156,14 +156,16 @@ scheduler-plugins-crd: ## Copy the CRDs from the Scheduler Plugins repository to
 	mkdir -p $(EXTERNAL_CRDS_DIR)/scheduler-plugins/
 	cp -f $(SCHEDULER_PLUGINS_ROOT)/manifests/coscheduling/* $(EXTERNAL_CRDS_DIR)/scheduler-plugins
 
-VOLCANO_APIS_ROOT = $(shell go list -m -f "{{.Dir}}" volcano.sh/apis)
-VOLCANO_VERSION = $(shell basename $(VOLCANO_APIS_ROOT) | cut -d'@' -f2)
+# volcano.sh/apis is versioned separately from the volcano-sh/volcano repository, and go.mod may pin it
+# to a pseudo-version (e.g. v1.13.1-0.20251028070205-46d20c0699e7) whose commit does not exist there.
+# Strip the pseudo-version suffix to get the release tag the CRD is downloaded from.
+VOLCANO_VERSION ?= $(shell go list -m -f '{{.Version}}' volcano.sh/apis | sed -E 's/-0\..*//')
 VOLCANO_CRD_URL = https://raw.githubusercontent.com/volcano-sh/volcano/$(VOLCANO_VERSION)/config/crd/volcano/bases/scheduling.volcano.sh_podgroups.yaml
 
 .PHONY: volcano-crd
 volcano-crd: ## Copy the CRDs from Volcano repository to the manifests/external-crds directory.
 	mkdir -p $(EXTERNAL_CRDS_DIR)/volcano/
-	curl -sSL $(VOLCANO_CRD_URL) -o $(EXTERNAL_CRDS_DIR)/volcano/scheduling.volcano.sh_podgroups.yaml
+	curl -fsSL $(VOLCANO_CRD_URL) -o $(EXTERNAL_CRDS_DIR)/volcano/scheduling.volcano.sh_podgroups.yaml
 
 # Instructions for code generation.
 .PHONY: manifests
@@ -173,17 +175,22 @@ manifests: controller-gen ## Generate manifests.
 		output:crd:artifacts:config=manifests/base/crds \
 		output:rbac:artifacts:config=manifests/base/rbac \
 		output:webhook:artifacts:config=manifests/base/webhook
-	@# controller-gen does not implement the +k8s:maxItems marker that upstream
-	@# Kubernetes types use to bound their lists, so the generated CRDs end up
-	@# with CEL rules on unbounded lists that the API server refuses to install.
-	@# Restore those bounds and verify the CRDs would be accepted.
-	go run ./hack/crdschema manifests/base/crds/trainer.kubeflow.org_*.yaml
 	@# controller-gen emits no license header. Prepend the year-less
 	@# boilerplate to each generated manifest. controller-gen rewrites these
 	@# files in full on every run, so prepending here once is idempotent.
 	@# Copy the header-free CRDs into the chart before adding the kustomize (#)
 	@# header, so the chart templates can use the Helm-style license block.
 	cp -f manifests/base/crds/trainer.kubeflow.org_*.yaml $(TRAINER_CHART_DIR)/templates/crd/
+	@# Keep the chart's manager ClusterRole rules in sync with the generated role.
+	@{ cat $(HELM_BOILERPLATE_HEADER); echo; \
+		echo 'apiVersion: rbac.authorization.k8s.io/v1'; \
+		echo 'kind: ClusterRole'; \
+		echo 'metadata:'; \
+		echo '  name: {{ include "trainer.manager.clusterRole.name" . }}'; \
+		echo '  labels:'; \
+		echo '    {{- include "trainer.manager.labels" . | nindent 4 }}'; \
+		sed -n '/^rules:$$/,$$p' manifests/base/rbac/role.yaml; \
+	} > $(TRAINER_CHART_DIR)/templates/rbac/clusterrole.yaml
 	@for f in manifests/base/crds/trainer.kubeflow.org_*.yaml \
 			manifests/base/rbac/role.yaml \
 			manifests/base/webhook/manifests.yaml; do \
@@ -199,6 +206,8 @@ manifests: controller-gen ## Generate manifests.
 	done
 
 .PHONY: generate
+# Match CI's exact Go version for generation and its prerequisites.
+generate: export GOTOOLCHAIN := go$(shell awk '/^go / {print $$2}' $(PROJECT_DIR)/go.mod)
 generate: go-mod-download manifests helm-docs ## Generate APIs.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/..."
 	hack/update-codegen.sh

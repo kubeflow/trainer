@@ -105,6 +105,10 @@ func (f *Flux) Validate(_ context.Context, runtimeInfo *runtime.Info, _, _ *trai
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Flux == nil {
 		return nil, allErrs
 	}
+	if trainerReplicas := runtime.TrainerReplicas(runtimeInfo); trainerReplicas > 1 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "runtimeRef"), trainerReplicas,
+			"trainer replicatedJob replicas must be 1 for the Flux runtime"))
+	}
 
 	// Iterate through Trainer's internal PodSet abstraction
 	for _, ps := range runtimeInfo.TemplateSpec.PodSets {

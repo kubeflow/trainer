@@ -85,6 +85,14 @@ func (m *MPI) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobOb
 		return nil, allErrs
 	}
 	specPath := field.NewPath("spec")
+	// The MPI hostfile and the launcher are built for a single Job per replicatedJob.
+	// The trainer ancestor is the launcher, so the node replicatedJob must be validated as well.
+	for _, rJobName := range []string{constants.Launcher, constants.Node} {
+		if replicas := runtime.ReplicatedJobReplicas(runtimeInfo, rJobName); replicas > 1 {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("runtimeRef"), replicas,
+				fmt.Sprintf("%s replicatedJob replicas must be 1 for the MPI runtime", rJobName)))
+		}
+	}
 	// validate PodSet configurations based on NumNodes and RunLauncherAsNode.
 	if trainJobTrainer := newJobObj.Spec.Trainer; trainJobTrainer != nil && ptr.Deref(trainJobTrainer.NumNodes, 1) >= 2 && ptr.Deref(runtimeInfo.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false) {
 		if runtimeInfo.FindPodSetByName(constants.Launcher) == nil || runtimeInfo.FindPodSetByName(constants.Node) == nil {
@@ -220,6 +228,30 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 							WithValue(strconv.Itoa(int(ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode, 1)))),
 						*corev1ac.EnvVar().
 							WithName(constants.OpenMPIEnvKeyRSHArgs).
+							WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
+						// Open MPI >= 5.0 replaced ORTE with PRTE and ignores the OMPI_MCA_orte_*
+						// keys above without warning, which silently collapses a multi-node job
+						// onto the launcher. Emit the PRTE equivalents as well so the same
+						// TrainingRuntime works on both Open MPI 4 and 5.
+						//
+						// Unlike ORTE, PRTE does not gracefully match a hostfile entry against
+						// the local node when "keep FQDN hostnames" is enabled: the hostfile
+						// records JobSet's short-form Pod DNS name (<pod>.<service>), which
+						// never equals what PRTE resolves for itself, so with runLauncherAsNode
+						// PRTE decides the launcher's own entry is a remote host and tries (and
+						// fails) to SSH to itself. Leave it disabled for PRTE so local rank
+						// launch stays local. Reproduced and verified on Open MPI 5.0.7.
+						*corev1ac.EnvVar().
+							WithName(constants.PRTEEnvHostFileLocation).
+							WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+						*corev1ac.EnvVar().
+							WithName(constants.PRTEEnvKeepFQDNHostNames).
+							WithValue("false"),
+						*corev1ac.EnvVar().
+							WithName(constants.PRTEEnvDefaultSlots).
+							WithValue(strconv.Itoa(int(*info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode))),
+						*corev1ac.EnvVar().
+							WithName(constants.PRTEEnvKeySSHArgs).
 							WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
 					)
 				default:

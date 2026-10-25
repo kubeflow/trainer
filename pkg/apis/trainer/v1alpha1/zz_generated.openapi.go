@@ -1984,7 +1984,7 @@ func schema_pkg_apis_trainer_v1alpha1_RandomAlgorithm(ref common.ReferenceCallba
 				Properties: map[string]spec.Schema{
 					"seed": {
 						SchemaProps: spec.SchemaProps{
-							Description: "seed is the seed for the random search algorithm.",
+							Description: "seed is the seed for the random search algorithm. It must be between 0 and 4294967295.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},

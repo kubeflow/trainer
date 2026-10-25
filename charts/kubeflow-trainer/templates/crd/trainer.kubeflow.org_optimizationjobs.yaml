@@ -23,7 +23,7 @@ metadata:
     {{- if .Values.crds.keep }}
     helm.sh/resource-policy: keep
     {{- end }}
-    controller-gen.kubebuilder.io/version: v0.21.0
+    controller-gen.kubebuilder.io/version: v0.23.0
   name: optimizationjobs.trainer.kubeflow.org
 spec:
   group: trainer.kubeflow.org
@@ -194,8 +194,8 @@ spec:
                       x-kubernetes-validations:
                       - message: exactly one of the fields in [uniform logUniform
                           categorical] must be set
-                        rule: '[has(self.uniform),has(self.logUniform),has(self.categorical)].filter(x,x==true).size()
-                          == 1'
+                        rule: (has(self.uniform)?1:0)+(has(self.logUniform)?1:0)+(has(self.categorical)?1:0)
+                          == 1
                   required:
                   - name
                   - searchSpace
@@ -219,15 +219,18 @@ spec:
                     description: random is the random search algorithm.
                     properties:
                       seed:
-                        description: seed is the seed for the random search algorithm.
+                        description: |-
+                          seed is the seed for the random search algorithm.
+                          It must be between 0 and 4294967295.
                         format: int64
+                        maximum: 4294967295
+                        minimum: 0
                         type: integer
                     type: object
                 type: object
                 x-kubernetes-validations:
                 - message: exactly one of the fields in [random grid] must be set
-                  rule: '[has(self.random),has(self.grid)].filter(x,x==true).size()
-                    == 1'
+                  rule: (has(self.random)?1:0)+(has(self.grid)?1:0) == 1
               trainJobTemplate:
                 description: trainJobTemplate is the template for the train job to
                   run.

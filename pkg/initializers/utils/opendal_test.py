@@ -20,6 +20,7 @@ import tempfile
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from opendal.exceptions import NotFound
 
 from pkg.initializers.utils.opendal import S3Storage
 
@@ -162,3 +163,204 @@ class TestS3Storage:
                             assert (
                                 actual_content == expected_content
                             ), f"Content mismatch for {relative_path}"
+
+    def _mock_bucket(self, mock_operator: MagicMock, objects: dict[str, bytes]):
+        """Make the mock operator behave like OpenDAL over a bucket of objects.
+
+        ``list`` matches the given path as a plain string prefix, like S3
+        ListObjectsV2, and ``stat`` succeeds only for an exact object key.
+        """
+
+        def list_objects(path, recursive=False):
+            prefix = "" if path == "/" else path
+            return [
+                self._create_mock_entry(key)
+                for key in objects
+                if key.startswith(prefix)
+            ]
+
+        def stat(path):
+            if path in objects:
+                return Mock(is_file=True, is_dir=False)
+            raise NotFound(f"{path} not found")
+
+        mock_operator.list.side_effect = list_objects
+        mock_operator.stat.side_effect = stat
+        mock_operator.read.side_effect = lambda key: objects[key]
+
+    def _downloaded_files(self, directory: str) -> list[str]:
+        return sorted(
+            os.path.relpath(os.path.join(root, name), directory).replace(os.sep, "/")
+            for root, _, names in os.walk(directory)
+            for name in names
+        )
+
+    @pytest.mark.parametrize("prefix", ["models/llama", "models/llama/"])
+    def test_download_only_objects_under_prefix(self, prefix):
+        """Objects that merely share the prefix as a string are not downloaded."""
+        with patch("pkg.initializers.utils.opendal.opendal") as mock_opendal:
+            mock_operator = MagicMock()
+            mock_opendal.Operator.return_value = mock_operator
+            mock_operator.layer.return_value = mock_operator
+            self._mock_bucket(
+                mock_operator,
+                {
+                    "models/llama/config.json": b"config",
+                    "models/llama/weights/model.safetensors": b"weights",
+                    "models/llama-2/config.json": b"sibling",
+                    "models/llama2-7b/config.json": b"sibling",
+                },
+            )
+
+            storage = S3Storage(bucket="test-bucket", region="us-east-1")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(prefix=prefix, destination_path=tmpdir)
+                downloaded = self._downloaded_files(tmpdir)
+
+            assert downloaded == ["config.json", "weights/model.safetensors"]
+            # The directory is listed with a trailing slash, so the siblings are
+            # never returned by the storage, let alone read.
+            mock_operator.list.assert_called_once_with("models/llama/", recursive=True)
+            assert sorted(
+                call.args[0] for call in mock_operator.read.call_args_list
+            ) == [
+                "models/llama/config.json",
+                "models/llama/weights/model.safetensors",
+            ]
+
+    def test_download_single_object(self):
+        """A prefix that names one object downloads that object under its file name."""
+        with patch("pkg.initializers.utils.opendal.opendal") as mock_opendal:
+            mock_operator = MagicMock()
+            mock_opendal.Operator.return_value = mock_operator
+            mock_operator.layer.return_value = mock_operator
+            self._mock_bucket(
+                mock_operator,
+                {
+                    "datasets/train.parquet": b"rows",
+                    "datasets/train.parquet.bak": b"stale rows",
+                },
+            )
+
+            storage = S3Storage(bucket="test-bucket", region="us-east-1")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(
+                    prefix="datasets/train.parquet", destination_path=tmpdir
+                )
+
+                assert os.listdir(tmpdir) == ["train.parquet"]
+                with open(os.path.join(tmpdir, "train.parquet"), "rb") as f:
+                    assert f.read() == b"rows"
+
+            # The exact key is read directly, nothing is listed.
+            mock_operator.list.assert_not_called()
+            mock_operator.read.assert_called_once_with("datasets/train.parquet")
+
+    def test_download_exact_object_takes_precedence(self):
+        """When both an object and a directory have the name, the object wins."""
+        with patch("pkg.initializers.utils.opendal.opendal") as mock_opendal:
+            mock_operator = MagicMock()
+            mock_opendal.Operator.return_value = mock_operator
+            mock_operator.layer.return_value = mock_operator
+            self._mock_bucket(
+                mock_operator,
+                {
+                    "models/llama": b"archive",
+                    "models/llama/config.json": b"config",
+                },
+            )
+
+            storage = S3Storage(bucket="test-bucket", region="us-east-1")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(prefix="models/llama", destination_path=tmpdir)
+                assert self._downloaded_files(tmpdir) == ["llama"]
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(prefix="models/llama/", destination_path=tmpdir)
+                assert self._downloaded_files(tmpdir) == ["config.json"]
+
+    def test_download_bucket_root(self):
+        """An empty prefix (s3://bucket) downloads the whole bucket."""
+        objects = {
+            "README.md": b"readme",
+            "datasets/train.parquet": b"rows",
+            "models/llama/config.json": b"config",
+        }
+        with patch("pkg.initializers.utils.opendal.opendal") as mock_opendal:
+            mock_operator = MagicMock()
+            mock_opendal.Operator.return_value = mock_operator
+            mock_operator.layer.return_value = mock_operator
+            self._mock_bucket(mock_operator, objects)
+
+            storage = S3Storage(bucket="test-bucket", region="us-east-1")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(prefix="", destination_path=tmpdir)
+                assert self._downloaded_files(tmpdir) == sorted(objects)
+
+            mock_operator.stat.assert_not_called()
+            mock_operator.list.assert_called_once_with("/", recursive=True)
+
+    @pytest.mark.parametrize(
+        "prefix,objects,expected_message",
+        [
+            (
+                # A partial object name no longer matches anything.
+                "datasets/train",
+                {"datasets/train-00001.parquet": b"rows"},
+                "No object at s3://test-bucket/datasets/train and no objects under "
+                "s3://test-bucket/datasets/train/",
+            ),
+            (
+                "datasets/train/",
+                {"datasets/train-00001.parquet": b"rows"},
+                "No objects under s3://test-bucket/datasets/train/",
+            ),
+            (
+                "",
+                {},
+                "No objects under s3://test-bucket/",
+            ),
+        ],
+    )
+    def test_download_nothing_found(self, prefix, objects, expected_message):
+        """A prefix that matches no object fails instead of succeeding silently."""
+        with patch("pkg.initializers.utils.opendal.opendal") as mock_opendal:
+            mock_operator = MagicMock()
+            mock_opendal.Operator.return_value = mock_operator
+            mock_operator.layer.return_value = mock_operator
+            self._mock_bucket(mock_operator, objects)
+
+            storage = S3Storage(bucket="test-bucket", region="us-east-1")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                with pytest.raises(FileNotFoundError, match=expected_message):
+                    storage.download(prefix=prefix, destination_path=tmpdir)
+                assert os.listdir(tmpdir) == []
+
+            mock_operator.read.assert_not_called()
+
+    def test_download_all_objects_ignored_warns(self, caplog):
+        """Ignore patterns that skip every object log a warning but do not fail."""
+        with patch("pkg.initializers.utils.opendal.opendal") as mock_opendal:
+            mock_operator = MagicMock()
+            mock_opendal.Operator.return_value = mock_operator
+            mock_operator.layer.return_value = mock_operator
+            self._mock_bucket(mock_operator, {"data/cache.tmp": b"cache"})
+
+            storage = S3Storage(bucket="test-bucket", region="us-east-1")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                with caplog.at_level("WARNING"):
+                    storage.download(
+                        prefix="data/",
+                        destination_path=tmpdir,
+                        ignore_patterns=["*.tmp"],
+                    )
+                assert os.listdir(tmpdir) == []
+
+            assert "skipped by the ignore patterns" in caplog.text
+            mock_operator.read.assert_not_called()

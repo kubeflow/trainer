@@ -18,8 +18,10 @@ package optimizationjob
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	katibapi "github.com/kubeflow/katib/pkg/apis/manager/v1beta1"
@@ -314,6 +316,183 @@ func TestExtractBestResult(t *testing.T) {
 				},
 			},
 		},
+		"tie on objective value picks the earlier trial": {
+			optJob: &trainer.OptimizationJob{
+				Spec: trainer.OptimizationJobSpec{
+					Objectives: []trainer.Objective{
+						{Metric: "accuracy", Direction: trainer.ObjectiveDirectionMaximize},
+					},
+				},
+			},
+			trainJobs: []trainer.TrainJob{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "tj-later",
+						CreationTimestamp: metav1.NewTime(time.Unix(200, 0)),
+					},
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.01"},
+							},
+						},
+					},
+					Status: trainer.TrainJobStatus{
+						Conditions: []metav1.Condition{
+							{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue},
+						},
+						TrainerStatus: &trainer.TrainerStatus{
+							Metrics: []trainer.Metric{{Name: "accuracy", Value: "1.0"}},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "tj-earlier",
+						CreationTimestamp: metav1.NewTime(time.Unix(100, 0)),
+					},
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+							},
+						},
+					},
+					Status: trainer.TrainJobStatus{
+						Conditions: []metav1.Condition{
+							{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue},
+						},
+						TrainerStatus: &trainer.TrainerStatus{
+							Metrics: []trainer.Metric{{Name: "accuracy", Value: "1.0"}},
+						},
+					},
+				},
+			},
+			want: &trainer.Result{
+				TrainJobName: "tj-earlier",
+				Parameters: []trainer.ParameterAssignment{
+					{Name: "lr", Value: "0.001"},
+				},
+			},
+		},
+		"tie on objective value and creation time picks the smaller name": {
+			optJob: &trainer.OptimizationJob{
+				Spec: trainer.OptimizationJobSpec{
+					Objectives: []trainer.Objective{
+						{Metric: "accuracy", Direction: trainer.ObjectiveDirectionMaximize},
+					},
+				},
+			},
+			trainJobs: []trainer.TrainJob{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "tj-b",
+						CreationTimestamp: metav1.NewTime(time.Unix(100, 0)),
+					},
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.01"},
+							},
+						},
+					},
+					Status: trainer.TrainJobStatus{
+						Conditions: []metav1.Condition{
+							{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue},
+						},
+						TrainerStatus: &trainer.TrainerStatus{
+							Metrics: []trainer.Metric{{Name: "accuracy", Value: "1.0"}},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "tj-a",
+						CreationTimestamp: metav1.NewTime(time.Unix(100, 0)),
+					},
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+							},
+						},
+					},
+					Status: trainer.TrainJobStatus{
+						Conditions: []metav1.Condition{
+							{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue},
+						},
+						TrainerStatus: &trainer.TrainerStatus{
+							Metrics: []trainer.Metric{{Name: "accuracy", Value: "1.0"}},
+						},
+					},
+				},
+			},
+			want: &trainer.Result{
+				TrainJobName: "tj-a",
+				Parameters: []trainer.ParameterAssignment{
+					{Name: "lr", Value: "0.001"},
+				},
+			},
+		},
+		"tie with minimize direction picks the earlier trial": {
+			optJob: &trainer.OptimizationJob{
+				Spec: trainer.OptimizationJobSpec{
+					Objectives: []trainer.Objective{
+						{Metric: "loss", Direction: trainer.ObjectiveDirectionMinimize},
+					},
+				},
+			},
+			trainJobs: []trainer.TrainJob{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "tj-later",
+						CreationTimestamp: metav1.NewTime(time.Unix(200, 0)),
+					},
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.01"},
+							},
+						},
+					},
+					Status: trainer.TrainJobStatus{
+						Conditions: []metav1.Condition{
+							{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue},
+						},
+						TrainerStatus: &trainer.TrainerStatus{
+							Metrics: []trainer.Metric{{Name: "loss", Value: "0.25"}},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "tj-earlier",
+						CreationTimestamp: metav1.NewTime(time.Unix(100, 0)),
+					},
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+							},
+						},
+					},
+					Status: trainer.TrainJobStatus{
+						Conditions: []metav1.Condition{
+							{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue},
+						},
+						TrainerStatus: &trainer.TrainerStatus{
+							Metrics: []trainer.Metric{{Name: "loss", Value: "0.25"}},
+						},
+					},
+				},
+			},
+			want: &trainer.Result{
+				TrainJobName: "tj-earlier",
+				Parameters: []trainer.ParameterAssignment{
+					{Name: "lr", Value: "0.001"},
+				},
+			},
+		},
 		"multiple epochs logs picks final occurrence of metric": {
 			optJob: &trainer.OptimizationJob{
 				Spec: trainer.OptimizationJobSpec{
@@ -394,6 +573,14 @@ func TestExtractBestResult(t *testing.T) {
 			got := ExtractBestResult(tc.optJob, tc.trainJobs)
 			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Errorf("ExtractBestResult() mismatch (-want +got):\n%s", diff)
+			}
+
+			// The result must not depend on the order of trainJobs.
+			reversed := slices.Clone(tc.trainJobs)
+			slices.Reverse(reversed)
+			got = ExtractBestResult(tc.optJob, reversed)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("ExtractBestResult() with reversed trainJobs mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
