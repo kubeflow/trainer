@@ -124,7 +124,7 @@ manager:
       enabled: false
       # -- Additional standard NetworkPolicy ingress rules, applied to jobs and caches.
       ingress: []
-      # -- Additional standard NetworkPolicy egress rules. Configure DNS, API and storage access before enabling.
+      # -- Additional standard NetworkPolicy egress rules for approved storage and custom infrastructure. DNS, API and Trainer status access are automatic.
       egress: []
     health:
       healthProbeBindAddress: ":8081"

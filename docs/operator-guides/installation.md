@@ -122,31 +122,42 @@ Restart the controller after configuration changes.
 networkPolicy:
   enabled: true
   ingress: []
-  egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              k8s-app: kube-dns
-      ports:
-        - protocol: UDP
-          port: 53
-        - protocol: TCP
-          port: 53
+  egress: []
 ```
 
-Before enabling, add administrator rules for:
+The controller automatically allows DNS to `kube-dns`/`node-local-dns` pods in
+`kube-system`, the Kubernetes API's discovered Service/endpoint IPs and ports,
+and the Trainer status service when enabled. API/status endpoint changes refresh
+active-job policies. No ML engineer API or SDK changes are needed.
 
-- DNS: this example allows CoreDNS; NodeLocal DNS and Service NAT may need other destinations.
-- API server: allow its actual IPs and ports. Allowing all TCP 443 is not API-only access.
-- Storage/downloads, shared caches and service meshes: allow required destinations; independently isolated caches also need ingress.
-- Status-server and monitoring endpoints used by your runtimes.
+Before enabling, platform owners should add administrator rules for:
+
+- Approved storage/download destinations and shared caches.
+- Custom DNS paths, service meshes and monitoring used by their runtimes.
+- Matching ingress on independently isolated shared caches or infrastructure.
+
+For example, these Helm values allow HTTPS to an approved storage network:
+
+```yaml
+manager:
+  config:
+    networkPolicy:
+      enabled: true
+      egress:
+        - to:
+            - ipBlock:
+                cidr: 192.0.2.0/24 # Replace with your approved storage network.
+          ports:
+            - protocol: TCP
+              port: 443
+```
 
 Rules apply to every job and cache, with at most 128 rules per direction.
 Invalid administrator rules are rejected at controller startup.
+External destinations remain denied unless approved by the platform owner.
 NetworkPolicy cannot allow DNS names; an empty rule allows all traffic in its direction.
+Custom NodeLocal DNS and Service NAT behavior can require additional rules; verify
+connectivity with your CNI before enabling isolation for existing workloads.
 
 Each job gets `trainjob-<UID>` for JobSet pods and `trainjob-cache-<UID>` for
 private LWS cache pods, allowing same-namespace communication within that job

@@ -89,6 +89,12 @@ var _ = ginkgo.Describe("TrainJob network isolation", func() {
 				workers[i] = pods.Items
 			}, 3*time.Minute, time.Second).Should(gomega.Succeed())
 		}
+		ginkgo.By("allow API egress without an administrator exception")
+		gomega.Eventually(func(g gomega.Gomega) {
+			output, err := networkTestExec(&workers[0][0], "wget", "-T", "5", "-qO-", "--no-check-certificate", "https://kubernetes.default.svc/version")
+			g.Expect(err).NotTo(gomega.HaveOccurred(), output)
+			g.Expect(output).To(gomega.ContainSubstring("gitVersion"))
+		}, 30*time.Second, time.Second).Should(gomega.Succeed())
 		// Synthetic cache labels require LWS admission disabled; see the installation guide.
 		cache := networkTestPod(namespaces[0].Name, "cache-alpha", map[string]string{"leaderworkerset.sigs.k8s.io/name": "alpha-cache"})
 		otherCache := networkTestPod(namespaces[0].Name, "cache-beta", map[string]string{"leaderworkerset.sigs.k8s.io/name": "beta-cache"})
