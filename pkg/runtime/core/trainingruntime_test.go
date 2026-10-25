@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -39,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
+	"sigs.k8s.io/yaml"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -2943,5 +2946,120 @@ func TestToApplyConfig(t *testing.T) {
 				t.Errorf("Unexpected apply configuration (-want,+got):\n%s", diff)
 			}
 		})
+	}
+}
+
+// TestMPIRuntimePodCounts builds the JobSet from the MPI runtimes shipped in manifests/base/runtimes,
+// where the launcher carries the trainer ancestor label.
+func TestMPIRuntimePodCounts(t *testing.T) {
+	cases := map[string]struct {
+		runtimeNumNodes   *int32
+		runLauncherAsNode bool
+		trainJobNumNodes  *int32
+		wantNode          int32
+		wantLauncher      int32
+	}{
+		"runtime numNodes is used when TrainJob numNodes is unset": {
+			runtimeNumNodes:   ptr.To[int32](3),
+			runLauncherAsNode: true,
+			wantNode:          2,
+			wantLauncher:      1,
+		},
+		"TrainJob numNodes overrides runtime numNodes": {
+			runtimeNumNodes:   ptr.To[int32](3),
+			runLauncherAsNode: true,
+			trainJobNumNodes:  ptr.To[int32](4),
+			wantNode:          3,
+			wantLauncher:      1,
+		},
+		"TrainJob numNodes with the default runtime numNodes": {
+			runtimeNumNodes:   ptr.To[int32](1),
+			runLauncherAsNode: true,
+			trainJobNumNodes:  ptr.To[int32](4),
+			wantNode:          3,
+			wantLauncher:      1,
+		},
+		"runtime and TrainJob numNodes are unset": {
+			wantNode:     1,
+			wantLauncher: 1,
+		},
+		"TrainJob numNodes with a separate launcher": {
+			runtimeNumNodes:  ptr.To[int32](3),
+			trainJobNumNodes: ptr.To[int32](4),
+			wantNode:         4,
+			wantLauncher:     1,
+		},
+	}
+	for _, file := range []string{"deepspeed_distributed.yaml", "mlx_distributed.yaml"} {
+		manifest, err := os.ReadFile(filepath.Join("..", "..", "..", "manifests", "base", "runtimes", file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for name, tc := range cases {
+			t.Run(file+"/"+name, func(t *testing.T) {
+				_, ctx := ktesting.NewTestContext(t)
+				var cancel func()
+				ctx, cancel = context.WithCancel(ctx)
+				t.Cleanup(cancel)
+				var clTrainingRuntime trainer.ClusterTrainingRuntime
+				if err := yaml.Unmarshal(manifest, &clTrainingRuntime); err != nil {
+					t.Fatal(err)
+				}
+				spec := clTrainingRuntime.Spec
+				spec.MLPolicy.NumNodes = tc.runtimeNumNodes
+				spec.MLPolicy.MPI.RunLauncherAsNode = ptr.To(tc.runLauncherAsNode)
+				trainingRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+					RuntimeSpec(spec).
+					Obj()
+				trainJobTrainer := testingutil.MakeTrainJobTrainerWrapper()
+				if tc.trainJobNumNodes != nil {
+					trainJobTrainer.NumNodes(*tc.trainJobNumNodes)
+				}
+				trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+					UID("uid").
+					RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+					Trainer(trainJobTrainer.Obj()).
+					Obj()
+
+				clientBuilder := testingutil.NewClientBuilder().WithObjects(trainingRuntime)
+				c := clientBuilder.Build()
+				r, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				objs, err := r.NewObjects(ctx, trainJob)
+				if err != nil {
+					t.Fatal(err)
+				}
+				resultObjs, err := testingutil.ToObject(c.Scheme(), objs...)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				got := map[string]int32{}
+				var hostfile string
+				for _, obj := range resultObjs {
+					switch o := obj.(type) {
+					case *jobsetv1alpha2.JobSet:
+						for _, rJob := range o.Spec.ReplicatedJobs {
+							got[rJob.Name] = ptr.Deref(rJob.Template.Spec.Parallelism, 1)
+						}
+					case *corev1.ConfigMap:
+						hostfile = o.Data[constants.MPIHostfileName]
+					}
+				}
+				want := map[string]int32{constants.Node: tc.wantNode, constants.Launcher: tc.wantLauncher}
+				if diff := cmp.Diff(want, got); len(diff) != 0 {
+					t.Errorf("Unexpected parallelism (-want,+got):\n%s", diff)
+				}
+				wantHosts := tc.wantNode
+				if tc.runLauncherAsNode {
+					wantHosts += tc.wantLauncher
+				}
+				if gotHosts := int32(strings.Count(hostfile, "\n")); gotHosts != wantHosts {
+					t.Errorf("Unexpected number of hostfile entries: got %d, want %d\n%s", gotHosts, wantHosts, hostfile)
+				}
+			})
+		}
 	}
 }

@@ -1169,6 +1169,57 @@ trainJob-node-1-0.trainJob slots=1
 	}
 }
 
+// TestEnforceMLPolicyPodSetCounts covers runtimes where the trainer ancestor label is on the node Job.
+// The built-in runtimes, which label the launcher, are covered by TestMPIRuntimePodCounts in pkg/runtime/core.
+func TestEnforceMLPolicyPodSetCounts(t *testing.T) {
+	cases := map[string]struct {
+		runtimeNumNodes   int32
+		runLauncherAsNode bool
+		wantNodeCount     int32
+	}{
+		"runtime numNodes includes the launcher when runLauncherAsNode is true": {
+			runtimeNumNodes:   3,
+			runLauncherAsNode: true,
+			wantNodeCount:     2,
+		},
+		"runtime numNodes is the node count with a separate launcher": {
+			runtimeNumNodes: 3,
+			wantNodeCount:   3,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			p, err := New(ctx, utiltesting.NewClientBuilder().Build(), nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize MPI plugin: %v", err)
+			}
+			launcherCount, nodeCount := int32(1), tc.runtimeNumNodes
+			info := &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(tc.runLauncherAsNode)).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{Name: constants.Launcher, Count: &launcherCount},
+						{Name: constants.Node, Ancestor: ptr.To(constants.AncestorTrainer), Count: &nodeCount},
+					},
+				},
+			}
+			trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").Obj()
+			if err := p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(info, trainJob); err != nil {
+				t.Fatalf("Unexpected error from EnforceMLPolicy: %v", err)
+			}
+			if launcherCount != 1 || nodeCount != tc.wantNodeCount {
+				t.Errorf("Unexpected PodSet counts: launcher=%d node=%d, want launcher=1 node=%d",
+					launcherCount, nodeCount, tc.wantNodeCount)
+			}
+		})
+	}
+}
+
 func TestValidate(t *testing.T) {
 	cases := map[string]struct {
 		info         *runtime.Info
