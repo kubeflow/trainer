@@ -247,6 +247,7 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 
 // validateMergedRuntimePatches validates the final merged result after all runtime patches are applied.
 // This ensures that volumeMounts reference existing volumes and tolerations have valid operators/effects.
+// It also tracks which RuntimePatch introduced each invalid value for better error reporting.
 func (j *JobSet) validateMergedRuntimePatches(jobSetSpec *jobsetv1alpha2ac.JobSetSpecApplyConfiguration, runtimePatchesPath *field.Path, trainJob *trainer.TrainJob) field.ErrorList {
 	var allErrs field.ErrorList
 
@@ -269,60 +270,94 @@ func (j *JobSet) validateMergedRuntimePatches(jobSetSpec *jobsetv1alpha2ac.JobSe
 			}
 		}
 
-		// Validate InitContainers
-		for _, c := range podSpec.InitContainers {
-			if c.Name == nil {
+		// For each runtime patch, validate the fields it introduces
+		for i, patch := range trainJob.Spec.RuntimePatches {
+			patchPath := runtimePatchesPath.Index(i)
+
+			if patch.TrainingRuntimeSpec == nil || patch.TrainingRuntimeSpec.Template == nil ||
+				patch.TrainingRuntimeSpec.Template.Spec == nil || patch.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs == nil {
 				continue
 			}
-			for _, vm := range c.VolumeMounts {
-				// Validate volumeMount references an existing volume
-				if vm.Name != nil && !volumeNames.Has(*vm.Name) {
-					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, trainJob.Spec.RuntimePatches,
-						fmt.Sprintf("volumeMount %q in initContainer %s of replicated job %s references non-existent volume", *vm.Name, *c.Name, *rJob.Name)))
-				}
-				// Validate mountPath is not empty
-				if vm.MountPath != nil && *vm.MountPath == "" {
-					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, trainJob.Spec.RuntimePatches,
-						fmt.Sprintf("volumeMount %q in initContainer %s of replicated job %s must have a non-empty mountPath", *vm.Name, *c.Name, *rJob.Name)))
-				}
-			}
-		}
 
-		// Validate Containers
-		for _, c := range podSpec.Containers {
-			if c.Name == nil {
-				continue
-			}
-			for _, vm := range c.VolumeMounts {
-				// Validate volumeMount references an existing volume
-				if vm.Name != nil && !volumeNames.Has(*vm.Name) {
-					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, trainJob.Spec.RuntimePatches,
-						fmt.Sprintf("volumeMount %q in container %s of replicated job %s references non-existent volume", *vm.Name, *c.Name, *rJob.Name)))
+			// Find the matching replicatedJob in this patch
+			for _, patchRJob := range patch.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs {
+				if patchRJob.Name != ptr.Deref(rJob.Name, "") {
+					continue
 				}
-				// Validate mountPath is not empty
-				if vm.MountPath != nil && *vm.MountPath == "" {
-					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, trainJob.Spec.RuntimePatches,
-						fmt.Sprintf("volumeMount %q in container %s of replicated job %s must have a non-empty mountPath", *vm.Name, *c.Name, *rJob.Name)))
-				}
-			}
-		}
 
-		// Validate Tolerations
-		for _, tol := range podSpec.Tolerations {
-			// Validate operator (if specified)
-			if tol.Operator != nil && *tol.Operator != corev1.TolerationOpEqual && *tol.Operator != corev1.TolerationOpExists {
-				allErrs = append(allErrs, field.Invalid(runtimePatchesPath, trainJob.Spec.RuntimePatches,
-					fmt.Sprintf("toleration in replicated job %s has invalid operator %q (must be Equal or Exists)", *rJob.Name, *tol.Operator)))
-			}
-			// Validate effect (if specified)
-			if tol.Effect != nil && *tol.Effect != corev1.TaintEffectNoSchedule && *tol.Effect != corev1.TaintEffectPreferNoSchedule && *tol.Effect != corev1.TaintEffectNoExecute {
-				allErrs = append(allErrs, field.Invalid(runtimePatchesPath, trainJob.Spec.RuntimePatches,
-					fmt.Sprintf("toleration in replicated job %s has invalid effect %q (must be NoSchedule, PreferNoSchedule, or NoExecute)", *rJob.Name, *tol.Effect)))
-			}
-			// If operator is Equal, value must be present when key is specified
-			if tol.Operator != nil && *tol.Operator == corev1.TolerationOpEqual && tol.Key != nil && *tol.Key != "" && (tol.Value == nil || *tol.Value == "") {
-				allErrs = append(allErrs, field.Invalid(runtimePatchesPath, trainJob.Spec.RuntimePatches,
-					fmt.Sprintf("toleration in replicated job %s with operator Equal must have a value when key is specified", *rJob.Name)))
+				if patchRJob.Template == nil || patchRJob.Template.Spec == nil ||
+					patchRJob.Template.Spec.Template == nil || patchRJob.Template.Spec.Template.Spec == nil {
+					continue
+				}
+
+				patchPodSpec := patchRJob.Template.Spec.Template.Spec
+
+				// Validate InitContainers from this patch
+				for _, patchContainer := range patchPodSpec.InitContainers {
+					mountPaths := sets.New[string]()
+					for _, vm := range patchContainer.VolumeMounts {
+						// Validate volumeMount references an existing volume
+						if !volumeNames.Has(vm.Name) {
+							allErrs = append(allErrs, field.Invalid(patchPath, patch,
+								fmt.Sprintf("volumeMount %q in initContainer %s of replicated job %s references non-existent volume", vm.Name, patchContainer.Name, patchRJob.Name)))
+						}
+						// Validate mountPath is not empty
+						if vm.MountPath == "" {
+							allErrs = append(allErrs, field.Invalid(patchPath, patch,
+								fmt.Sprintf("volumeMount %q in initContainer %s of replicated job %s must have a non-empty mountPath", vm.Name, patchContainer.Name, patchRJob.Name)))
+						}
+						// Validate duplicate mountPath within the same container
+						if vm.MountPath != "" {
+							if mountPaths.Has(vm.MountPath) {
+								allErrs = append(allErrs, field.Invalid(patchPath, patch,
+									fmt.Sprintf("duplicate mountPath %q in initContainer %s of replicated job %s", vm.MountPath, patchContainer.Name, patchRJob.Name)))
+							}
+							mountPaths.Insert(vm.MountPath)
+						}
+					}
+				}
+
+				// Validate Containers from this patch
+				for _, patchContainer := range patchPodSpec.Containers {
+					mountPaths := sets.New[string]()
+					for _, vm := range patchContainer.VolumeMounts {
+						// Validate volumeMount references an existing volume
+						if !volumeNames.Has(vm.Name) {
+							allErrs = append(allErrs, field.Invalid(patchPath, patch,
+								fmt.Sprintf("volumeMount %q in container %s of replicated job %s references non-existent volume", vm.Name, patchContainer.Name, patchRJob.Name)))
+						}
+						// Validate mountPath is not empty
+						if vm.MountPath == "" {
+							allErrs = append(allErrs, field.Invalid(patchPath, patch,
+								fmt.Sprintf("volumeMount %q in container %s of replicated job %s must have a non-empty mountPath", vm.Name, patchContainer.Name, patchRJob.Name)))
+						}
+						// Validate duplicate mountPath within the same container
+						if vm.MountPath != "" {
+							if mountPaths.Has(vm.MountPath) {
+								allErrs = append(allErrs, field.Invalid(patchPath, patch,
+									fmt.Sprintf("duplicate mountPath %q in container %s of replicated job %s", vm.MountPath, patchContainer.Name, patchRJob.Name)))
+							}
+							mountPaths.Insert(vm.MountPath)
+						}
+					}
+				}
+
+				// Validate Tolerations from this patch
+				for _, tol := range patchPodSpec.Tolerations {
+					// Validate operator (if specified)
+					if tol.Operator != corev1.TolerationOpEqual && tol.Operator != corev1.TolerationOpExists && tol.Operator != "" {
+						allErrs = append(allErrs, field.Invalid(patchPath, patch,
+							fmt.Sprintf("toleration in replicated job %s has invalid operator %q (must be Equal or Exists)", patchRJob.Name, tol.Operator)))
+					}
+					// Validate effect (if specified)
+					// Empty effect ("") is valid and matches any taint effect
+					if tol.Effect != "" && tol.Effect != corev1.TaintEffectNoSchedule && tol.Effect != corev1.TaintEffectPreferNoSchedule && tol.Effect != corev1.TaintEffectNoExecute {
+						allErrs = append(allErrs, field.Invalid(patchPath, patch,
+							fmt.Sprintf("toleration in replicated job %s has invalid effect %q (must be NoSchedule, PreferNoSchedule, NoExecute, or empty)", patchRJob.Name, tol.Effect)))
+					}
+					// Note: Equal operator with empty value is valid per Kubernetes spec
+					// An omitted toleration value resolves to "" and can match a taint with an empty value
+				}
 			}
 		}
 	}
