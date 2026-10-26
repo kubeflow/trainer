@@ -259,6 +259,14 @@ kubeflow_trainer_runtime_info{api_group="trainer.kubeflow.org",kind="TrainingRun
 	}); !ok || nodes != 4 {
 		t.Fatalf("requested runtime nodes = (%d, %t), want (4, true)", nodes, ok)
 	}
+	if nodes, ok := collector.requestedNodes(&trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "team-a"},
+		Spec: trainer.TrainJobSpec{RuntimeRef: trainer.RuntimeRef{
+			Name: "torch", APIGroup: ptr.To("example.com"), Kind: &trainingKind,
+		}},
+	}); ok || nodes != 0 {
+		t.Fatalf("requested runtime nodes for non-Trainer API group = (%d, %t), want (0, false)", nodes, ok)
+	}
 
 	clusterInformer.Delete(clusterRuntime)
 	assertMetric(t, reg, `# HELP kubeflow_trainer_runtime_info Current TrainingRuntime and ClusterTrainingRuntime resources.
