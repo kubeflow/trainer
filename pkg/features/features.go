@@ -17,6 +17,8 @@ limitations under the License.
 package features
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
@@ -39,6 +41,13 @@ const (
 	// Enables Dynamic Resource Allocation (DRA) support: trainer.resourceClaimsPerNode and
 	// resourceClaims / resources.claims in runtimePatches.
 	TrainJobDynamicResourceAllocation featuregate.Feature = "TrainJobDynamicResourceAllocation"
+
+	// owner: akshaychitneni
+	// kep: https://github.com/kubeflow/trainer/blob/master/proposals/2605-optimization-job-crd/README.md
+	//
+	// Enables the OptimizationJob API for hyperparameter optimization. Requires TrainJobStatus,
+	// because trials report their objective metrics through the TrainJob status server.
+	OptimizationJob featuregate.Feature = "OptimizationJob"
 )
 
 // defaultFeatureGates consists of all known Trainer-specific feature keys.
@@ -51,9 +60,20 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	TrainJobStatus: {Default: false, PreRelease: featuregate.Alpha},
 
 	TrainJobDynamicResourceAllocation: {Default: false, PreRelease: featuregate.Alpha},
+
+	OptimizationJob: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 // Enabled is helper for `utilfeature.DefaultFeatureGate.Enabled()`
 func Enabled(f featuregate.Feature) bool {
 	return utilfeature.DefaultFeatureGate.Enabled(f)
+}
+
+// ValidateDependencies returns an error when an enabled feature requires a disabled feature.
+// The Trainer controller manager calls it once the feature gates are set.
+func ValidateDependencies() error {
+	if Enabled(OptimizationJob) && !Enabled(TrainJobStatus) {
+		return fmt.Errorf("feature gate %s requires feature gate %s to be enabled", OptimizationJob, TrainJobStatus)
+	}
+	return nil
 }

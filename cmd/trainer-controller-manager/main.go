@@ -110,6 +110,11 @@ func main() {
 		}
 	}
 
+	if err := features.ValidateDependencies(); err != nil {
+		setupLog.Error(err, "Invalid feature gates")
+		os.Exit(1)
+	}
+
 	restCfg := ctrl.GetConfigOrDie()
 	config.ApplyClientConnection(restCfg, &cfg)
 

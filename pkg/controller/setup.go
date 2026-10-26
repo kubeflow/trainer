@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
@@ -46,13 +47,15 @@ func SetupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, opt
 	).SetupWithManager(mgr, options); err != nil {
 		return trainer.TrainJobKind, err
 	}
-	if err := NewOptimizationJobReconciler(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		mgr.GetEventRecorder("optimizationjob-controller"),
-		suggestionClient,
-	).SetupWithManager(mgr, options); err != nil {
-		return trainer.OptimizationJobKind, err
+	if features.Enabled(features.OptimizationJob) {
+		if err := NewOptimizationJobReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorder("optimizationjob-controller"),
+			suggestionClient,
+		).SetupWithManager(mgr, options); err != nil {
+			return trainer.OptimizationJobKind, err
+		}
 	}
 	return "", nil
 }
