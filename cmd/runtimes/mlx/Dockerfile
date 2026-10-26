@@ -17,7 +17,7 @@ FROM mpioperator/base:v0.8.2 AS mpi
 # Ubuntu 22.04 packages Open MPI 4.1.2, so build Open MPI 5 from source. The image stays on
 # Ubuntu 22.04 because mlx-data does not publish wheels for Python 3.14, the Python of
 # Ubuntu 26.04, the first Ubuntu LTS that packages Open MPI 5.
-FROM nvidia/cuda:13.4.2-devel-ubuntu22.04 AS openmpi
+FROM nvidia/cuda:13.4.3-devel-ubuntu22.04 AS openmpi
 ARG OPENMPI_VERSION=5.0.10
 ARG OPENMPI_SHA256=0acecc4fc218e5debdbcb8a41d182c6b0f1d29393015ed763b2a91d5d7374cc6
 RUN apt update && apt install -y --no-install-recommends \
@@ -31,7 +31,7 @@ RUN curl -fsSL -o /tmp/openmpi.tar.bz2 \
     && make -j"$(nproc)" \
     && make install DESTDIR=/openmpi
 
-FROM nvidia/cuda:13.4.2-devel-ubuntu22.04
+FROM nvidia/cuda:13.4.3-devel-ubuntu22.04
 
 # Install libraries required for OpenMPI to work.
 RUN apt update && apt install -y --no-install-recommends \
