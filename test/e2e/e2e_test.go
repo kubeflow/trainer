@@ -137,65 +137,115 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 		})
 	})
 
-	ginkgo.When("Creating TrainJob to perform OpenMPI workload", func() {
-		// Verify the `deepspeed-distributed` ClusterTrainingRuntime. Its image ships Open MPI 5, so the
-		// Open MPI 4 entry sets an Open MPI 4 image on the TrainJob, which reaches the launcher and the nodes.
-		ginkgo.DescribeTable("should create TrainJob with DeepSpeed runtime reference",
-			func(image *string) {
-				// Create a multi-node MPI TrainJob.
-				trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-deepspeed").
-					RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), deepSpeedRuntime).
-					Trainer(&trainer.Trainer{
-						Image:    image,
-						NumNodes: ptr.To(int32(2)),
-						// Verify MPI ranks run across both expected nodes.
-						Command: []string{"sh", "-c", `test "$(mpirun hostname | sort -u | wc -l)" -eq 2`},
-					}).
-					Obj()
+	ginkgo.When("Creating TrainJob to perform DeepSpeed workload", func() {
+		// Verify the `deepspeed-distributed` ClusterTrainingRuntime.
+		ginkgo.It("should create TrainJob with DeepSpeed runtime reference", func() {
+			// Create a multi-node MPI TrainJob.
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-deepspeed").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), deepSpeedRuntime).
+				Trainer(&trainer.Trainer{
+					NumNodes: ptr.To(int32(2)),
+					// Verify MPI ranks run across both expected nodes.
+					Command: []string{"sh", "-c", `test "$(mpirun hostname | sort -u | wc -l)" -eq 2`},
+				}).
+				Obj()
 
-				ginkgo.By("Create a TrainJob with deepspeed-distributed runtime reference", func() {
-					gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
-				})
+			ginkgo.By("Create a TrainJob with deepspeed-distributed runtime reference", func() {
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			})
 
-				// Wait for jobs to become active
-				ginkgo.By("Wait for TrainJob jobs to become active", func() {
-					gomega.Eventually(func(g gomega.Gomega) {
-						gotTrainJob := &trainer.TrainJob{}
-						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
-						nodeStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Node)
-						g.Expect(ok).Should(gomega.BeTrue())
-						g.Expect(nodeStatus.Active).Should(gomega.Equal(ptr.To(int32(1))))
-						g.Expect(nodeStatus.Failed).Should(gomega.Equal(ptr.To(int32(0))))
-					}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
-				})
+			// Wait for jobs to become active
+			ginkgo.By("Wait for TrainJob jobs to become active", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					nodeStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Node)
+					g.Expect(ok).Should(gomega.BeTrue())
+					g.Expect(nodeStatus.Active).Should(gomega.Equal(ptr.To(int32(1))))
+					g.Expect(nodeStatus.Failed).Should(gomega.Equal(ptr.To(int32(0))))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
 
-				// Wait for TrainJob to be in Succeeded status.
-				ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
-					gomega.Eventually(func(g gomega.Gomega) {
-						gotTrainJob := &trainer.TrainJob{}
-						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
-						g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
-							{
-								Type:    trainer.TrainJobComplete,
-								Status:  metav1.ConditionTrue,
-								Reason:  jobsetconsts.AllJobsCompletedReason,
-								Message: jobsetconsts.AllJobsCompletedMessage,
-							},
-						}, util.IgnoreConditions))
-						launcherStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Launcher)
-						g.Expect(ok).Should(gomega.BeTrue())
-						g.Expect(launcherStatus.Succeeded).Should(gomega.Equal(ptr.To(int32(1))))
-						g.Expect(launcherStatus.Failed).Should(gomega.Equal(ptr.To(int32(0))))
+			// Wait for TrainJob to be in Succeeded status.
+			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
+						{
+							Type:    trainer.TrainJobComplete,
+							Status:  metav1.ConditionTrue,
+							Reason:  jobsetconsts.AllJobsCompletedReason,
+							Message: jobsetconsts.AllJobsCompletedMessage,
+						},
+					}, util.IgnoreConditions))
+					launcherStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Launcher)
+					g.Expect(ok).Should(gomega.BeTrue())
+					g.Expect(launcherStatus.Succeeded).Should(gomega.Equal(ptr.To(int32(1))))
+					g.Expect(launcherStatus.Failed).Should(gomega.Equal(ptr.To(int32(0))))
 
-						nodeStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Node)
-						g.Expect(ok).Should(gomega.BeTrue())
-						g.Expect(nodeStatus.Failed).Should(gomega.Equal(ptr.To(int32(0))))
-					}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
-				})
-			},
-			ginkgo.Entry("with the DeepSpeed image, which ships Open MPI 5", nil),
-			ginkgo.Entry("with an Open MPI 4 image", ptr.To(openMPI4Image)),
-		)
+					nodeStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Node)
+					g.Expect(ok).Should(gomega.BeTrue())
+					g.Expect(nodeStatus.Failed).Should(gomega.Equal(ptr.To(int32(0))))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+		})
+	})
+
+	ginkgo.When("Creating TrainJob to perform OpenMPI 4.0 workload", func() {
+		// Use the DeepSpeed runtime, but set the OpenMPI 4.0 image.
+		ginkgo.It("should create TrainJob with DeepSpeed runtime reference and OpenMPI 4.0 image", func() {
+			// Create a multi-node MPI TrainJob.
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-openmpi4").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), deepSpeedRuntime).
+				Trainer(&trainer.Trainer{
+					Image:    ptr.To(openMPI4Image),
+					NumNodes: ptr.To(int32(2)),
+					// Verify MPI ranks run across both expected nodes.
+					Command: []string{"sh", "-c", `test "$(mpirun hostname | sort -u | wc -l)" -eq 2`},
+				}).
+				Obj()
+
+			ginkgo.By("Create a TrainJob with deepspeed-distributed runtime reference and the OpenMPI 4.0 image", func() {
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			})
+
+			// Wait for jobs to become active
+			ginkgo.By("Wait for TrainJob jobs to become active", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					nodeStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Node)
+					g.Expect(ok).Should(gomega.BeTrue())
+					g.Expect(nodeStatus.Active).Should(gomega.Equal(ptr.To(int32(1))))
+					g.Expect(nodeStatus.Failed).Should(gomega.Equal(ptr.To(int32(0))))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+
+			// Wait for TrainJob to be in Succeeded status.
+			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
+						{
+							Type:    trainer.TrainJobComplete,
+							Status:  metav1.ConditionTrue,
+							Reason:  jobsetconsts.AllJobsCompletedReason,
+							Message: jobsetconsts.AllJobsCompletedMessage,
+						},
+					}, util.IgnoreConditions))
+					launcherStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Launcher)
+					g.Expect(ok).Should(gomega.BeTrue())
+					g.Expect(launcherStatus.Succeeded).Should(gomega.Equal(ptr.To(int32(1))))
+					g.Expect(launcherStatus.Failed).Should(gomega.Equal(ptr.To(int32(0))))
+
+					nodeStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Node)
+					g.Expect(ok).Should(gomega.BeTrue())
+					g.Expect(nodeStatus.Failed).Should(gomega.Equal(ptr.To(int32(0))))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+		})
 	})
 
 	ginkgo.When("Creating TrainJob to perform JAX workload", func() {
