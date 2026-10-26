@@ -116,6 +116,7 @@ func (m *trainerMetrics) Start(ctx context.Context) error {
 		return fmt.Errorf("wait for TrainJob metrics observer: %w", err)
 	}
 	m.ready.Store(true)
+	m.log.Info("TrainJob metrics observer is ready")
 	<-ctx.Done()
 	return nil
 }
@@ -201,6 +202,7 @@ func (m *trainerMetrics) observeRequestedWorkload(trainJob *trainer.TrainJob, ru
 // events. Collect only reads the in-memory snapshot and never calls the API.
 type runtimeInfoCollector struct {
 	cache cache.Cache
+	log   logr.Logger
 
 	mu       sync.RWMutex
 	snapshot map[string]runtimeInfo
@@ -220,6 +222,7 @@ type runtimeInfo struct {
 func newRuntimeInfoCollector(c cache.Cache) *runtimeInfoCollector {
 	return &runtimeInfoCollector{
 		cache:    c,
+		log:      ctrl.Log.WithName("runtime-info-collector"),
 		snapshot: make(map[string]runtimeInfo),
 	}
 }
@@ -260,7 +263,7 @@ func (c *runtimeInfoCollector) Start(ctx context.Context) error {
 	}
 	defer func() {
 		if removeErr := trainingInformer.RemoveEventHandler(trainingRegistration); removeErr != nil {
-			ctrl.Log.WithName("trainer-metrics").Error(removeErr, "failed to remove TrainingRuntime metrics observer")
+			c.log.Error(removeErr, "failed to remove TrainingRuntime metrics observer")
 		}
 	}()
 
@@ -274,7 +277,7 @@ func (c *runtimeInfoCollector) Start(ctx context.Context) error {
 	}
 	defer func() {
 		if removeErr := clusterInformer.RemoveEventHandler(clusterRegistration); removeErr != nil {
-			ctrl.Log.WithName("trainer-metrics").Error(removeErr, "failed to remove ClusterTrainingRuntime metrics observer")
+			c.log.Error(removeErr, "failed to remove ClusterTrainingRuntime metrics observer")
 		}
 	}()
 
@@ -285,6 +288,7 @@ func (c *runtimeInfoCollector) Start(ctx context.Context) error {
 		return fmt.Errorf("wait for runtime metrics observers: %w", err)
 	}
 	c.ready.Store(true)
+	c.log.Info("runtime metrics observers are ready")
 	<-ctx.Done()
 	return nil
 }
