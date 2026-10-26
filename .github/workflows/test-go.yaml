@@ -89,7 +89,7 @@ jobs:
           make test-integration
 
       - name: Coveralls report
-        uses: shogo82148/actions-goveralls@daabb2902148216a0b13c82107a6e67ed97f796e # v1
+        uses: shogo82148/actions-goveralls@4b30166c2ac96ac557328a27874a16b777f9b8bd # v1
         continue-on-error: true
         with:
           path-to-profile: cover.out
