@@ -138,36 +138,15 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 	})
 
 	ginkgo.When("Creating TrainJob to perform OpenMPI workload", func() {
-		// Verify the `deepspeed-distributed` ClusterTrainingRuntime. Its image ships Open MPI 5,
-		// so the Open MPI 4 entry runs the same runtime with an Open MPI 4 image.
+		// Verify the `deepspeed-distributed` ClusterTrainingRuntime. Its image ships Open MPI 5, so the
+		// Open MPI 4 entry sets an Open MPI 4 image on the TrainJob, which reaches the launcher and the nodes.
 		ginkgo.DescribeTable("should create TrainJob with DeepSpeed runtime reference",
-			func(image string) {
-				runtimeRef := trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind)
-				runtimeName := deepSpeedRuntime
-				if image != "" {
-					deepSpeed := &trainer.ClusterTrainingRuntime{}
-					gomega.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: deepSpeedRuntime}, deepSpeed)).Should(gomega.Succeed())
-					mpiRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "e2e-test-deepspeed").
-						RuntimeSpec(*deepSpeed.Spec.DeepCopy()).
-						Obj()
-					// spec.trainer.image only reaches the launcher, so set the image on every replicatedJob.
-					for i := range mpiRuntime.Spec.Template.Spec.ReplicatedJobs {
-						containers := mpiRuntime.Spec.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers
-						for j := range containers {
-							containers[j].Image = image
-						}
-					}
-					ginkgo.By("Create a copy of the deepspeed-distributed runtime with the given image", func() {
-						gomega.Expect(k8sClient.Create(ctx, mpiRuntime)).Should(gomega.Succeed())
-					})
-					runtimeRef = trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind)
-					runtimeName = mpiRuntime.Name
-				}
-
+			func(image *string) {
 				// Create a multi-node MPI TrainJob.
 				trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-deepspeed").
-					RuntimeRef(runtimeRef, runtimeName).
+					RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), deepSpeedRuntime).
 					Trainer(&trainer.Trainer{
+						Image:    image,
 						NumNodes: ptr.To(int32(2)),
 						// Verify MPI ranks run across both expected nodes.
 						Command: []string{"sh", "-c", `test "$(mpirun hostname | sort -u | wc -l)" -eq 2`},
@@ -214,8 +193,8 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 					}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 				})
 			},
-			ginkgo.Entry("with the DeepSpeed image, which ships Open MPI 5", ""),
-			ginkgo.Entry("with an Open MPI 4 image", openMPI4Image),
+			ginkgo.Entry("with the DeepSpeed image, which ships Open MPI 5", nil),
+			ginkgo.Entry("with an Open MPI 4 image", ptr.To(openMPI4Image)),
 		)
 	})
 
