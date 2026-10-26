@@ -1232,7 +1232,7 @@ In `pkg/runtime/framework/plugins/workload`:
   replica).
 - Gang `minCount` computation for each level from the resolved `runtime.Info` PodSets, including
   the MPI case where the dependent `launcher` is excluded from `minCount`, and `numNodes: 1`.
-- Sequenced-startup fallback: a runtime using `dependsOn` or `InOrder` with only level 1 fields
+- Sequenced-startup fallback: a runtime using `dependsOn` with only level 1 fields
   produces one template per ReplicatedJob.
 - Defaulting of a missing `schedulingPolicy` to Gang at each level.
 - `Workload` and `PodGroup` build output, including correct `controllerRef` and

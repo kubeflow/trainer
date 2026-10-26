@@ -87,7 +87,8 @@ can use either level 2 or level 3, and every ReplicatedJob of the runtime must b
 exactly one entry.
 
 The scheduling policy defaults to `gang`. Kubeflow Trainer sets the gang `minCount` to the number of
-Pods in the PodGroup, so you don't set it in the runtime. Use the `basic` policy to schedule Pods
+Pods in the PodGroup, excluding the Pods of ReplicatedJobs that depend on another ReplicatedJob of
+the same PodGroup, so you don't set it in the runtime. Use the `basic` policy to schedule Pods
 individually.
 
 ### TrainJob-Level Scheduling
@@ -148,9 +149,11 @@ Kubeflow Trainer creates a Workload for the TrainJob with a single PodGroupTempl
 PodGroup from it that both `node` Pods are assigned to. The PodGroup uses the gang policy with
 `minCount: 2`, the `topology.kubernetes.io/zone` topology constraint, and the `all` disruption mode.
 
-The TrainJob-level gang can't be used when the runtime uses `dependsOn` or the `InOrder`
-startup policy, since the dependent Jobs are created after the others and the gang could never
-reach its `minCount`. Use ReplicatedJob-level scheduling for such runtimes.
+The TrainJob-level gang can't be used when the runtime uses `dependsOn`, since the dependent
+Jobs are created after the others and the gang could never reach its `minCount`. Excluding the
+dependent ReplicatedJobs from `minCount` doesn't help here, since it would leave the main workers,
+such as the trainer nodes that depend on the initializers, outside of the gang.
+Use ReplicatedJob-level scheduling for such runtimes.
 
 ### ReplicatedJob-Level Scheduling
 
@@ -192,7 +195,11 @@ entry: a gang PodGroup with `minCount: 2` for the `node` Pods, and a basic PodGr
 `launcher` Pod.
 
 When an entry lists multiple ReplicatedJobs, they share a single PodGroup. The ReplicatedJobs
-that depend on another ReplicatedJob in the same entry are excluded from the gang `minCount`.
+that depend on another ReplicatedJob in the same entry are excluded from the gang `minCount`, since
+JobSet creates them only after their dependencies reach the required status. Their Pods join the
+PodGroup once created. For example, if the entry targets both `launcher` and `node`, the gang
+`minCount` is 2 for the `node` Pods, and the `launcher` Pod joins the PodGroup after the `node`
+Pods are ready.
 
 ### Job-Level Scheduling
 

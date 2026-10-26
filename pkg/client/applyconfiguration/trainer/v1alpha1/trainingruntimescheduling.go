@@ -44,14 +44,14 @@ import (
 // disruptionMode unset. Level 2 and level 3 entries can be combined for different
 // ReplicatedJobs of the same runtime.
 //
-// Sequenced startup (dependsOn or an InOrder startupPolicy) creates Jobs sequentially, so a
-// single TrainJob-level gang could never reach its minCount. A runtime using sequenced startup
-// must therefore use the per-ReplicatedJob model.
+// JobSet creates the ReplicatedJobs that set dependsOn only after their dependencies reach the
+// required status, so a single TrainJob-level gang could never reach its minCount. A runtime
+// using dependsOn must therefore use the per-ReplicatedJob model.
 type TrainingRuntimeSchedulingApplyConfiguration struct {
 	// schedulingPolicy defines the TrainJob-level (level 1) scheduling policy for every Pod
 	// created by the TrainJob. Defaults to Gang when scheduling is set but schedulingPolicy is
 	// nil and replicatedJobs is not set.
-	// TrainJob-level gang scheduling, including the default, cannot be used with sequenced startup.
+	// TrainJob-level gang scheduling, including the default, cannot be used with dependsOn.
 	// Mutually exclusive with replicatedJobs: see the type-level comment.
 	SchedulingPolicy *v1alpha3.WorkloadCompositePodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty"`
 	// schedulingConstraints defines TrainJob-level (level 1) topology constraints for every
