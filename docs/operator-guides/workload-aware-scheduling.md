@@ -72,11 +72,11 @@ workloads                      scheduling.k8s.io/v1beta1   true         Workload
 [The `scheduling` API](https://pkg.go.dev/github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1#TrainingRuntimeScheduling)
 configures PodGroups at one of the following levels:
 
-| Level                   | Configuration                                                            | PodGroups                                                                |
-| ----------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| Level 1 – TrainJob      | `scheduling.schedulingPolicy`, `schedulingConstraints`, `disruptionMode` | One PodGroup for all Pods of the TrainJob                                |
-| Level 2 – ReplicatedJob | `scheduling.replicatedJobs[]`                                            | One PodGroup per entry, shared by the Pods of its `targetReplicatedJobs` |
-| Level 3 – Job           | `scheduling.replicatedJobs[].job`                                        | One PodGroup per Job of the targeted ReplicatedJob                       |
+| Level                   | Configuration                     | PodGroups                                          | When to use                                                   |
+| ----------------------- | --------------------------------- | -------------------------------------------------- | ------------------------------------------------------------- |
+| Level 1 – TrainJob      | `scheduling`                      | One PodGroup for all Pods of the TrainJob          | All Pods must be scheduled, placed, and preempted as one unit |
+| Level 2 – ReplicatedJob | `scheduling.replicatedJobs[]`     | One PodGroup per `replicatedJobs` entry            | ReplicatedJobs need different configurations                  |
+| Level 3 – Job           | `scheduling.replicatedJobs[].job` | One PodGroup per Job of the targeted ReplicatedJob | Each Job needs its own gang or topology constraints           |
 
 The TrainJob level can't be combined with `replicatedJobs`. Within `replicatedJobs`, each entry
 can use either level 2 or level 3, and every ReplicatedJob of the runtime must be targeted by
