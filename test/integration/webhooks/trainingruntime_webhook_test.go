@@ -716,6 +716,27 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 				},
 				gomega.MatchError(gomega.ContainSubstring("exactly one of resourceClaimName or resourceClaimTemplateName must be set")),
 			),
+			ginkgo.Entry("Should fail to create trainingRuntime with duplicate Job-level resourceClaims names",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainingRuntimeScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{{
+									TargetReplicatedJobs: []string{constants.Node},
+									Job: &trainer.JobScheduling{
+										ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{
+											{Name: "tpu-slice", ResourceClaimName: ptr.To("tpu-slice")},
+											{Name: "tpu-slice", ResourceClaimName: ptr.To("tpu-slice")},
+										},
+									},
+								}},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("Duplicate value")),
+			),
 			ginkgo.Entry("Should fail to create trainingRuntime with targetReplicatedJobs referencing a ReplicatedJob which does not exist",
 				func() *trainer.TrainingRuntime {
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")

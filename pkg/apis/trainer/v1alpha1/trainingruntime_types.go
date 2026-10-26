@@ -316,7 +316,8 @@ type JobScheduling struct {
 
 	// resourceClaims defines the DRA ResourceClaims shared by all Pods in each Job's PodGroup.
 	// Requires the DRAWorkloadResourceClaims Kubernetes feature gate.
-	// +listType=atomic
+	// +listType=map
+	// +listMapKey=name
 	// +kubebuilder:validation:MaxItems=4
 	// +kubebuilder:validation:XValidation:rule="self.all(c, has(c.resourceClaimName) != has(c.resourceClaimTemplateName))", message="exactly one of resourceClaimName or resourceClaimTemplateName must be set"
 	// +optional

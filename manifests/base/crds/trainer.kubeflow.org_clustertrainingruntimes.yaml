@@ -313,7 +313,9 @@ spec:
                                 type: object
                               maxItems: 4
                               type: array
-                              x-kubernetes-list-type: atomic
+                              x-kubernetes-list-map-keys:
+                              - name
+                              x-kubernetes-list-type: map
                               x-kubernetes-validations:
                               - message: exactly one of resourceClaimName or resourceClaimTemplateName
                                   must be set

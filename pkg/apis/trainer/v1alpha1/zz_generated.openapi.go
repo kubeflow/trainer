@@ -970,7 +970,10 @@ func schema_pkg_apis_trainer_v1alpha1_JobScheduling(ref common.ReferenceCallback
 					"resourceClaims": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
 							},
 						},
 						SchemaProps: spec.SchemaProps{

@@ -14902,7 +14902,10 @@
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupResourceClaim"
             },
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
           },
           "schedulingConstraints": {
             "description": "schedulingConstraints defines topology constraints applied to each replica of the targeted ReplicatedJob.",
