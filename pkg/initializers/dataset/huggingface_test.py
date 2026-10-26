@@ -84,6 +84,54 @@ def test_load_config(test_name, test_config, expected):
                 "expected_repo_id": "org/dataset-v1",
             },
         ),
+        (
+            "Dataset id without a namespace",
+            {
+                "config": {
+                    "storage_uri": "hf://imdb",
+                    "ignore_patterns": None,
+                    "access_token": None,
+                },
+                "should_login": False,
+                "expected_repo_id": "imdb",
+            },
+        ),
+        (
+            "Dataset id with a namespace",
+            {
+                "config": {
+                    "storage_uri": "hf://owner/ds",
+                    "ignore_patterns": None,
+                    "access_token": None,
+                },
+                "should_login": False,
+                "expected_repo_id": "owner/ds",
+            },
+        ),
+        (
+            "Extra path segments are ignored",
+            {
+                "config": {
+                    "storage_uri": "hf://owner/ds/extra",
+                    "ignore_patterns": None,
+                    "access_token": None,
+                },
+                "should_login": False,
+                "expected_repo_id": "owner/ds",
+            },
+        ),
+        (
+            "Trailing slash is ignored",
+            {
+                "config": {
+                    "storage_uri": "hf://owner/ds/",
+                    "ignore_patterns": None,
+                    "access_token": None,
+                },
+                "should_login": False,
+                "expected_repo_id": "owner/ds",
+            },
+        ),
     ],
 )
 def test_download_dataset(test_name, test_case):
@@ -115,3 +163,21 @@ def test_download_dataset(test_name, test_case):
             ignore_patterns=test_case["config"]["ignore_patterns"],
         )
     print("Test execution completed")
+
+
+def test_download_dataset_without_repo_id():
+    """Test that a storage URI without a dataset id is rejected"""
+
+    huggingface_dataset_instance = HuggingFace()
+    huggingface_dataset_instance.config = MagicMock(
+        storage_uri="hf://", ignore_patterns=None, access_token=None
+    )
+
+    with patch("huggingface_hub.login") as mock_login, patch(
+        "huggingface_hub.snapshot_download"
+    ) as mock_download:
+        with pytest.raises(ValueError, match="Invalid HuggingFace dataset URI"):
+            huggingface_dataset_instance.download_dataset()
+
+        mock_login.assert_not_called()
+        mock_download.assert_not_called()
