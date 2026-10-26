@@ -88,3 +88,8 @@ mlPolicy:
     sshAuthMountPath: /home/mpiuser/.ssh
     runLauncherAsNode: true
 ```
+
+The TrainJob `spec.trainer.image` is set on both the launcher and the worker nodes, so all MPI
+processes run the same application and MPI versions. `spec.trainer.command` and `args` are set
+only on the launcher, which runs `mpirun`, while the nodes keep the command of the runtime, which
+starts the SSH server, so the image must also provide the SSH environment that the runtime expects.
