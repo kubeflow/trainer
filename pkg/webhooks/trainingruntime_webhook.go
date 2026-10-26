@@ -46,7 +46,7 @@ const (
 	schedulingFeatureGateErrorMsg      = "TrainJobWorkloadAwareScheduling feature gate is disabled"
 	schedulingTargetNotFoundErrorMsg   = "must reference a replicatedJob in spec.template.spec.replicatedJobs"
 	schedulingUntargetedErrorMsg       = "must be targeted by a spec.scheduling.replicatedJobs entry when spec.scheduling.replicatedJobs is set"
-	schedulingJobReplicasErrorMsg      = "must target a ReplicatedJob with at most 1 replica; a PodGroup per replica is not supported yet"
+	schedulingJobReplicasErrorMsg      = "must target a ReplicatedJob with at most 1 replicas; a PodGroup per replica is not supported yet"
 	schedulingJobClaimErrorMsg         = "must have a Pod resourceClaim with the same name, resourceClaimName, and resourceClaimTemplateName in the targeted ReplicatedJob"
 	schedulingTrainJobPriorityErrorMsg = "must match %q of the other ReplicatedJobs sharing the TrainJob-level PodGroup"
 	schedulingGroupPriorityErrorMsg    = "priorityClassName %q must match %q of the other ReplicatedJobs sharing this PodGroup"

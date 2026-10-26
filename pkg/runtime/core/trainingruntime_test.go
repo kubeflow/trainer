@@ -2700,7 +2700,7 @@ func TestNewRuntimeInfoScheduling(t *testing.T) {
 	trainingRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj()
 	trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj()
 
-	info, err := (&TrainingRuntime{}).newRuntimeInfo(trainJob, trainingRuntime.Spec.Template, nil, nil, scheduling)
+	info, err := (&TrainingRuntime{}).newRuntimeInfo(trainJob, trainingRuntime.Spec.Template, nil, nil, scheduling.DeepCopy())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
