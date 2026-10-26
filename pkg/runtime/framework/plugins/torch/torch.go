@@ -160,6 +160,9 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	// PET_* envs and the trainer port are injected even when spec.trainer is omitted.
 	trainerContainer := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node)
 	if trainerContainer != nil && trainJob.Spec.Trainer != nil {
+		if trainJob.Spec.Trainer.Image != nil {
+			trainerContainer.Image = *trainJob.Spec.Trainer.Image
+		}
 		apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
 	}
 

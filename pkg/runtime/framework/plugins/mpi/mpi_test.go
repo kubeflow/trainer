@@ -1167,6 +1167,41 @@ trainJob-node-1-0.trainJob slots=1
 	}
 }
 
+func TestMPITrainerImageOverridesLauncherAndWorker(t *testing.T) {
+	info := runtime.NewInfo(
+		runtime.WithMLPolicySource(&trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{MPI: &trainer.MPIMLPolicySource{NumProcPerNode: ptr.To[int32](1), MPIImplementation: ptr.To(trainer.MPIImplementationOpenMPI)}}}),
+		runtime.WithPodSet(constants.Launcher, nil, 1, corev1.PodSpec{}, corev1ac.PodSpec().WithContainers(corev1ac.Container().WithName(constants.Node).WithImage("launcher-runtime-image"))),
+		runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().WithContainers(corev1ac.Container().WithName(constants.Node).WithImage("worker-runtime-image").WithCommand("worker").WithArgs("--keep-args"))),
+	)
+	job := &trainer.TrainJob{}
+	job.Spec.Trainer = &trainer.Trainer{Image: ptr.To("trainjob-image")}
+	if err := (&MPI{}).EnforceMLPolicy(info, job); err != nil {
+		t.Fatal(err)
+	}
+	for _, ps := range info.TemplateSpec.PodSets {
+		if got := ps.Containers[0].Image; got != "trainjob-image" {
+			t.Errorf("%s image = %q, want trainjob-image", ps.Name, got)
+		}
+		if ps.Name == constants.Node {
+			container := ps.Containers[0]
+			if diff := gocmp.Diff([]string{"worker"}, container.Command); diff != "" {
+				t.Errorf("worker command changed (-want,+got):\n%s", diff)
+			}
+			if diff := gocmp.Diff([]string{"--keep-args"}, container.Args); diff != "" {
+				t.Errorf("worker args changed (-want,+got):\n%s", diff)
+			}
+		}
+	}
+	info = runtime.NewInfo(runtime.WithMLPolicySource(&trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{MPI: &trainer.MPIMLPolicySource{NumProcPerNode: ptr.To[int32](1), MPIImplementation: ptr.To(trainer.MPIImplementationOpenMPI)}}}), runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().WithContainers(corev1ac.Container().WithName(constants.Node).WithImage("runtime-image"))))
+	job.Spec.Trainer.Image = nil
+	if err := (&MPI{}).EnforceMLPolicy(info, job); err != nil {
+		t.Fatal(err)
+	}
+	if got := info.TemplateSpec.PodSets[0].Containers[0].Image; got != "runtime-image" {
+		t.Errorf("nil image override changed runtime image to %q", got)
+	}
+}
+
 func TestValidate(t *testing.T) {
 	cases := map[string]struct {
 		info         *runtime.Info

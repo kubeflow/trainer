@@ -84,6 +84,7 @@ type Container struct {
 	Name         string
 	Image        string
 	Command      []string
+	Args         []string
 	Env          []corev1ac.EnvVarApplyConfiguration
 	Ports        []corev1ac.ContainerPortApplyConfiguration
 	VolumeMounts []corev1ac.VolumeMountApplyConfiguration
@@ -164,6 +165,7 @@ func toPodSetContainer(containerApply ...corev1ac.ContainerApplyConfiguration) i
 				Name:         ptr.Deref(cApply.Name, ""),
 				Image:        ptr.Deref(cApply.Image, ""),
 				Command:      cApply.Command,
+				Args:         cApply.Args,
 				Env:          cApply.Env,
 				Ports:        cApply.Ports,
 				VolumeMounts: cApply.VolumeMounts,

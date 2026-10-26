@@ -207,3 +207,37 @@ func TestPlainML(t *testing.T) {
 		})
 	}
 }
+
+func TestPlainMLTrainerImage(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		requestedImage string
+		wantImage      string
+	}{
+		{
+			name:           "override",
+			requestedImage: "trainjob-image",
+			wantImage:      "trainjob-image",
+		},
+		{
+			name:      "nil image preserves runtime image",
+			wantImage: "runtime-image",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			info := runtime.NewInfo(
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().WithContainers(corev1ac.Container().WithName(constants.Node).WithImage("runtime-image"))),
+			)
+			trainJob := &trainer.TrainJob{Spec: trainer.TrainJobSpec{Trainer: &trainer.Trainer{Image: nil}}}
+			if tc.requestedImage != "" {
+				trainJob.Spec.Trainer.Image = ptr.To(tc.requestedImage)
+			}
+			if err := (&PlainML{}).EnforceMLPolicy(info, trainJob); err != nil {
+				t.Fatal(err)
+			}
+			if got := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node).Image; got != tc.wantImage {
+				t.Errorf("image = %q, want %q", got, tc.wantImage)
+			}
+		})
+	}
+}

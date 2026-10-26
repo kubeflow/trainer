@@ -17,11 +17,13 @@ limitations under the License.
 package jobset
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
@@ -32,6 +34,8 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
+	mpiplugin "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
+	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 func makeJobSet(ancestor, containerName string, replicas int32, replicatedJobName string) *jobsetv1alpha2ac.JobSetApplyConfiguration {
@@ -60,6 +64,95 @@ func makeJobSet(ancestor, containerName string, replicas int32, replicatedJobNam
 				},
 			},
 		},
+	}
+}
+
+func TestBuildMPIJobSetTrainerImageAndWorkerRuntimeOverrides(t *testing.T) {
+	info := runtime.NewInfo(
+		runtime.WithMLPolicySource(&trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{
+			MPI: &trainer.MPIMLPolicySource{
+				NumProcPerNode:    ptr.To[int32](1),
+				MPIImplementation: ptr.To(trainer.MPIImplementationOpenMPI),
+			},
+		}}),
+		runtime.WithTemplateSpecObjApply(jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+			jobsetv1alpha2ac.ReplicatedJob().
+				WithName(constants.Node).
+				WithTemplate(batchv1ac.JobTemplateSpec().
+					WithSpec(batchv1ac.JobSpec().
+						WithTemplate(corev1ac.PodTemplateSpec().
+							WithSpec(corev1ac.PodSpec().
+								WithContainers(corev1ac.Container().WithName(constants.Node).WithImage("worker-runtime-image").WithCommand("/usr/sbin/sshd").WithArgs("-De")).
+								WithInitContainers(corev1ac.Container().WithName("worker-init").WithImage("init-runtime-image").WithArgs("init-runtime-args")),
+							),
+						),
+					),
+				),
+			jobsetv1alpha2ac.ReplicatedJob().
+				WithName(constants.Launcher).
+				WithTemplate(batchv1ac.JobTemplateSpec().
+					WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}).
+					WithSpec(batchv1ac.JobSpec().
+						WithTemplate(corev1ac.PodTemplateSpec().
+							WithSpec(corev1ac.PodSpec().
+								WithContainers(corev1ac.Container().WithName(constants.Node).WithImage("launcher-runtime-image").WithCommand("launcher-runtime-command").WithArgs("launcher-runtime-args")),
+							),
+						),
+					),
+				),
+		)),
+		runtime.WithPodSet(constants.Node, nil, 1, corev1.PodSpec{}, corev1ac.PodSpec().
+			WithContainers(corev1ac.Container().WithName(constants.Node).WithImage("worker-runtime-image").WithCommand("/usr/sbin/sshd").WithArgs("-De")).
+			WithInitContainers(corev1ac.Container().WithName("worker-init").WithImage("init-runtime-image").WithArgs("init-runtime-args"))),
+		runtime.WithPodSet(constants.Launcher, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+			WithContainers(corev1ac.Container().WithName(constants.Node).WithImage("launcher-runtime-image").WithCommand("launcher-runtime-command").WithArgs("launcher-runtime-args"))),
+	)
+	trainJob := &trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Name: "mpi-image-test", Namespace: metav1.NamespaceDefault},
+		Spec: trainer.TrainJobSpec{Trainer: &trainer.Trainer{
+			Image:   ptr.To("trainjob-image"),
+			Command: []string{"trainjob-command"},
+			Args:    []string{"trainjob-args"},
+		}},
+	}
+	if err := (&mpiplugin.MPI{}).EnforceMLPolicy(info, trainJob); err != nil {
+		t.Fatal(err)
+	}
+	info.TemplateSpec.PodSets[0].Containers[0].Args = []string{"updated-worker-args"}
+	info.TemplateSpec.PodSets[0].InitContainers[0].Args = []string{"updated-init-args"}
+
+	jobSetPlugin := &JobSet{client: utiltesting.NewClientBuilder().Build()}
+	applyConfigs, err := jobSetPlugin.Build(context.Background(), info, trainJob)
+	if err != nil {
+		t.Fatalf("Build() error = %v", err)
+	}
+	if len(applyConfigs) != 1 {
+		t.Fatalf("Build() returned %d configurations, want 1", len(applyConfigs))
+	}
+	jobSet := applyConfigs[0].(*jobsetv1alpha2ac.JobSetApplyConfiguration)
+	workerSpec := jobSet.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec
+	worker := workerSpec.Containers[0]
+	if got := ptr.Deref(worker.Image, ""); got != "trainjob-image" {
+		t.Errorf("worker image = %q, want trainjob-image", got)
+	}
+	if diff := cmp.Diff([]string{"/usr/sbin/sshd"}, worker.Command); diff != "" {
+		t.Errorf("worker command changed (-want,+got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"updated-worker-args"}, worker.Args); diff != "" {
+		t.Errorf("worker args changed (-want,+got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"updated-init-args"}, workerSpec.InitContainers[0].Args); diff != "" {
+		t.Errorf("worker init args were not synchronized (-want,+got):\n%s", diff)
+	}
+	launcher := jobSet.Spec.ReplicatedJobs[1].Template.Spec.Template.Spec.Containers[0]
+	if got := ptr.Deref(launcher.Image, ""); got != "trainjob-image" {
+		t.Errorf("launcher image = %q, want trainjob-image", got)
+	}
+	if diff := cmp.Diff([]string{"trainjob-command"}, launcher.Command); diff != "" {
+		t.Errorf("launcher command (-want,+got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"trainjob-args"}, launcher.Args); diff != "" {
+		t.Errorf("launcher args (-want,+got):\n%s", diff)
 	}
 }
 
@@ -457,7 +550,6 @@ func TestBuilderTrainer(t *testing.T) {
 											Containers: []corev1ac.ContainerApplyConfiguration{
 												{
 													Name:    ptr.To(constants.Node),
-													Image:   ptr.To("docker.io/my-org/train:latest"),
 													Command: []string{"torchrun", "--nproc_per_node=4"},
 													Args:    []string{"train.py", "--epochs=10"},
 												},
@@ -693,7 +785,6 @@ func TestBuilderTrainer(t *testing.T) {
 											Containers: []corev1ac.ContainerApplyConfiguration{
 												{
 													Name:    ptr.To(constants.Node),
-													Image:   ptr.To("registry.example/train:combined"),
 													Command: []string{"mpirun"},
 													Env: []corev1ac.EnvVarApplyConfiguration{
 														{

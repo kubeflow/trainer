@@ -186,6 +186,9 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 		// Update Containers in the PodSet
 		for cIdx, container := range ps.Containers {
 			if container.Name == constants.Node {
+				if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.Image != nil {
+					info.TemplateSpec.PodSets[psIdx].Containers[cIdx].Image = *jobTrainer.Image
+				}
 				apply.UpsertVolumeMounts(
 					&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].VolumeMounts,
 					*corev1ac.VolumeMount().WithName(constants.FluxInstallVolumeName).WithMountPath(constants.FluxVolumePath),

@@ -190,6 +190,12 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 			if container.Name != constants.Node {
 				continue
 			}
+
+			// Apply the Trainer image to both MPI workers and the launcher.
+			if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.Image != nil {
+				info.TemplateSpec.PodSets[psIdx].Containers[cIdx].Image = *jobTrainer.Image
+			}
+
 			apply.UpsertVolumeMounts(
 				&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].VolumeMounts,
 				[]corev1ac.VolumeMountApplyConfiguration{

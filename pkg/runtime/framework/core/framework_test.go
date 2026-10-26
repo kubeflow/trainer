@@ -907,7 +907,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 													corev1ac.Container().
 														WithName(constants.Node).
 														WithResources(nodeContainerRequests("1", "4Gi")).
-														WithImage("test:trainjob").
+														WithImage("test:runtime").
 														WithCommand("trainjob").
 														WithArgs("trainjob").
 														WithVolumeMounts(
@@ -1726,7 +1726,6 @@ test-job-node-0-1.test-job slots=1
 												WithContainers(
 													corev1ac.Container().
 														WithName(constants.Node).
-														WithImage("test:trainjob").
 														WithCommand("trainjob").
 														WithArgs("trainjob").
 														WithResources(nodeContainerRequests("2", "8Gi")).
@@ -2236,7 +2235,6 @@ test-job-node-0-1.test-job slots=1
 													corev1ac.Container().
 														WithName(constants.Node).
 														WithName(constants.Node).
-														WithImage("test:trainjob").
 														WithCommand("trainjob").
 														WithArgs("trainjob").
 														WithResources(nodeContainerRequests("1", "4Gi")).

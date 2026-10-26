@@ -63,6 +63,9 @@ func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 	var trainerContainer *runtime.Container
 	if trainJob.Spec.Trainer != nil {
 		if trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
+			if trainJob.Spec.Trainer.Image != nil {
+				trainerContainer.Image = *trainJob.Spec.Trainer.Image
+			}
 			apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
 		}
 	}

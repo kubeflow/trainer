@@ -445,3 +445,36 @@ func TestJAXEnforceMLPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestJAXTrainerImageOverrideAndNil(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		requested string
+		want      string
+	}{
+		{
+			name:      "override",
+			requested: "trainjob-image",
+			want:      "trainjob-image",
+		},
+		{
+			name: "nil preserves runtime",
+			want: "runtime-image",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			info := runtime.NewInfo(runtime.WithMLPolicySource(&trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{JAX: &trainer.JAXMLPolicySource{}}}), runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().WithContainers(corev1ac.Container().WithName(constants.Node).WithImage("runtime-image"))))
+			job := &trainer.TrainJob{}
+			job.Spec.Trainer = &trainer.Trainer{}
+			if tc.requested != "" {
+				job.Spec.Trainer.Image = ptr.To(tc.requested)
+			}
+			if err := (&Jax{}).EnforceMLPolicy(info, job); err != nil {
+				t.Fatal(err)
+			}
+			if got := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node).Image; got != tc.want {
+				t.Errorf("image = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

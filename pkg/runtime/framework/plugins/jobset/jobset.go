@@ -400,6 +400,9 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 			if len(container.Command) > 0 {
 				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Command = container.Command
 			}
+			if len(container.Args) > 0 {
+				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Args = container.Args
+			}
 			if container.Image != "" {
 				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Image = ptr.To(container.Image)
 			}
@@ -430,6 +433,9 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 			}
 			if len(container.Command) > 0 {
 				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Command = container.Command
+			}
+			if len(container.Args) > 0 {
+				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Args = container.Args
 			}
 			if container.Image != "" {
 				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Image = ptr.To(container.Image)

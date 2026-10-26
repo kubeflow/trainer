@@ -2325,6 +2325,39 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 	}
 }
 
+func TestTorchTrainerImageOverrideAndNil(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		requested string
+		want      string
+	}{
+		{
+			name:      "override",
+			requested: "trainjob-image",
+			want:      "trainjob-image",
+		},
+		{
+			name: "nil preserves runtime",
+			want: "runtime-image",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			info := runtime.NewInfo(runtime.WithMLPolicySource(&trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{Torch: &trainer.TorchMLPolicySource{}}}), runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().WithContainers(corev1ac.Container().WithName(constants.Node).WithImage("runtime-image"))))
+			job := &trainer.TrainJob{}
+			job.Spec.Trainer = &trainer.Trainer{}
+			if tc.requested != "" {
+				job.Spec.Trainer.Image = ptr.To(tc.requested)
+			}
+			if err := (&Torch{}).EnforceMLPolicy(info, job); err != nil {
+				t.Fatal(err)
+			}
+			if got := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node).Image; got != tc.want {
+				t.Errorf("image = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 // draNodeInfo builds a Torch runtime Info whose node container carries the given resources.
 func draNodeInfo(res *corev1ac.ResourceRequirementsApplyConfiguration) *runtime.Info {
 	return runtime.NewInfo(

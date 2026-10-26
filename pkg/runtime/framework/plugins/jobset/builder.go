@@ -126,9 +126,6 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 				if *container.Name == constants.Node {
 					// Update values from the TrainJob trainer.
 					if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil {
-						if image := jobTrainer.Image; image != nil {
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Image = image
-						}
 						if command := jobTrainer.Command; command != nil {
 							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Command = command
 						}

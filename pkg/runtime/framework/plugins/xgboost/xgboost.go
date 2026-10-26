@@ -93,6 +93,9 @@ func (x *XGBoost) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 	if trainerContainer := info.FindContainerByPodSetAncestorContainerName(
 		constants.AncestorTrainer, constants.Node,
 	); trainerContainer != nil {
+		if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.Image != nil {
+			trainerContainer.Image = *jobTrainer.Image
+		}
 		numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
 
 		// Auto-derive numWorkersPerNode from GPU resources.
