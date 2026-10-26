@@ -4,7 +4,8 @@ This guide describes how to use Kubernetes
 [Workload-Aware Scheduling (WAS)](https://kubernetes.io/docs/concepts/workloads/workload-api/)
 with Kubeflow Trainer.
 
-WAS is built into `kube-scheduler` and doesn't require a third-party scheduler. It supports:
+WAS is built into `kube-scheduler` and doesn't require a third-party scheduler, like coscheduling or
+Volcano. The Kubernetes WAS supports:
 
 - **Gang scheduling**: schedule a group of Pods only when all of them can be placed, configured
   with `schedulingPolicy`.
@@ -15,9 +16,12 @@ WAS is built into `kube-scheduler` and doesn't require a third-party scheduler. 
 - **Shared ResourceClaims**: allocate DRA devices shared by a group of Pods, configured with
   `resourceClaims`.
 
-When a runtime configures `spec.scheduling`, Kubeflow Trainer creates a `Workload` and its
-`PodGroups` for every TrainJob, and assigns the TrainJob Pods to the PodGroups. `kube-scheduler`
-then schedules, places, and preempts the Pods of each PodGroup according to its configuration.
+## Scheduling Overview
+
+When a ClusterTrainingRuntime or TrainingRuntime configures `spec.scheduling`, Kubeflow Trainer
+creates a `Workload` and its `PodGroups` for every TrainJob, and assigns the TrainJob Pods to the
+PodGroups. `kube-scheduler` then schedules, places, and preempts the Pods of each PodGroup
+according to its configuration.
 
 :::{important}
 Workload-Aware Scheduling support was introduced in Kubeflow Trainer v2.4.0 behind the
