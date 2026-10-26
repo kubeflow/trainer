@@ -92,16 +92,21 @@ class S3Storage(OpenDALStorage):
 
             downloaded = 0
             for key in keys:
-                if ignore_patterns:
-                    if any(fnmatch.fnmatch(key, p) for p in ignore_patterns):
-                        logging.info(f"Skipping ignored file: {key}")
-                        continue
-
                 # Create relative path from the prefix
                 relative_path = key[len(base) :].lstrip("/")
                 if not relative_path:
                     # If prefix matches exactly, use the filename
                     relative_path = Path(key).name
+
+                # Match ignore patterns against the relative path, like the HF
+                # initializer, and against the full key for backward compatibility.
+                if ignore_patterns:
+                    if any(
+                        fnmatch.fnmatch(relative_path, p) or fnmatch.fnmatch(key, p)
+                        for p in ignore_patterns
+                    ):
+                        logging.info(f"Skipping ignored file: {key}")
+                        continue
 
                 file_destination_path = destination / relative_path
 
