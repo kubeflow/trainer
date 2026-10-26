@@ -74,3 +74,10 @@ func Setup(mgr ctrl.Manager, cfg *configapi.ControllerMetrics, tlsOpts *configap
 
 	return mgr.Add(server)
 }
+
+// SetupServer creates and registers the metrics server with the manager.
+//
+// Deprecated: use Setup.
+func SetupServer(mgr ctrl.Manager, cfg *configapi.ControllerMetrics, tlsOpts *configapi.TLSOptions) error {
+	return Setup(mgr, cfg, tlsOpts)
+}

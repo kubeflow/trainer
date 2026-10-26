@@ -314,6 +314,9 @@ func (c *runtimeInfoCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (c *runtimeInfoCollector) requestedNodes(trainJob *trainer.TrainJob) (int32, bool) {
+	if ptr.Deref(trainJob.Spec.RuntimeRef.APIGroup, trainer.GroupVersion.Group) != trainer.GroupVersion.Group {
+		return 0, false
+	}
 	kind := ptr.Deref(trainJob.Spec.RuntimeRef.Kind, clusterTrainingRuntimeKind)
 	namespace := trainJob.Namespace
 	if kind == clusterTrainingRuntimeKind {
