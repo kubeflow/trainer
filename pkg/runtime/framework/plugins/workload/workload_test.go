@@ -27,8 +27,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
@@ -45,6 +47,47 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
+
+func TestNew(t *testing.T) {
+	// newRESTMapper returns a RESTMapper that serves only the given scheduling.k8s.io/v1beta1 kinds.
+	newRESTMapper := func(kinds ...string) meta.RESTMapper {
+		mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{schedulingv1beta1.SchemeGroupVersion})
+		for _, kind := range kinds {
+			mapper.Add(schedulingv1beta1.SchemeGroupVersion.WithKind(kind), meta.RESTScopeNamespace)
+		}
+		return mapper
+	}
+	cases := map[string]struct {
+		restMapper meta.RESTMapper
+		wantError  bool
+	}{
+		"Workload and PodGroup APIs are served": {
+			restMapper: newRESTMapper("Workload", "PodGroup"),
+		},
+		"Workload API is not served": {
+			restMapper: newRESTMapper("PodGroup"),
+			wantError:  true,
+		},
+		"PodGroup API is not served": {
+			restMapper: newRESTMapper("Workload"),
+			wantError:  true,
+		},
+		"scheduling.k8s.io/v1beta1 API is not served": {
+			restMapper: newRESTMapper(),
+			wantError:  true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cli := utiltesting.NewClientBuilder().WithRESTMapper(tc.restMapper).Build()
+			_, err := New(ctx, cli, nil, nil)
+			if (err != nil) != tc.wantError {
+				t.Errorf("New() error = %v, wantError %v", err, tc.wantError)
+			}
+		})
+	}
+}
 
 func TestWorkload(t *testing.T) {
 	cases := map[string]struct {
@@ -696,7 +739,7 @@ func TestWorkload(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			t.Cleanup(cancel)
 
-			clientBuilder := utiltesting.NewClientBuilder().WithObjects(c.objs...)
+			clientBuilder := utiltesting.WithWorkloadRESTMapping(utiltesting.NewClientBuilder()).WithObjects(c.objs...)
 			if c.expectBuildError != nil {
 				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
 					Get: func(context.Context, client.WithWatch, client.ObjectKey, client.Object, ...client.GetOption) error {
@@ -1012,7 +1055,7 @@ func TestDelete(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			t.Cleanup(cancel)
 
-			clientBuilder := utiltesting.NewClientBuilder().WithObjects(c.objs...)
+			clientBuilder := utiltesting.WithWorkloadRESTMapping(utiltesting.NewClientBuilder()).WithObjects(c.objs...)
 			if c.listError != nil {
 				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
 					List: func(context.Context, client.WithWatch, client.ObjectList, ...client.ListOption) error {
@@ -1218,7 +1261,7 @@ func TestValidate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			p, err := New(context.Background(), utiltesting.NewClientBuilder().Build(), nil, nil)
+			p, err := New(context.Background(), utiltesting.WithWorkloadRESTMapping(utiltesting.NewClientBuilder()).Build(), nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize Workload plugin: %v", err)
 			}

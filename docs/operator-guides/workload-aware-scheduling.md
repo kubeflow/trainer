@@ -71,6 +71,18 @@ workloads                      scheduling.k8s.io/v1beta1   true         Workload
 
 ```
 
+:::{important}
+The Trainer controller fails to start when the `TrainJobWorkloadAwareScheduling` feature gate is
+enabled on a cluster that doesn't serve the `scheduling.k8s.io/v1beta1` Workload and PodGroup APIs,
+and logs an error such as:
+
+```
+the TrainJobWorkloadAwareScheduling feature gate requires the cluster to serve the scheduling.k8s.io/v1beta1, Kind=Workload API
+```
+
+Enable the APIs on `kube-apiserver` as described above, or disable the feature gate.
+:::
+
 ## Scheduling Levels
 
 [The `scheduling` API](https://pkg.go.dev/github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1#TrainingRuntimeScheduling)

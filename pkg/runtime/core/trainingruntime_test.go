@@ -2836,7 +2836,7 @@ func TestTrainingRuntimeValidateObjects(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 
-			clientBuilder := testingutil.NewClientBuilder()
+			clientBuilder := testingutil.WithWorkloadRESTMapping(testingutil.NewClientBuilder())
 			if tc.existingRuntime != nil {
 				clientBuilder = clientBuilder.WithObjects(tc.existingRuntime)
 			}

@@ -2931,7 +2931,7 @@ func TestRunEnforceSchedulingPlugins(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
-			clientBuilder := testingutil.NewClientBuilder()
+			clientBuilder := testingutil.WithWorkloadRESTMapping(testingutil.NewClientBuilder())
 
 			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
