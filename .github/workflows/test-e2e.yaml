@@ -73,6 +73,32 @@ jobs:
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts/*
           retention-days: 1
 
+  was-e2e-test:
+    name: Workload-Aware Scheduling E2E Test
+    runs-on: cncf-ubuntu-16-64-x86
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Workload-Aware Scheduling requires Kubernetes v1.37+.
+        kubernetes-version: ["1.37.0"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Setup Kind Cluster with Workload-Aware Scheduling
+        run: |
+          make test-e2e-setup-cluster-was K8S_VERSION=${{ matrix.kubernetes-version }}
+
+      - name: Run WAS e2e with Go
+        run: |
+          make test-e2e-was || (kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer && exit 1)
+
   gpu-e2e-test:
     name: GPU E2E Test
     timeout-minutes: 120
