@@ -68,6 +68,8 @@ type OptimizationJobList struct {
 // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="OptimizationJobSpec is immutable and cannot be updated after creation"
 // +kubebuilder:validation:XValidation:rule="self.parallelTrials <= self.numTrials",message="parallelTrials cannot exceed numTrials"
 // +kubebuilder:validation:XValidation:rule="!has(self.searchAlgorithm.grid) || self.parameters.all(p, has(p.searchSpace.categorical))",message="Grid search requires all parameters to be Categorical; Uniform and LogUniform are not supported."
+// +kubebuilder:validation:XValidation:rule="!has(self.trainJobTemplate.spec.trainer) || !has(self.trainJobTemplate.spec.trainer.env) || self.trainJobTemplate.spec.trainer.env.all(e, !e.name.startsWith('KUBEFLOW_TRAINER_OPT_'))",message="trainJobTemplate.spec.trainer.env must not set names with the KUBEFLOW_TRAINER_OPT_ prefix, it is reserved for parameter assignments"
+// +kubebuilder:validation:XValidation:rule="!has(self.trainJobTemplate.spec.trainer) || !has(self.trainJobTemplate.spec.trainer.env) || size(self.trainJobTemplate.spec.trainer.env) + size(self.parameters) <= 128",message="trainJobTemplate.spec.trainer.env and parameters together must not exceed 128 environment variables"
 type OptimizationJobSpec struct {
 	// objectives is the list of objectives to optimize.
 	// +listType=map

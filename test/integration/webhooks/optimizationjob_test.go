@@ -17,6 +17,8 @@ limitations under the License.
 package webhooks
 
 import (
+	"fmt"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -182,6 +184,59 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 					return optimizationJob
 				},
 				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed in creating optimizationJob with trainer env in the template",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
+						TrainJobTemplateTrainer(testingutil.MakeTrainJobTrainerWrapper().
+							Env(corev1.EnvVar{Name: "LR_SCHEDULER", Value: "cosine"}).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail in creating optimizationJob with template trainer env for a parameter",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
+						TrainJobTemplateTrainer(testingutil.MakeTrainJobTrainerWrapper().
+							Env(corev1.EnvVar{Name: "KUBEFLOW_TRAINER_OPT_lr", Value: "0.01"}).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail in creating optimizationJob with template trainer env using the parameter prefix",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
+						TrainJobTemplateTrainer(testingutil.MakeTrainJobTrainerWrapper().
+							Env(corev1.EnvVar{Name: "KUBEFLOW_TRAINER_OPT_epochs", Value: "10"}).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed in creating optimizationJob with 128 trainer env and parameters in total",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
+						TrainJobTemplateTrainer(testingutil.MakeTrainJobTrainerWrapper().
+							Env(makeEnvVars(127)...).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail in creating optimizationJob with more than 128 trainer env and parameters in total",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
+						TrainJobTemplateTrainer(testingutil.MakeTrainJobTrainerWrapper().
+							Env(makeEnvVars(128)...).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
 		)
 	})
 })
+
+func makeEnvVars(n int) []corev1.EnvVar {
+	envs := make([]corev1.EnvVar, 0, n)
+	for i := range n {
+		envs = append(envs, corev1.EnvVar{Name: fmt.Sprintf("ENV_%d", i), Value: "value"})
+	}
+	return envs
+}
