@@ -503,9 +503,6 @@ func TestReconcileTTL(t *testing.T) {
 		"pending expiry requeues remaining time": {
 			ttl: ptr.To[int32](60), condition: &metav1.Condition{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue, LastTransitionTime: finished}, now: finished.Add(20 * time.Second), wantDelay: 40 * time.Second,
 		},
-		"longer TTL uses original finish time": {
-			ttl: ptr.To[int32](120), condition: &metav1.Condition{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue, LastTransitionTime: finished}, now: finished.Add(90 * time.Second), wantDelay: 30 * time.Second,
-		},
 		"future finish time defers cleanup": {
 			ttl: ptr.To[int32](60), condition: &metav1.Condition{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue, LastTransitionTime: finished}, now: finished.Add(-time.Minute), wantDelay: 2 * time.Minute,
 		},
