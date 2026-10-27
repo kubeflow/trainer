@@ -56,6 +56,23 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 	})
 
 	ginkgo.When("Creating OptimizationJob", func() {
+		optimizationJobWithParameterName := func(parameterName string) func() *trainer.OptimizationJob {
+			return func() *trainer.OptimizationJob {
+				return testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
+					Parameters(trainer.Parameter{
+						Name: parameterName,
+						SearchSpace: &trainer.SearchSpace{
+							Uniform: trainer.UniformSpace{
+								Min: "0.001",
+								Max: "0.1",
+							},
+						},
+					}).
+					NumTrials(1).
+					ParallelTrials(1).
+					Obj()
+			}
+		}
 		ginkgo.DescribeTable("Validate OptimizationJob on creation", func(optimizationJob func() *trainer.OptimizationJob, errorMatcher gomega.OmegaMatcher) {
 			gomega.Expect(k8sClient.Create(ctx, optimizationJob())).Should(errorMatcher)
 		},
@@ -101,42 +118,17 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				testingutil.BeInvalidError()),
+			// Parameter names become environment variables; reject unusable names at admission.
+			ginkgo.Entry("accepts underscore-separated names", optimizationJobWithParameterName("learning_rate"), gomega.Succeed()),
+			ginkgo.Entry("accepts names beginning with underscore", optimizationJobWithParameterName("_lr"), gomega.Succeed()),
+			ginkgo.Entry("accepts alphanumeric names", optimizationJobWithParameterName("batch_size2"), gomega.Succeed()),
+			ginkgo.Entry("accepts uppercase names", optimizationJobWithParameterName("LearningRate"), gomega.Succeed()),
+			ginkgo.Entry("rejects names containing slash", optimizationJobWithParameterName("weight/decay"), testingutil.BeInvalidError()),
+			ginkgo.Entry("rejects names containing spaces", optimizationJobWithParameterName("n layers"), testingutil.BeInvalidError()),
+			ginkgo.Entry("rejects names beginning with a digit", optimizationJobWithParameterName("1learning_rate"), testingutil.BeInvalidError()),
+			ginkgo.Entry("rejects names containing hyphen", optimizationJobWithParameterName("learning-rate"), testingutil.BeInvalidError()),
+			ginkgo.Entry("rejects names containing equals sign", optimizationJobWithParameterName("a=b"), testingutil.BeInvalidError()),
+			ginkgo.Entry("rejects non-ASCII names", optimizationJobWithParameterName("lré"), testingutil.BeInvalidError()),
 		)
 	})
-
-	// Parameter names become environment variables; reject unusable names at admission.
-	ginkgo.DescribeTable("validates parameter names at admission",
-		func(parameterName string, shouldSucceed bool) {
-			job := testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
-				Parameters(trainer.Parameter{
-					Name: parameterName,
-					SearchSpace: &trainer.SearchSpace{
-						Uniform: trainer.UniformSpace{
-							Min: "0.001",
-							Max: "0.1",
-						},
-					},
-				}).
-				NumTrials(1).
-				ParallelTrials(1).
-				Obj()
-			err := k8sClient.Create(ctx, job)
-			if shouldSucceed {
-				gomega.Expect(err).Should(gomega.Succeed())
-			} else {
-				gomega.Expect(err).Should(testingutil.BeInvalidError())
-			}
-		},
-		ginkgo.Entry("accepts underscore-separated names", "learning_rate", true),
-		ginkgo.Entry("accepts names beginning with underscore", "_lr", true),
-		ginkgo.Entry("accepts alphanumeric names", "batch_size2", true),
-		ginkgo.Entry("accepts uppercase names", "LearningRate", true),
-		ginkgo.Entry("rejects names containing slash", "weight/decay", false),
-		ginkgo.Entry("rejects names containing spaces", "n layers", false),
-		ginkgo.Entry("rejects names beginning with a digit", "1learning_rate", false),
-		ginkgo.Entry("rejects names containing hyphen", "learning-rate", false),
-		ginkgo.Entry("rejects names containing equals sign", "a=b", false),
-		ginkgo.Entry("rejects non-ASCII names", "lré", false),
-	)
-
 })
