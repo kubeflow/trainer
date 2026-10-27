@@ -688,6 +688,24 @@ runtime's initializer jobs would otherwise start with no `STORAGE_URI` and fail 
 such as `Initializer.from_hf(model=..., dataset=...)` can come later and would help TorchTune
 users equally; it is not part of this KEP.
 
+##### Kubeflow-owned trainer configs
+
+Kubeflow defines its own config classes. They hold only the TRL fields that Kubeflow supports.
+We do not re-export TRL's config objects, and we do not copy all of their fields.
+
+- **TRL field names.** Each field uses TRL's exact name, for example `beta`, `loss_type` and
+  `num_generations`. A TRL user does not learn new names, and `to_args()` renders each field as
+  the TRL flag with the same name.
+- **A subset.** A field goes into a class only when Kubeflow tests it. Other flags go through
+  `extra_args`.
+- **No TRL import.** The SDK does not depend on the `trl` package. The TRL version is pinned in
+  the runtime image, not in the SDK.
+- **Adding a field.** Adding a field is an additive SDK change. It needs the field, a
+  `to_args()` test, and a check against the pinned TRL version.
+
+This keeps the public SDK API small and stable. When TRL renames or removes a field, only that
+field in the Kubeflow class changes, not the whole surface.
+
 #### Choosing the config shape
 
 Four shapes were considered. The one above is C. The full comparison, with the upstream field
