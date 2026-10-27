@@ -94,10 +94,8 @@ func (j *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 				// Coordinator address - first pod in the headless service
 				*corev1ac.EnvVar().
 					WithName("JAX_COORDINATOR_ADDRESS").
-					WithValue(fmt.Sprintf("%s-%s-0-0.%s:%d",
-						trainJob.Name,
-						constants.Node,
-						trainJob.Name,
+					WithValue(fmt.Sprintf("%s:%d",
+						runtime.NodeCoordinatorHost(info, trainJob.Name),
 						constants.ContainerTrainerPort)),
 			)
 		}

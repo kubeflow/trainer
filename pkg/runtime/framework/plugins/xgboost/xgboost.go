@@ -116,9 +116,8 @@ func (x *XGBoost) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 		}
 		totalWorkers := numNodes * numWorkersPerNode
 
-		// Build tracker URI: <trainjob-name>-node-0-0.<trainjob-name>
-		trackerURI := fmt.Sprintf("%s-%s-0-0.%s",
-			trainJob.Name, constants.Node, trainJob.Name)
+		// Build tracker URI: <trainjob-name>-node-0-0.<subdomain>
+		trackerURI := runtime.NodeCoordinatorHost(info, trainJob.Name)
 
 		// Inject DMLC_* environment variables.
 		apply.UpsertEnvVars(&trainerContainer.Env,

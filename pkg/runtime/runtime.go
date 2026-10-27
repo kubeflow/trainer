@@ -17,6 +17,7 @@ limitations under the License.
 package runtime
 
 import (
+	"fmt"
 	"iter"
 	"maps"
 	"slices"
@@ -324,6 +325,24 @@ func ReplicatedJobReplicas(info *Info, rJobName string) int32 {
 		}
 	}
 	return constants.DefaultJobReplicas
+}
+
+// PodNetworkSubdomain returns the subdomain of the headless Service that provides DNS names
+// for the TrainJob Pods. It is spec.network.subdomain of the JobSet template when set,
+// otherwise the TrainJob name, which is the JobSet default.
+func PodNetworkSubdomain(info *Info, trainJobName string) string {
+	if jobSetSpec, ok := TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info); ok && jobSetSpec != nil {
+		if network := jobSetSpec.Network; network != nil && network.Subdomain != nil {
+			return *network.Subdomain
+		}
+	}
+	return trainJobName
+}
+
+// NodeCoordinatorHost returns the DNS name of the first trainer node Pod (rank 0),
+// which distributed frameworks use as the coordinator address.
+func NodeCoordinatorHost(info *Info, trainJobName string) string {
+	return fmt.Sprintf("%s-%s-0-0.%s", trainJobName, constants.Node, PodNetworkSubdomain(info, trainJobName))
 }
 
 // GetNumGPUPerNode returns the GPU count if found in container resources.

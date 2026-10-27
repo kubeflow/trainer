@@ -334,10 +334,7 @@ func (j *JobSet) syncPodNetwork(info *runtime.Info, trainJob *trainer.TrainJob) 
 	if !ok {
 		return nil
 	}
-	subDomain := trainJob.Name
-	if jobSetNet := spec.Network; jobSetNet != nil && jobSetNet.Subdomain != nil {
-		subDomain = *jobSetNet.Subdomain
-	}
+	subDomain := runtime.PodNetworkSubdomain(info, trainJob.Name)
 	for rJobIdx, rJob := range spec.ReplicatedJobs {
 		rJobReplicas := ptr.Deref(rJob.Replicas, constants.DefaultJobReplicas)
 		perReplica, err := podsPerReplica(info.TemplateSpec.PodSets[rJobIdx].Count, rJobReplicas, ptr.Deref(rJob.Name, ""))
