@@ -26,7 +26,7 @@ kind create cluster # or minikube start
 Run the following command to deploy a released version of Kubeflow Trainer control plane:
 
 ```bash
-export VERSION=v2.1.0
+export VERSION=v2.3.0
 helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
     --namespace kubeflow-system \
     --create-namespace \
@@ -93,7 +93,13 @@ For the latest changes run:
 kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifests/overlays/manager?ref=master"
 ```
 
-Run the following command to deploy Kubeflow Trainer built-in runtimes
+Run the following command to deploy Kubeflow Trainer built-in runtimes:
+
+```bash
+kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifests/overlays/runtimes?ref=${VERSION}"
+```
+
+For the latest changes run:
 
 ```bash
 kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifests/overlays/runtimes?ref=master"

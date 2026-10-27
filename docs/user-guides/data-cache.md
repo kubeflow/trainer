@@ -48,7 +48,7 @@ You need to install the following resources to use data cache:
 Run the following command to install the required resources:
 
 ```bash
-export VERSION=v2.1.0
+export VERSION=v2.3.0
 kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifests/overlays/data-cache?ref=${VERSION}"
 ```
 
