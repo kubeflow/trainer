@@ -903,7 +903,7 @@ config and is chosen with `train(runtime=...)` — no SDK field.
 | CRDs | **No change.** No new or modified fields, no version bump. |
 | Torch plugin | **No change.** Neither `EnforceMLPolicy` nor `Validate` is touched; TRL falls through the default path. A unit test asserts it stays that way. |
 | Plugin registry | **No change.** TRL reuses the torch plugin via `mlPolicy.torch`. |
-| Existing TorchTune runtimes | **No change** in behaviour. Same images and rendered `TrainJob`s. They get the deprecated label when TRL support lands; see [Deprecation](#deprecation). |
+| Existing TorchTune runtimes | **No change** in behaviour. Same images and rendered `TrainJob`s. They get the deprecated label when TRL support lands. See [Deprecation](#deprecation). |
 | Default manifests | **Additive.** A new runtime under a new name; nothing renamed or removed. |
 
 **Client side, Phase 1.** Additive.
@@ -912,7 +912,7 @@ config and is chosen with `train(runtime=...)` — no SDK field.
 |---|---|
 | `CustomTrainer`, `CustomTrainerContainer` | **No change.** All fields retained. |
 | `BuiltinTrainer` | **Construction signature unchanged**; produces byte-identical `TrainJob` arguments for TorchTune. `config` widens to `FrameworkConfig`. Not deprecated in Phase 1. |
-| `TorchTuneConfig` | **No change** to fields or signature; gains two `ClassVar`s, `to_args()` and `to_initializer_args()`. Deprecated with the TorchTune runtimes; see [Deprecation](#deprecation). |
+| `TorchTuneConfig` | **No change** to fields or signature; gains two `ClassVar`s, `to_args()` and `to_initializer_args()`. Deprecated with the TorchTune runtimes. See [Deprecation](#deprecation). |
 | `TrainerClient.train()` | **No change** to the signature. |
 | `TrainJobTemplate` | **No change.** |
 | Python version | No new floor. `kw_only=True` needs 3.10, already the SDK's minimum. |
@@ -1106,6 +1106,10 @@ warning first, and removal no earlier than two SDK minor releases later.
 
 ## Open Questions
 
+**Guiding principle.** For now, this KEP optimises for consistency with TRL. Where a choice is
+open, we pick what TRL does: its trainer names, its field names and its scripts. We revisit
+this when a second config-driven framework is in scope.
+
 1. **Should a runtime report its achieved world size?** The largest gap left open, and not
    TRL-specific. The `trl-demo` failure exited 0 on both pods, so a two-node job that trained
    two isolated copies was indistinguishable from one that trained jointly. torchrun-first
@@ -1116,10 +1120,13 @@ warning first, and removal no earlier than two SDK minor releases later.
    without it, "the TrainJob succeeded" is not evidence that distributed training happened.
    [KEP-2779](../2779-trainjob-progress/README.md) already establishes a runtime→status channel
    this could reuse.
-2. **Does dynamic registration extend to the control plane?** *Partly answered.* The registry is
-   SDK-side and stays there — the server side shows a new runtime needs no control-plane
-   registration at all, only an image and a manifest. Open: whether the Trainer should
-   *provision* runtimes for frameworks it does not ship (e.g. from a catalog CR).
+2. **How far does dynamic registration go?** *Partly answered.* The SDK registry in this KEP
+   is explicit: importing a config registers it. The server side shows that a new runtime needs
+   no control-plane registration, only an image and a manifest. Open:
+   - Should the SDK discover frameworks automatically, for example through Python entry
+     points, instead of by import?
+   - Should the Trainer *provision* runtimes for frameworks it does not ship, for example from
+     a catalog CR?
 3. **Should accelerate get its own plugin later?** The launcher-only options in
    [What torchrun gives up](#what-torchrun-gives-up) — an accelerate config file per job, the
    Megatron-LM plugin, TPU — are the reasons the question will return. The position from the SDK
@@ -1139,6 +1146,24 @@ warning first, and removal no earlier than two SDK minor releases later.
    carrying no stability promise.
 6. **Does a compute-profile runtime axis appear for GRPO?** GRPO rollouts can use a vLLM server,
    which may justify a second TRL runtime. Deferred until there is a working GRPO E2E to measure.
+7. **Which frameworks after TRL?** This KEP ships only TRL in tree. LlamaFactory, Axolotl and
+   Unsloth are candidates (see [Which framework, and why TRL](#which-framework-and-why-trl)).
+   Open: which of them, if any, Kubeflow ships in tree, and which stay out of tree as a
+   `FrameworkConfig` subclass. An open point from the call: Unsloth may fit better as an option
+   of the TRL runtime than as a separate framework.
+8. **Which TRL trainers after SFT, DPO and GRPO?** TRL also has stable `RewardTrainer` and
+   `RLOOTrainer`, each with a `trl/scripts/` module. `KTOTrainer` is exported at the top level,
+   but a copy also exists under `trl/experimental/`, so its status needs a check. ORPO is
+   experimental. Open: which of these Kubeflow adds, and when.
+9. **Are the `*Trainer` slot names final?** The call chose TRL's trainer names (`DPOTrainer`).
+   Two clashes are known (see [Naming the slot: `trainer`](#naming-the-slot-trainer)):
+   `trl.DPOTrainer` in the same notebook, and the SDK's `*Trainer` suffix for objects passed to
+   `train(trainer=...)`. The fallback is `*Config` names such as `TRLDPOConfig`. This needs a
+   decision before the first release, because public names are frozen once shipped.
+10. **Is the Phase 2 deprecation rule right?** The SDK has no written policy for breaking
+    changes. This KEP proposes a warning first, and removal no earlier than two SDK minor
+    releases later (see [Phase 2](#phase-2-the-move-to-configtrainer)). Maintainers should
+    confirm the rule or point to a better one.
 
 ## Implementation History
 
@@ -1160,6 +1185,11 @@ warning first, and removal no earlier than two SDK minor releases later.
   trainer hierarchy inherited from sdk#285; give `TRLConfig` a typed per-method slot instead of
   a flat config with a method enum; do **not** mirror TorchTune's per-model-family runtime
   layout, since the model family is not a TRL axis.
+- **2026-10**: reviewed on the Kubeflow Trainer community call, with the goal to merge in
+  November. Agreed: Phase 1 ships TRL through `BuiltinTrainer`, and the `ConfigTrainer`
+  refactor is Phase 2 or a follow-up KEP. TRL is not supported in both trainers. The slot uses
+  TRL's trainer names (`trainer=DPOTrainer(...)`). Kubeflow owns its config classes, with a
+  subset of TRL's fields. TorchTune is deprecated once TRL lands. The server side is unchanged.
 
 ## Drawbacks
 
