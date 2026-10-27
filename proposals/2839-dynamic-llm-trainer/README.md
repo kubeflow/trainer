@@ -878,7 +878,7 @@ config and is chosen with `train(runtime=...)` — no SDK field.
 | CRDs | **No change.** No new or modified fields, no version bump. |
 | Torch plugin | **No change.** Neither `EnforceMLPolicy` nor `Validate` is touched; TRL falls through the default path. A unit test asserts it stays that way. |
 | Plugin registry | **No change.** TRL reuses the torch plugin via `mlPolicy.torch`. |
-| Existing TorchTune runtimes | **No change.** Same images, manifests, rendered `TrainJob`s. |
+| Existing TorchTune runtimes | **No change** in behaviour. Same images and rendered `TrainJob`s. They get the deprecated label when TRL support lands; see [Deprecation](#deprecation). |
 | Default manifests | **Additive.** A new runtime under a new name; nothing renamed or removed. |
 
 **Client side, Phase 1.** Additive.
@@ -887,7 +887,7 @@ config and is chosen with `train(runtime=...)` — no SDK field.
 |---|---|
 | `CustomTrainer`, `CustomTrainerContainer` | **No change.** All fields retained. |
 | `BuiltinTrainer` | **Construction signature unchanged**; produces byte-identical `TrainJob` arguments for TorchTune. `config` widens to `FrameworkConfig`. Not deprecated in Phase 1. |
-| `TorchTuneConfig` | **No change** to fields or signature; gains two `ClassVar`s, `to_args()` and `to_initializer_args()`. |
+| `TorchTuneConfig` | **No change** to fields or signature; gains two `ClassVar`s, `to_args()` and `to_initializer_args()`. Deprecated with the TorchTune runtimes; see [Deprecation](#deprecation). |
 | `TrainerClient.train()` | **No change** to the signature. |
 | `TrainJobTemplate` | **No change.** |
 | Python version | No new floor. `kw_only=True` needs 3.10, already the SDK's minimum. |
@@ -1053,6 +1053,31 @@ follow-up KEP. It does not block any C phase.
 - At least one community `FrameworkConfig` subclass in the wild.
 - A runtime can report its achieved world size to `TrainJob` status, so a silently degraded run
   is observable (see [Open Questions](#open-questions)).
+
+#### Deprecation
+
+**TorchTune is deprecated when TRL support lands**, because TorchTune is end-of-life. Upstream
+stopped active development on 15 July 2025. It promised only critical bug fixes and security
+patches during 2025, and no new features
+([torchtune#2883](https://github.com/meta-pytorch/torchtune/issues/2883)).
+
+"TRL support lands" means the TRL alpha criteria above are met. At that point, the
+deprecation follows the
+[Runtime Deprecation Policy](https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/):
+
+1. The TorchTune `ClusterTrainingRuntime`s under `manifests/base/runtimes/torchtune/` get the
+   label `trainer.kubeflow.org/support: "deprecated"`.
+2. The Trainer release notes list the deprecation as a breaking change.
+3. The validation webhook warns when a deprecated runtime is deployed, and when a TrainJob
+   uses one. This warning exists today.
+4. The SDK warns when a deprecated runtime is listed or used. This warning does not exist
+   yet. It is follow-up work for the deprecation, and it does not block TRL.
+5. The TorchTune runtimes can be removed two Trainer minor releases after the deprecation, not
+   earlier.
+
+`TorchTuneConfig` stays in the SDK until its runtimes are removed. It then follows the same
+SDK rule as `BuiltinTrainer` in [Phase 2](#phase-2-the-move-to-configtrainer): a deprecation
+warning first, and removal no earlier than two SDK minor releases later.
 
 ## Open Questions
 
