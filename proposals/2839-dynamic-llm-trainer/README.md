@@ -60,6 +60,31 @@ group-relative policy optimization (GRPO) are the techniques users are asking fo
 ([#3508](https://github.com/kubeflow/trainer/issues/3508)), and the Trainer has no surface for
 either.
 
+### Why TRL support is worth having
+
+These are the practical cases that TRL support solves. The user stories in
+[Proposal](#user-stories) show the SDK calls.
+
+1. **Alignment on preference data.** A team has pairs of chosen and rejected answers and wants
+   to align a chat model with DPO. Today, the Trainer has no supported way to do this, so the
+   team must write, build and maintain its own training image. With TRL, the team writes a
+   `DPOTrainer` config and uses the runtime that Kubeflow ships.
+2. **Reward-based training for reasoning.** A team wants to train a model on math or code
+   tasks with GRPO and a reward function. This is the request in #3508. The community PR
+   [#3718](https://github.com/kubeflow/trainer/pull/3718) shows the cost today: it adds a
+   separate GRPO image with its own `train.py`. With TRL, the same job is one `GRPOTrainer`
+   config on one shared runtime.
+3. **A supported path off TorchTune.** A team runs SFT with `TorchTuneConfig` today. TorchTune
+   is end-of-life, so the team needs a maintained framework for the same job. With TRL, the
+   team keeps `BuiltinTrainer` and the `Initializer`, and changes only the config.
+4. **One stack for platform teams.** A platform team supports many data scientists. It wants
+   one maintained post-training runtime for SFT, DPO and GRPO, not one custom image per
+   technique. TRL gives one image and one `ClusterTrainingRuntime` for all three.
+
+TRL is the most direct way to get these. It is maintained by Hugging Face, it has one script
+per trainer, and other frameworks such as Axolotl use its trainers internally (see
+[Which framework, and why TRL](#which-framework-and-why-trl)).
+
 ### Goals
 
 **Server side**
