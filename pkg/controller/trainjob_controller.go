@@ -285,7 +285,7 @@ func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJo
 func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
 	b := builder.TypedControllerManagedBy[reconcile.Request](mgr).
 		Named("trainjob_controller").
-		WithOptions(options).
+		WithOptions(withGroupKindConcurrency(mgr, trainer.TrainJobKind, options)).
 		WatchesRawSource(source.TypedKind(
 			mgr.GetCache(),
 			&trainer.TrainJob{},
@@ -300,4 +300,14 @@ func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager, options controll
 		}
 	}
 	return b.Complete(r)
+}
+
+// withGroupKindConcurrency applies the manager's groupKindConcurrency for kind, since the
+// controller builder only does that for controllers built with For().
+func withGroupKindConcurrency(mgr ctrl.Manager, kind string, options controller.Options) controller.Options {
+	if options.MaxConcurrentReconciles == 0 {
+		gk := trainer.SchemeGroupVersion.WithKind(kind).GroupKind().String()
+		options.MaxConcurrentReconciles = mgr.GetControllerOptions().GroupKindConcurrency[gk]
+	}
+	return options
 }
