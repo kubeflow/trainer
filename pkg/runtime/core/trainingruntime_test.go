@@ -2715,6 +2715,67 @@ func TestTrainingRuntimeValidateObjects(t *testing.T) {
 				}, ""),
 			},
 		},
+		"patch[0] adds volume and patch[1] mounts it - real merge validates successfully": {
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches([]trainer.RuntimePatch{
+					{
+						Manager: "test.io/volume-manager",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: "node",
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														Volumes: []corev1.Volume{{
+															Name: "shared-data",
+															VolumeSource: corev1.VolumeSource{
+																EmptyDir: &corev1.EmptyDirVolumeSource{},
+															},
+														}},
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+					{
+						Manager: "test.io/mount-manager",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: "node",
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														Containers: []trainer.ContainerPatch{{
+															Name: "node",
+															VolumeMounts: []corev1.VolumeMount{
+																{Name: "shared-data", MountPath: "/data"},
+															},
+														}},
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+				}).
+				Obj(),
+			existingRuntime: validRuntime,
+			wantErrs:        nil,
+		},
 	}
 
 	for name, tc := range cases {

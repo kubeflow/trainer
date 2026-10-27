@@ -2551,7 +2551,7 @@ func TestValidate(t *testing.T) {
 					fmt.Sprintf("container %q in job %q references resourceClaim %q which is not defined in the Pod's resourceClaims", constants.Node, constants.Node, "nic")),
 			},
 		},
-		"runtimePatches with volumeMount referencing non-existent volume is rejected": {
+		"runtimePatches can mount plugin-managed volumes like mpi-ssh-auth": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
 					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
@@ -2568,9 +2568,6 @@ func TestValidate(t *testing.T) {
 												Containers: []corev1ac.ContainerApplyConfiguration{
 													{
 														Name: ptr.To(constants.Node),
-														VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
-															{Name: ptr.To("non-existent"), MountPath: ptr.To("/data")},
-														},
 													},
 												},
 											},
@@ -2598,7 +2595,8 @@ func TestValidate(t *testing.T) {
 														Containers: []trainer.ContainerPatch{{
 															Name: constants.Node,
 															VolumeMounts: []corev1.VolumeMount{
-																{Name: "non-existent", MountPath: "/data"},
+																{Name: "mpi-ssh-auth", MountPath: "/etc/mpi/ssh"},
+																{Name: "mpi-hostfile", MountPath: "/etc/mpi/hostfile"},
 															},
 														}},
 													},
@@ -2611,9 +2609,6 @@ func TestValidate(t *testing.T) {
 						},
 					},
 				}).Obj(),
-			wantError: field.ErrorList{
-				field.NotFound(runtimePatchesPath.Index(0).Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).Child("template", "spec", "template", "spec", "containers").Index(0).Child("volumeMounts").Index(0).Child("name"), "non-existent"),
-			},
 		},
 		"runtimePatches with empty mountPath is rejected": {
 			info: &runtime.Info{
@@ -3251,7 +3246,7 @@ func TestValidate(t *testing.T) {
 														Containers: []trainer.ContainerPatch{{
 															Name: constants.Node,
 															VolumeMounts: []corev1.VolumeMount{
-																{Name: "non-existent", MountPath: "/bad"},
+																{Name: "vol1", MountPath: ""},
 															},
 														}},
 													},
@@ -3265,74 +3260,7 @@ func TestValidate(t *testing.T) {
 					},
 				}).Obj(),
 			wantError: field.ErrorList{
-				field.NotFound(runtimePatchesPath.Index(1).Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).Child("template", "spec", "template", "spec", "containers").Index(0).Child("volumeMounts").Index(0).Child("name"), "non-existent"),
-			},
-		},
-		"runtimePatches with initContainer volumeMount referencing missing volume is rejected": {
-			info: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
-						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
-							{
-								Name: ptr.To(constants.Node),
-								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
-									Spec: &batchv1ac.JobSpecApplyConfiguration{
-										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
-											Spec: &corev1ac.PodSpecApplyConfiguration{
-												Volumes: []corev1ac.VolumeApplyConfiguration{
-													{Name: ptr.To("vol1")},
-												},
-												InitContainers: []corev1ac.ContainerApplyConfiguration{
-													{
-														Name: ptr.To("init"),
-														VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
-															{Name: ptr.To("missing-vol"), MountPath: ptr.To("/init")},
-														},
-													},
-												},
-												Containers: []corev1ac.ContainerApplyConfiguration{
-													{Name: ptr.To(constants.Node)},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimePatches([]trainer.RuntimePatch{
-					{
-						Manager: "test.io/manager",
-						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
-							Template: &trainer.JobSetTemplatePatch{
-								Spec: &trainer.JobSetSpecPatch{
-									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
-										Name: constants.Node,
-										Template: &trainer.JobTemplatePatch{
-											Spec: &trainer.JobSpecPatch{
-												Template: &trainer.PodTemplatePatch{
-													Spec: &trainer.PodSpecPatch{
-														InitContainers: []trainer.ContainerPatch{{
-															Name: "init",
-															VolumeMounts: []corev1.VolumeMount{
-																{Name: "missing-vol", MountPath: "/init"},
-															},
-														}},
-													},
-												},
-											},
-										},
-									}},
-								},
-							},
-						},
-					},
-				}).Obj(),
-			wantError: field.ErrorList{
-				field.NotFound(runtimePatchesPath.Index(0).Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).Child("template", "spec", "template", "spec", "initContainers").Index(0).Child("volumeMounts").Index(0).Child("name"), "missing-vol"),
+				field.Required(runtimePatchesPath.Index(1).Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).Child("template", "spec", "template", "spec", "containers").Index(0).Child("volumeMounts").Index(0).Child("mountPath"), ""),
 			},
 		},
 		"runtimePatches with toleration having NoExecute effect passes": {

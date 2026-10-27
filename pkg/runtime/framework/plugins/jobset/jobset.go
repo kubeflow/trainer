@@ -243,7 +243,8 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	}
 
 	// Validate volumeMounts and tolerations introduced by runtime patches.
-	allErrs = append(allErrs, j.validateMergedRuntimePatches(jobSetSpec, runtimePatchesPath, newObj)...)
+	allErrs = append(allErrs, validateRuntimePatchesPodSpec(jobSetSpec, runtimePatchesPath, newObj)...)
+
 	// numNodes is the total number of nodes across all trainer replicas, so it must be
 	// divisible by replicas to have the same number of nodes in every replicated Job.
 	if trainerReplicas := runtime.TrainerReplicas(info); trainerReplicas > 1 {
@@ -260,10 +261,10 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	return nil, allErrs
 }
 
-// validateMergedRuntimePatches validates volumeMounts and tolerations introduced by each runtime patch.
+// validateRuntimePatchesPodSpec validates volumeMounts and tolerations introduced by each runtime patch.
 // VolumeMounts are checked against the volumes of the merged JobSet spec, so a patch can mount volumes
 // defined in the runtime template or in any runtime patch.
-func (j *JobSet) validateMergedRuntimePatches(jobSetSpec *jobsetv1alpha2ac.JobSetSpecApplyConfiguration, runtimePatchesPath *field.Path, trainJob *trainer.TrainJob) field.ErrorList {
+func validateRuntimePatchesPodSpec(jobSetSpec *jobsetv1alpha2ac.JobSetSpecApplyConfiguration, runtimePatchesPath *field.Path, trainJob *trainer.TrainJob) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if len(trainJob.Spec.RuntimePatches) == 0 {
@@ -348,7 +349,10 @@ func (j *JobSet) validateMergedRuntimePatches(jobSetSpec *jobsetv1alpha2ac.JobSe
 }
 
 // validateVolumeMountsPatch validates volumeMounts in containers (or initContainers).
-// It checks that volumeMounts reference existing volumes, have non-empty mountPath, and no duplicate mountPaths.
+// It checks that volumeMounts have non-empty mountPath and no duplicate mountPaths.
+// Note: Volume existence is not validated here because plugins may inject volumes during
+// the EnforceMLPolicy stage (after ValidateObjects). Kubernetes will validate volume
+// references when the Pod is created.
 func validateVolumeMountsPatch(fldPath *field.Path, containers []trainer.ContainerPatch, volumeNames sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 
@@ -357,10 +361,6 @@ func validateVolumeMountsPatch(fldPath *field.Path, containers []trainer.Contain
 		mountPaths := sets.New[string]()
 		for l, vm := range container.VolumeMounts {
 			volumeMountPath := containerPath.Child("volumeMounts").Index(l)
-			// Validate volumeMount references an existing volume
-			if !volumeNames.Has(vm.Name) {
-				allErrs = append(allErrs, field.NotFound(volumeMountPath.Child("name"), vm.Name))
-			}
 			// Validate mountPath is not empty
 			if vm.MountPath == "" {
 				allErrs = append(allErrs, field.Required(volumeMountPath.Child("mountPath"), ""))
