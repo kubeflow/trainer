@@ -25,11 +25,19 @@ with no translation. The `trl` CLI is not used: it hands off to `accelerate laun
 not read `PET_*` and degrades to single-process training while still reporting success. That
 failure is recorded as a limitation, and supporting accelerate is deferred.
 
-**Client side (`kubeflow/sdk`).** One additive change: `FrameworkConfig`, an abstract config
-that knows its framework label, its entrypoint and how to render itself as arguments, plus a
-registry keyed on the framework label. `TorchTuneConfig` becomes an instance of it and
-`BuiltinTrainer.config` widens from the concrete `TorchTuneConfig` to `FrameworkConfig`. TRL
-then arrives as `TRLConfig`, carrying a typed per-method config in its `method` slot.
+**Client side (`kubeflow/sdk`).** The client work has two phases.
+
+- **Phase 1 (this KEP).** TRL ships through the existing `BuiltinTrainer`, next to
+  `TorchTuneConfig`. We add `FrameworkConfig`, an abstract config that knows its framework
+  label, its entrypoint and how to render itself as arguments. We also add a registry keyed on
+  the framework label. `TorchTuneConfig` becomes a `FrameworkConfig`, and
+  `BuiltinTrainer.config` widens from `TorchTuneConfig` to `FrameworkConfig`. TRL arrives as
+  `TRLConfig`. Its typed `trainer` slot holds a Kubeflow-owned trainer config, such as
+  `DPOTrainer`.
+- **Phase 2 (later, or a follow-up KEP).** The SDK moves to the `BaseTrainer` /
+  `ConfigTrainer` / `FuncTrainer` hierarchy. TRL then moves from `BuiltinTrainer` to
+  `ConfigTrainer`. This is a breaking change for users. See
+  [Phase 2: the move to `ConfigTrainer`](#phase-2-the-move-to-configtrainer).
 
 The contract between the two sides already exists and is narrow: the framework label, and the
 container `command` the SDK appends rendered arguments to. The runtime is usable from raw YAML
@@ -73,8 +81,9 @@ either.
    model with no new trainer class.
 6. Provide an extension point for community config-driven frameworks — a `FrameworkConfig`
    subclass in any package, registered by import.
-7. Keep 100% backward compatibility with `CustomTrainer`, `CustomTrainerContainer`,
-   `BuiltinTrainer` and `TrainerClient.train()`.
+7. In Phase 1, keep full backward compatibility with `CustomTrainer`,
+   `CustomTrainerContainer`, `BuiltinTrainer` and `TrainerClient.train()`. Phase 2 is the only
+   planned breaking change, and this KEP documents it in advance.
 
 ### Non-Goals
 
@@ -90,13 +99,14 @@ either.
    [Limitation: the TRL CLI and `accelerate launch`](#limitation-the-trl-cli-and-accelerate-launch)
    for why it is excluded and [Open Questions](#open-questions) for what taking it up would
    involve.
-5. **A general SDK trainer hierarchy.** An earlier draft of this KEP, inherited from
-   [sdk#285](https://github.com/kubeflow/sdk/issues/285), also proposed `BaseTrainer` /
-   `FuncTrainer` / `ConfigTrainer`, per-framework trainer classes (`TorchTrainer`,
-   `DeepSpeedTrainer`, `JAXTrainer`, `XGBoostTrainer`), `RuntimeConfig` and runtime
-   auto-discovery. None of that is needed to land TRL, and it is removed here so this KEP
-   covers one feature. It remains tracked in sdk#285.
-6. **Deprecating `CustomTrainer` or `BuiltinTrainer`.** Both stay supported, unchanged.
+5. **The SDK trainer hierarchy in Phase 1.** The `BaseTrainer` / `FuncTrainer` /
+   `ConfigTrainer` refactor from [sdk#285](https://github.com/kubeflow/sdk/issues/285) is
+   Phase 2. It is done later in this KEP or in a follow-up KEP. TRL does not need it to ship.
+   The per-framework trainer classes (`TorchTrainer`, `DeepSpeedTrainer`, `JAXTrainer`,
+   `XGBoostTrainer`), `RuntimeConfig` and runtime auto-discovery stay tracked in sdk#285.
+6. **Deprecating `CustomTrainer` or `BuiltinTrainer` in Phase 1.** Both stay supported and
+   unchanged in Phase 1. Phase 2 replaces `BuiltinTrainer` with `ConfigTrainer`. See
+   [Phase 2: the move to `ConfigTrainer`](#phase-2-the-move-to-configtrainer).
 7. **In-tree Axolotl, LlamaFactory or Unsloth runtimes.** Only TRL is proposed here; further
    frameworks are follow-up work reached through the same extension point.
 8. **Changes to `TrainJobTemplate`.**
@@ -426,6 +436,22 @@ image.
 
 ### Client Side (`kubeflow/sdk`)
 
+#### Phases
+
+| Phase | Trainer class | What ships |
+|---|---|---|
+| **Phase 1** (this KEP) | `BuiltinTrainer` | `FrameworkConfig`, the registry, and `TRLConfig` next to `TorchTuneConfig` |
+| **Phase 2** (later, or a follow-up KEP) | `ConfigTrainer` | The `BaseTrainer` / `ConfigTrainer` / `FuncTrainer` hierarchy from sdk#285 |
+
+Phase 1 gives users TRL now. It does not wait for the hierarchy refactor, and the refactor does
+not block it. The rest of this section describes Phase 1.
+
+**TRL is not supported in both `BuiltinTrainer` and `ConfigTrainer`.** When Phase 2 ships,
+`TRLConfig` moves to `ConfigTrainer`, and `BuiltinTrainer` stops accepting it. The SDK does not
+keep two code paths for one framework. Users who start with TRL in Phase 1 must change their
+code in Phase 2. [Phase 2: the move to `ConfigTrainer`](#phase-2-the-move-to-configtrainer)
+shows the change.
+
 #### Current limitations
 
 `BuiltinTrainer` has a single field, `config: TorchTuneConfig`. TorchTune is hardcoded at four
@@ -717,7 +743,7 @@ same notebook. It also lets `LlamaFactorySFTConfig` land later without asymmetry
 
 #### Wiring it up
 
-`BuiltinTrainer` stays exactly where it is and keeps its construction signature; only its
+In Phase 1, `BuiltinTrainer` stays where it is and keeps its construction signature. Only its
 `config` field widens from `TorchTuneConfig` to `FrameworkConfig`. Both entry points then
 accept any framework:
 
@@ -808,17 +834,60 @@ config and is chosen with `train(runtime=...)` — no SDK field.
 | Existing TorchTune runtimes | **No change.** Same images, manifests, rendered `TrainJob`s. |
 | Default manifests | **Additive.** A new runtime under a new name; nothing renamed or removed. |
 
-**Client side.** Additive.
+**Client side, Phase 1.** Additive.
 
 | Aspect | Impact |
 |---|---|
 | `CustomTrainer`, `CustomTrainerContainer` | **No change.** All fields retained. |
-| `BuiltinTrainer` | **Construction signature unchanged**; produces byte-identical `TrainJob` arguments for TorchTune. `config` widens to `FrameworkConfig`. Nothing deprecated. |
+| `BuiltinTrainer` | **Construction signature unchanged**; produces byte-identical `TrainJob` arguments for TorchTune. `config` widens to `FrameworkConfig`. Not deprecated in Phase 1. |
 | `TorchTuneConfig` | **No change** to fields or signature; gains two `ClassVar`s, `to_args()` and `to_initializer_args()`. |
 | `TrainerClient.train()` | **No change** to the signature. |
 | `TrainJobTemplate` | **No change.** |
 | Python version | No new floor. `kw_only=True` needs 3.10, already the SDK's minimum. |
 | Public exports | New names only: `FrameworkConfig`, `TRLConfig`, `TRLMethodConfig`, `TRLSFTConfig`, `TRLDPOConfig`, `TRLGRPOConfig`. Nothing removed or renamed. |
+
+#### Phase 2: the move to `ConfigTrainer`
+
+Phase 2 is a **breaking change** for SDK users. `BuiltinTrainer` is replaced by
+`ConfigTrainer`. A config that works with `BuiltinTrainer` in Phase 1 must move to
+`ConfigTrainer`:
+
+```python
+# Phase 1
+TrainerClient().train(
+    initializer=initializer,
+    trainer=BuiltinTrainer(config=TRLConfig(...)),
+)
+
+# Phase 2
+TrainerClient().train(
+    initializer=initializer,
+    trainer=ConfigTrainer(config=TRLConfig(...)),
+)
+```
+
+What users must change:
+
+- Replace `BuiltinTrainer` with `ConfigTrainer`. The config object stays the same.
+- TorchTune users make the same change, as long as TorchTune is still supported (see
+  [Deprecation](#deprecation)).
+
+What does not change:
+
+- `TRLConfig`, its `trainer` slot and its fields.
+- The runtime, the framework label and the rendered `TrainJob`.
+
+The SDK has no written policy for breaking API changes. `RELEASE.md` only defines version
+numbers, and the SDK is at `0.x`. This KEP proposes this rule for Phase 2:
+
+1. The release that adds `ConfigTrainer` also makes `BuiltinTrainer` show a deprecation
+   warning.
+2. `BuiltinTrainer` stays for at least two SDK minor releases after that release. This is the
+   same window as the Trainer's runtime deprecation policy.
+3. After that, a minor release can remove `BuiltinTrainer`.
+
+The Phase 2 design (class names, fields, the `FuncTrainer` side) is decided in Phase 2, not
+here.
 
 ### Test Plan
 
@@ -906,6 +975,9 @@ image with no manifest is unreachable.
 
 C1 is a pure refactor with no behaviour change, so it can merge on its own; C2 is what makes
 TRL reachable from Python.
+
+C1 to C3 are Phase 1. Phase 2 (`ConfigTrainer`) is planned after them, in this KEP or a
+follow-up KEP. It does not block any C phase.
 
 ### Graduation Criteria
 
@@ -1003,6 +1075,10 @@ TRL reachable from Python.
   alternative is a branch per framework in shared code, which is what this replaces.
 - **Two repositories must stay in step** on the framework label and the launch shape. One
   integration test asserts the contract, but it can only run where both are installed.
+- **Phase 1 TRL users must change their code in Phase 2.** TRL is not supported in both
+  `BuiltinTrainer` and `ConfigTrainer`, so these users must replace `BuiltinTrainer` with
+  `ConfigTrainer`. We accept this cost because users get TRL now, without waiting for the
+  refactor. The change is one class name, and the config stays the same.
 
 ## Alternatives
 
@@ -1033,8 +1109,9 @@ moving a field into `config.model` later is a breaking change.
 The trainer does nothing different per framework — it hands `command` and `to_args()` to the
 backend — so a subclass per framework would encode in the type hierarchy a distinction that
 exists only in data. It also makes every framework a new exported class name and frozen public
-API, and forces `BuiltinTrainer` onto a deprecation path toward a `TorchTuneTrainer` successor
-for no behaviour change. *What it gets right:* typed per-framework fields and a flatter call.
+API. It would also deprecate `BuiltinTrainer` for a `TorchTuneTrainer` successor, with no
+change in behaviour. Phase 2 replaces `BuiltinTrainer` too, but with one `ConfigTrainer` for
+all config-driven frameworks, not one class per framework. *What it gets right:* typed per-framework fields and a flatter call.
 The accepted design keeps the typed fields — on the config — at the cost of one level of
 nesting.
 
