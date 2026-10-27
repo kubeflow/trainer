@@ -7,7 +7,24 @@ Shared resources for AI coding agents working on Kubeflow Trainer.
 ├── docs/       # Reference docs (Kubernetes API conventions)
 └── skills/     # Agent skills
     ├── add-new-crd/
+    ├── approve-dependabot-prs/
     └── review-pr/
+```
+
+## approve-dependabot-prs
+
+Approves open Dependabot PRs whose CI is green. The skill submits a GitHub **Approve** review with
+`/lgtm` and `/approve` in the review body, so Prow adds the `lgtm` and `approved` labels. PRs with
+failing, cancelled, or running checks are skipped and reported with the reason.
+
+```
+/approve-dependabot-prs
+```
+
+To use it in Claude Code, symlink it the same way as [review-pr](#configure-for-claude-code):
+
+```bash
+ln -s ../../.agents/skills/approve-dependabot-prs .claude/skills/approve-dependabot-prs
 ```
 
 ## review-pr
