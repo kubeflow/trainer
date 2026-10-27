@@ -136,6 +136,26 @@ LOCAL_RANK: 0
 ...
 ```
 
+### Understanding Launcher-as-Worker and Node Sizing
+
+In distributed runtimes using the MPI execution model (such as DeepSpeed), the execution environment consists of two replicated jobs:
+1. **`launcher`**: Coordinates distributed execution by discovering endpoints, generating the OpenMPI hostfile, and invoking `mpirun`.
+2. **`node`**: Worker pods running an OpenSSH daemon (`sshd`) that accept commands executed remotely by the launcher.
+
+#### How `runLauncherAsNode: true` Works
+
+In distributed DeepSpeed, the node initiating `mpirun` also participates directly as a training compute node (Worker-1 / Rank 0). Kubeflow Trainer configures this pattern using `runLauncherAsNode: true` in the runtime `mlPolicy`:
+
+- **Rank 0 on Launcher:** The `launcher` pod is assigned `resourcesPerNode` (GPUs) and acts as Worker-1 in the MPI hostfile with slots equal to the requested GPU count.
+- **Automatic Replica Deduction:** When requesting `numNodes: N` in `spec.trainer.numNodes`, Trainer automatically calculates the worker `node` replica count as:
+  $$\text{Worker Nodes} = \max(\text{numNodes} - 1, 1)$$
+- **Total Compute Nodes:** Exactly $1 \text{ (Launcher)} + (N - 1) \text{ (Workers)} = N \text{ nodes}$. This ensures your total allocated GPU nodes match `spec.trainer.numNodes` without provisioning an additional idle launcher pod.
+
+#### Field Propagation Across Pods
+
+- **`trainer.image`**: Propagated to **both** the `launcher` and worker `node` pods, ensuring all nodes share identical Python libraries, CUDA dependencies, and model code.
+- **`trainer.command` and `trainer.args`**: Applied **only** to the `launcher` pod to execute `mpirun`. Worker `node` pods retain their SSH daemon command (`/usr/sbin/sshd`) to wait for instructions over SSH.
+
 ## Create TrainJob with DeepSpeed Training
 
 ### Configure DeepSpeed Training Function
