@@ -30,7 +30,7 @@ import (
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
-func TestValidateCreateOptimizationJob(t *testing.T) {
+func TestOptimizationJobValidateCreate(t *testing.T) {
 	cases := map[string]struct {
 		featureGates featuregatetesting.FeatureOverrides
 		wantError    field.ErrorList
