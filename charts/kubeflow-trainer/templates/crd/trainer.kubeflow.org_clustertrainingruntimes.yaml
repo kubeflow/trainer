@@ -9512,17 +9512,16 @@ spec:
               rule: '!has(self.template) || !has(self.template.spec) || !has(self.template.spec.ttlSecondsAfterFinished)'
             - message: Job ttlSecondsAfterFinished must be unset; use runPolicy instead
               rule: '!has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs)
-                || self.template.spec.replicatedJobs.all(rj, !has(rj.template) ||
-                !has(rj.template.spec) || !has(rj.template.spec.ttlSecondsAfterFinished))'
+                || self.template.spec.replicatedJobs.all(rj, !has(rj.template.spec)
+                || !has(rj.template.spec.ttlSecondsAfterFinished))'
             - message: Job activeDeadlineSeconds must be unset; use runPolicy instead
               rule: '!has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs)
-                || self.template.spec.replicatedJobs.all(rj, !has(rj.template) ||
-                !has(rj.template.spec) || !has(rj.template.spec.activeDeadlineSeconds))'
+                || self.template.spec.replicatedJobs.all(rj, !has(rj.template.spec)
+                || !has(rj.template.spec.activeDeadlineSeconds))'
             - message: Pod activeDeadlineSeconds must be unset; use runPolicy instead
               rule: '!has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs)
-                || self.template.spec.replicatedJobs.all(rj, !has(rj.template) ||
-                !has(rj.template.spec) || !has(rj.template.spec.template) || !has(rj.template.spec.template.spec)
-                || !has(rj.template.spec.template.spec.activeDeadlineSeconds))'
+                || self.template.spec.replicatedJobs.all(rj, !has(rj.template.spec)
+                || !has(rj.template.spec.template.spec) || !has(rj.template.spec.template.spec.activeDeadlineSeconds))'
         type: object
     served: true
     storage: true

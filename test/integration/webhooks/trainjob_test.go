@@ -129,14 +129,12 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 				Obj()
 			job.Spec.TTLSecondsAfterFinished = ptr.To[int32](60)
 			gomega.Expect(k8sClient.Create(ctx, job)).Should(gomega.Succeed())
-			job.Status.StartTime = ptr.To(metav1.Now())
 			job.Status.Conditions = []metav1.Condition{{
 				Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue,
 				Reason: "Completed", Message: "Training completed", LastTransitionTime: metav1.Now(),
 			}}
 			gomega.Expect(k8sClient.Status().Update(ctx, job)).Should(gomega.Succeed())
 			gomega.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(job), job)).Should(gomega.Succeed())
-			gomega.Expect(job.Status.StartTime).ShouldNot(gomega.BeNil())
 			job.Spec.TTLSecondsAfterFinished = ttl
 			gomega.Expect(k8sClient.Update(ctx, job)).Should(errorMatcher)
 		},

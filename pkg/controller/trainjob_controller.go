@@ -94,10 +94,7 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	if trainjob.IsManagedByExternalController(&trainJob) {
 		log.V(2).Info("Skipping TrainJob managed by a custom controller", "managedBy", ptr.Deref(trainJob.Spec.ManagedBy, ""))
-		if trainjob.IsTrainJobFinished(&trainJob) {
-			return r.reconcileTTL(ctx, &trainJob, trainJob.Spec.TTLSecondsAfterFinished)
-		}
-		return ctrl.Result{}, nil
+		return r.reconcileTTL(ctx, &trainJob, trainJob.Spec.TTLSecondsAfterFinished)
 	}
 
 	var err error
