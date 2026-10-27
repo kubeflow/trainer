@@ -645,6 +645,8 @@ func MakeOptimizationJobWrapper(namespace, name string) *OptimizationJobWrapper 
 				Name:      name,
 			},
 			Spec: trainer.OptimizationJobSpec{
+				NumTrials:      1,
+				ParallelTrials: 1,
 				Objectives: []trainer.Objective{{
 					Metric:    "accuracy",
 					Direction: trainer.ObjectiveDirectionMaximize,

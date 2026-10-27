@@ -102,101 +102,81 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 				},
 				testingutil.BeInvalidError()),
 			// Parameter names become environment variables; reject unusable names at admission.
-			ginkgo.Entry("accepts underscore-separated names",
+			ginkgo.Entry("Should succeed in creating optimizationJob with underscore-separated parameters",
 				func() *trainer.OptimizationJob {
 					optimizationJob := testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
-						NumTrials(1).
-						ParallelTrials(1).
 						Obj()
 					optimizationJob.Spec.Parameters[0].Name = "learning_rate"
 					return optimizationJob
 				},
 				gomega.Succeed()),
-			ginkgo.Entry("accepts names beginning with underscore",
+			ginkgo.Entry("Should succeed in creating optimizationJob with parameters beginning with underscore",
 				func() *trainer.OptimizationJob {
 					optimizationJob := testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
-						NumTrials(1).
-						ParallelTrials(1).
 						Obj()
 					optimizationJob.Spec.Parameters[0].Name = "_lr"
 					return optimizationJob
 				},
 				gomega.Succeed()),
-			ginkgo.Entry("accepts alphanumeric names",
+			ginkgo.Entry("Should succeed in creating optimizationJob with alphanumeric parameters",
 				func() *trainer.OptimizationJob {
 					optimizationJob := testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
-						NumTrials(1).
-						ParallelTrials(1).
 						Obj()
 					optimizationJob.Spec.Parameters[0].Name = "batch_size2"
 					return optimizationJob
 				},
 				gomega.Succeed()),
-			ginkgo.Entry("accepts uppercase names",
+			ginkgo.Entry("Should succeed in creating optimizationJob with uppercase parameters",
 				func() *trainer.OptimizationJob {
 					optimizationJob := testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
-						NumTrials(1).
-						ParallelTrials(1).
 						Obj()
 					optimizationJob.Spec.Parameters[0].Name = "LearningRate"
 					return optimizationJob
 				},
 				gomega.Succeed()),
-			ginkgo.Entry("rejects names containing slash",
+			ginkgo.Entry("Should fail in creating optimizationJob with parameters containing slash",
 				func() *trainer.OptimizationJob {
 					optimizationJob := testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
-						NumTrials(1).
-						ParallelTrials(1).
 						Obj()
 					optimizationJob.Spec.Parameters[0].Name = "weight/decay"
 					return optimizationJob
 				},
 				testingutil.BeInvalidError()),
-			ginkgo.Entry("rejects names containing spaces",
+			ginkgo.Entry("Should fail in creating optimizationJob with parameters containing spaces",
 				func() *trainer.OptimizationJob {
 					optimizationJob := testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
-						NumTrials(1).
-						ParallelTrials(1).
 						Obj()
 					optimizationJob.Spec.Parameters[0].Name = "n layers"
 					return optimizationJob
 				},
 				testingutil.BeInvalidError()),
-			ginkgo.Entry("rejects names beginning with a digit",
+			ginkgo.Entry("Should fail in creating optimizationJob with parameters beginning with a digit",
 				func() *trainer.OptimizationJob {
 					optimizationJob := testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
-						NumTrials(1).
-						ParallelTrials(1).
 						Obj()
 					optimizationJob.Spec.Parameters[0].Name = "1learning_rate"
 					return optimizationJob
 				},
 				testingutil.BeInvalidError()),
-			ginkgo.Entry("rejects names containing hyphen",
+			ginkgo.Entry("Should fail in creating optimizationJob with parameters containing hyphen",
 				func() *trainer.OptimizationJob {
 					optimizationJob := testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
-						NumTrials(1).
-						ParallelTrials(1).
 						Obj()
 					optimizationJob.Spec.Parameters[0].Name = "learning-rate"
 					return optimizationJob
 				},
 				testingutil.BeInvalidError()),
-			ginkgo.Entry("rejects names containing equals sign",
+			ginkgo.Entry("Should fail in creating optimizationJob with parameters containing equals sign",
 				func() *trainer.OptimizationJob {
 					optimizationJob := testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
-						NumTrials(1).
-						ParallelTrials(1).
 						Obj()
 					optimizationJob.Spec.Parameters[0].Name = "a=b"
 					return optimizationJob
 				},
 				testingutil.BeInvalidError()),
-			ginkgo.Entry("rejects non-ASCII names",
+			ginkgo.Entry("Should fail in creating optimizationJob with non-ASCII parameters",
 				func() *trainer.OptimizationJob {
 					optimizationJob := testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
-						NumTrials(1).
-						ParallelTrials(1).
 						Obj()
 					optimizationJob.Spec.Parameters[0].Name = "lré"
 					return optimizationJob
