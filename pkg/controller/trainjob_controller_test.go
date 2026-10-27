@@ -30,6 +30,7 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	networkingv1ac "k8s.io/client-go/applyconfigurations/networking/v1"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2/ktesting"
 	clocktesting "k8s.io/utils/clock/testing"
@@ -455,6 +456,45 @@ func TestReconcileObjects(t *testing.T) {
 				if tc.wantDeleted && !apierrors.IsNotFound(getErr) {
 					t.Errorf("Expected %s to be deleted, got error: %v", obj.GetName(), getErr)
 				}
+			}
+		})
+	}
+}
+
+func TestReconcileObjectsApplyOrder(t *testing.T) {
+	for name, failPolicy := range map[string]bool{"success": false, "policy failure blocks workload creation": true} {
+		t.Run(name, func(t *testing.T) {
+			var applied []string
+			denied := errors.New("policy denied")
+			c := utiltesting.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
+				Apply: func(_ context.Context, _ client.WithWatch, obj apiruntime.ApplyConfiguration, _ ...client.ApplyOption) error {
+					if _, ok := obj.(*networkingv1ac.NetworkPolicyApplyConfiguration); ok {
+						applied = append(applied, "policy")
+						if failPolicy {
+							return denied
+						}
+					} else {
+						applied = append(applied, "workload")
+					}
+					return nil
+				},
+			}).Build()
+			r := &TrainJobReconciler{client: c}
+			fr := &fakeRuntime{objsToApply: []apiruntime.ApplyConfiguration{
+				networkingv1ac.NetworkPolicy("policy", "team-a"), corev1ac.ConfigMap("workload", "team-a"),
+			}}
+			err := r.reconcileObjects(context.Background(), fr, utiltesting.MakeTrainJobWrapper("team-a", "alpha").Obj())
+			want := []string{"policy", "workload"}
+			if failPolicy {
+				want = []string{"policy"}
+				if !errors.Is(err, denied) {
+					t.Fatal(err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(want, applied); diff != "" {
+				t.Fatal(diff)
 			}
 		})
 	}

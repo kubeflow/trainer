@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
 )
@@ -68,6 +69,10 @@ type Configuration struct {
 	// default enablement status of a feature.
 	// +optional
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
+
+	// networkPolicy configures per-TrainJob ingress and egress isolation. Disabled when omitted.
+	// +optional
+	NetworkPolicy *NetworkPolicyConfig `json:"networkPolicy,omitempty"`
 
 	// tls contains TLS configuration for the controller manager servers.
 	// +optional
@@ -275,4 +280,22 @@ type TLSOptions struct {
 	// +kubebuilder:validation:MaxItems=10
 	// +kubebuilder:validation:items:MaxLength=32
 	NextProtos []string `json:"nextProtos,omitempty"`
+}
+
+// NetworkPolicyConfig adds administrator-managed exceptions to same-job communication.
+// Rules use the standard Kubernetes NetworkPolicy semantics and are additive.
+type NetworkPolicyConfig struct {
+	// enabled creates policies for each TrainJob. Defaults to false.
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// ingress allows additional sources, such as monitoring or shared-cache clients.
+	// +kubebuilder:validation:MaxItems=128
+	// +listType=atomic
+	// +optional
+	Ingress []networkingv1.NetworkPolicyIngressRule `json:"ingress,omitempty"`
+	// egress allows additional destinations, such as DNS, API servers and storage.
+	// +kubebuilder:validation:MaxItems=128
+	// +listType=atomic
+	// +optional
+	Egress []networkingv1.NetworkPolicyEgressRule `json:"egress,omitempty"`
 }

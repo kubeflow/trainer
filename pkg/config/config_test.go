@@ -26,8 +26,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/rest"
 	componentconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/utils/ptr"
@@ -69,6 +72,15 @@ webhook:
 clientConnection:
   qps: 100
   burst: 200
+networkPolicy:
+  enabled: true
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 192.0.2.0/24
+      ports:
+        - protocol: TCP
+          port: 443
 `), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
 	}
@@ -402,6 +414,13 @@ this is not: valid: yaml: content
 				ClientConnection: &configapi.ClientConnection{
 					QPS:   ptr.To[float32](100),
 					Burst: ptr.To[int32](200),
+				},
+				NetworkPolicy: &configapi.NetworkPolicyConfig{
+					Enabled: ptr.To(true),
+					Egress: []networkingv1.NetworkPolicyEgressRule{{
+						To:    []networkingv1.NetworkPolicyPeer{{IPBlock: &networkingv1.IPBlock{CIDR: "192.0.2.0/24"}}},
+						Ports: []networkingv1.NetworkPolicyPort{{Protocol: ptr.To(corev1.ProtocolTCP), Port: ptr.To(intstr.FromInt(443))}},
+					}},
 				},
 				StatusServer: defaultStatusServer,
 			},

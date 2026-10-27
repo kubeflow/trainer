@@ -29,6 +29,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jax"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/networkpolicy"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/trainjobstatus"
@@ -40,15 +41,16 @@ type Registry map[string]func(ctx context.Context, client client.Client, indexer
 
 func NewRegistry() Registry {
 	registry := Registry{
-		coscheduling.Name: coscheduling.New,
-		flux.Name:         flux.New,
-		volcano.Name:      volcano.New,
-		mpi.Name:          mpi.New,
-		plainml.Name:      plainml.New,
-		torch.Name:        torch.New,
-		jobset.Name:       jobset.New,
-		jax.Name:          jax.New,
-		xgboost.Name:      xgboost.New,
+		coscheduling.Name:  coscheduling.New,
+		flux.Name:          flux.New,
+		volcano.Name:       volcano.New,
+		mpi.Name:           mpi.New,
+		networkpolicy.Name: networkpolicy.New,
+		plainml.Name:       plainml.New,
+		torch.Name:         torch.New,
+		jobset.Name:        jobset.New,
+		jax.Name:           jax.New,
+		xgboost.Name:       xgboost.New,
 	}
 
 	if features.Enabled(features.TrainJobStatus) {

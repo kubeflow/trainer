@@ -1,0 +1,15 @@
+# For the opt-in TrainJob network isolation E2E suite on a disposable cluster.
+manager:
+  config:
+    networkPolicy:
+      enabled: true
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  network-policy-test-allowed: "true"
+      egress:
+        - to:
+            - podSelector:
+                matchLabels:
+                  network-policy-test-allowed: "true"

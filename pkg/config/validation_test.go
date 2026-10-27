@@ -17,10 +17,15 @@ limitations under the License.
 package config
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 
@@ -364,5 +369,77 @@ func TestValidateClientConnection(t *testing.T) {
 				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestNetworkPolicyRuleLimits(t *testing.T) {
+	for name, cfg := range map[string]*configapi.NetworkPolicyConfig{
+		"ingress": {Ingress: make([]networkingv1.NetworkPolicyIngressRule, 129)},
+		"egress":  {Egress: make([]networkingv1.NetworkPolicyEgressRule, 129)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			errs := validate(&configapi.Configuration{NetworkPolicy: cfg})
+			if len(errs) != 1 || errs[0].Type != field.ErrorTypeTooMany || errs[0].Field != "networkPolicy."+name {
+				t.Fatalf("unexpected errors: %v", errs)
+			}
+		})
+	}
+}
+
+func TestNetworkPolicyRules(t *testing.T) {
+	for name, tc := range map[string]struct {
+		ports     []networkingv1.NetworkPolicyPort
+		peers     []networkingv1.NetworkPolicyPeer
+		field     string
+		errorType field.ErrorType
+	}{
+		"empty rule allows all":  {},
+		"numeric range":          {ports: []networkingv1.NetworkPolicyPort{{Port: ptr.To(intstr.FromInt32(80)), EndPort: ptr.To[int32](90)}}},
+		"named SCTP port":        {ports: []networkingv1.NetworkPolicyPort{{Port: ptr.To(intstr.FromString("http")), Protocol: ptr.To(corev1.ProtocolSCTP)}}},
+		"UDP all ports":          {ports: []networkingv1.NetworkPolicyPort{{Protocol: ptr.To(corev1.ProtocolUDP)}}},
+		"IPv4 exception":         {peers: []networkingv1.NetworkPolicyPeer{{IPBlock: &networkingv1.IPBlock{CIDR: "10.0.0.0/8", Except: []string{"10.1.0.0/16"}}}}},
+		"IPv6 exception":         {peers: []networkingv1.NetworkPolicyPeer{{IPBlock: &networkingv1.IPBlock{CIDR: "2001:db8::/32", Except: []string{"2001:db8:1::/48"}}}}},
+		"selectors together":     {peers: []networkingv1.NetworkPolicyPeer{{PodSelector: &metav1.LabelSelector{}, NamespaceSelector: &metav1.LabelSelector{}}}},
+		"bad protocol":           {ports: []networkingv1.NetworkPolicyPort{{Protocol: ptr.To(corev1.Protocol("ICMP"))}}, field: "ports[0].protocol", errorType: field.ErrorTypeNotSupported},
+		"zero port":              {ports: []networkingv1.NetworkPolicyPort{{Port: ptr.To(intstr.FromInt32(0))}}, field: "ports[0].port"},
+		"port overflow":          {ports: []networkingv1.NetworkPolicyPort{{Port: ptr.To(intstr.FromInt32(65536))}}, field: "ports[0].port"},
+		"invalid named port":     {ports: []networkingv1.NetworkPolicyPort{{Port: ptr.To(intstr.FromString("HTTP!"))}}, field: "ports[0].port"},
+		"reversed range":         {ports: []networkingv1.NetworkPolicyPort{{Port: ptr.To(intstr.FromInt32(90)), EndPort: ptr.To[int32](80)}}, field: "ports[0].endPort"},
+		"end without port":       {ports: []networkingv1.NetworkPolicyPort{{EndPort: ptr.To[int32](80)}}, field: "ports[0].endPort"},
+		"end with named port":    {ports: []networkingv1.NetworkPolicyPort{{Port: ptr.To(intstr.FromString("http")), EndPort: ptr.To[int32](80)}}, field: "ports[0].endPort"},
+		"end overflow":           {ports: []networkingv1.NetworkPolicyPort{{Port: ptr.To(intstr.FromInt32(80)), EndPort: ptr.To[int32](65536)}}, field: "ports[0].endPort"},
+		"bad CIDR":               {peers: []networkingv1.NetworkPolicyPeer{{IPBlock: &networkingv1.IPBlock{CIDR: "10.0.0.0/33"}}}, field: "PEER[0].ipBlock.cidr"},
+		"bad exception":          {peers: []networkingv1.NetworkPolicyPeer{{IPBlock: &networkingv1.IPBlock{CIDR: "10.0.0.0/8", Except: []string{"invalid"}}}}, field: "PEER[0].ipBlock.except[0]"},
+		"exception outside CIDR": {peers: []networkingv1.NetworkPolicyPeer{{IPBlock: &networkingv1.IPBlock{CIDR: "10.0.0.0/8", Except: []string{"192.0.2.0/24"}}}}, field: "PEER[0].ipBlock.except[0]"},
+		"exception equals CIDR":  {peers: []networkingv1.NetworkPolicyPeer{{IPBlock: &networkingv1.IPBlock{CIDR: "10.0.0.0/8", Except: []string{"10.0.0.0/8"}}}}, field: "PEER[0].ipBlock.except[0]"},
+		"empty peer":             {peers: []networkingv1.NetworkPolicyPeer{{}}, field: "PEER[0]", errorType: field.ErrorTypeRequired},
+		"mixed peer":             {peers: []networkingv1.NetworkPolicyPeer{{PodSelector: &metav1.LabelSelector{}, IPBlock: &networkingv1.IPBlock{CIDR: "10.0.0.0/8"}}}, field: "PEER[0]", errorType: field.ErrorTypeForbidden},
+		"invalid selector":       {peers: []networkingv1.NetworkPolicyPeer{{PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"invalid!": "yes"}}}}, field: "PEER[0].podSelector.matchLabels"},
+	} {
+		for direction, peerField := range map[string]string{"ingress": "from", "egress": "to"} {
+			t.Run(name+"/"+direction, func(t *testing.T) {
+				policy := &configapi.NetworkPolicyConfig{}
+				if direction == "ingress" {
+					policy.Ingress = []networkingv1.NetworkPolicyIngressRule{{Ports: tc.ports, From: tc.peers}}
+				} else {
+					policy.Egress = []networkingv1.NetworkPolicyEgressRule{{Ports: tc.ports, To: tc.peers}}
+				}
+				errs := validate(&configapi.Configuration{NetworkPolicy: policy})
+				if tc.field == "" {
+					if len(errs) != 0 {
+						t.Fatalf("unexpected errors: %v", errs)
+					}
+					return
+				}
+				wantType := tc.errorType
+				if wantType == "" {
+					wantType = field.ErrorTypeInvalid
+				}
+				wantField := "networkPolicy." + direction + "[0]." + strings.ReplaceAll(tc.field, "PEER", peerField)
+				if len(errs) != 1 || errs[0].Field != wantField || errs[0].Type != wantType {
+					t.Fatalf("got %v, want %s on %s", errs, wantType, wantField)
+				}
+			})
+		}
 	}
 }

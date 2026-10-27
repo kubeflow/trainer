@@ -111,6 +111,80 @@ jobset-controller-manager-54968bd57b-88dk4            2/2     Running   0       
 kubeflow-trainer-controller-manager-cc6468559-dblnw   1/1     Running   0          65s
 ```
 
+## TrainJob network isolation
+
+Isolation is disabled by default. To enable it, set the following controller
+Configuration (under `manager.config` in Helm values). For Kustomize, patch
+`manifests/base/manager/controller_manager_config.yaml` through your overlay.
+Restart the controller after configuration changes.
+
+```yaml
+networkPolicy:
+  enabled: true
+  ingress: []
+  egress: []
+```
+
+The controller automatically allows DNS to `kube-dns`/`node-local-dns` pods in
+`kube-system`, the Kubernetes API's discovered Service/endpoint IPs and ports,
+and the Trainer status service when enabled. API/status endpoint changes refresh
+active-job policies. No ML engineer API or SDK changes are needed.
+
+Before enabling, platform owners should add administrator rules for:
+
+- Approved storage/download destinations and shared caches.
+- Custom DNS paths, service meshes and monitoring used by their runtimes.
+- Matching ingress on independently isolated shared caches or infrastructure.
+
+For example, these Helm values allow HTTPS to an approved storage network:
+
+```yaml
+manager:
+  config:
+    networkPolicy:
+      enabled: true
+      egress:
+        - to:
+            - ipBlock:
+                cidr: 192.0.2.0/24 # Replace with your approved storage network.
+          ports:
+            - protocol: TCP
+              port: 443
+```
+
+Rules apply to every job and cache, with at most 128 rules per direction.
+Invalid administrator rules are rejected at controller startup.
+External destinations remain denied unless approved by the platform owner.
+NetworkPolicy cannot allow DNS names; an empty rule allows all traffic in its direction.
+Custom NodeLocal DNS and Service NAT behavior can require additional rules; verify
+connectivity with your CNI before enabling isolation for existing workloads.
+
+Each job gets `trainjob-<UID>` for JobSet pods and `trainjob-cache-<UID>` for
+private LWS cache pods, allowing same-namespace communication within that job
+and its cache plus administrator exceptions. Cache names exceeding the 63-character
+label limit omit the cache policy. Policies precede workloads; apply failures block
+new workloads with errors and Events. Active jobs have edited/deleted policies
+repaired. Finished jobs retain existing policies until deletion, but do not gain
+policies when enabling. Disabling and restarting removes owned policies, including
+for finished jobs; foreign policies are never adopted or deleted. No TrainJob
+API/SDK changes or tenant opt-out are introduced.
+
+Use a NetworkPolicy-capable CNI and verify allowed and denied connections.
+Policies are additive and propagation is not atomic; existing connections are
+CNI-specific. Prevent tenants from spoofing controller pod labels, modifying
+operator configuration, or creating bypass policies. This is network isolation,
+not authentication, encryption, or a boundary against namespace administrators.
+
+Run the real-network regression on a disposable cluster configured with
+`test/e2e/testdata/network-policy-values.yaml` (HTTP workloads and cache-label
+fixtures, no GPUs). Disable optional LWS for these synthetic fixtures; its admission
+webhook requires metadata that only LWS-managed pods receive:
+
+```sh
+TRAINER_NETWORK_POLICY_E2E=true go test ./test/e2e \
+  -ginkgo.focus='TrainJob network isolation' -ginkgo.v
+```
+
 ## Next Steps
 
 - How to [migrate from Kubeflow Training Operator v1](migration).

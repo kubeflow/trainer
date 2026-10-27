@@ -119,6 +119,13 @@ manager:
   # -- Controller manager configuration.
   # This configuration is used to generate the ConfigMap for the controller manager.
   config:
+    networkPolicy:
+      # -- Isolate each TrainJob and its data cache with ingress and egress NetworkPolicies.
+      enabled: false
+      # -- Additional standard NetworkPolicy ingress rules, applied to jobs and caches.
+      ingress: []
+      # -- Additional standard NetworkPolicy egress rules for approved storage and custom infrastructure. DNS, API and Trainer status access are automatic.
+      egress: []
     health:
       healthProbeBindAddress: ":8081"
       readinessEndpointName: "readyz"

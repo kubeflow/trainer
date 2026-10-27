@@ -31,6 +31,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/networkpolicy"
 	index "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 )
 
@@ -93,7 +94,12 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 			f.preComponentBuilderPlugins = append(f.preComponentBuilderPlugins, p)
 		}
 		if p, ok := plugin.(framework.ComponentBuilderPlugin); ok {
-			f.componentBuilderPlugins = append(f.componentBuilderPlugins, p)
+			// Isolation must be applied before any plugin can create workload Pods.
+			if p.Name() == networkpolicy.Name {
+				f.componentBuilderPlugins = append([]framework.ComponentBuilderPlugin{p}, f.componentBuilderPlugins...)
+			} else {
+				f.componentBuilderPlugins = append(f.componentBuilderPlugins, p)
+			}
 		}
 		if p, ok := plugin.(framework.ComponentDeleterPlugin); ok {
 			f.componentDeleterPlugins = append(f.componentDeleterPlugins, p)
