@@ -255,7 +255,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 							WithValue("false"),
 						*corev1ac.EnvVar().
 							WithName(constants.PRTEEnvDefaultSlots).
-							WithValue(strconv.Itoa(int(*info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode))),
+							WithValue(strconv.Itoa(int(ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode, 1)))),
 						*corev1ac.EnvVar().
 							WithName(constants.PRTEEnvKeySSHArgs).
 							WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
