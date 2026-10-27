@@ -72,9 +72,12 @@ gh pr view <number> -R kubeflow/trainer --json number,title,isDraft,mergeable,la
   }'
 ```
 
-The PR's CI is green when `blocking` is empty. A `CheckRun` reports its result in `conclusion`
-only after `status` is `COMPLETED`. A `StatusContext`, such as the Prow `tide` status, reports it
-in `state`.
+The PR's CI is green only when `blocking` is empty and at least one non-ignored check is present.
+The filtered output above does not show successful checks; fetch the full rollup with
+`gh pr view <number> -R kubeflow/trainer --json statusCheckRollup` to verify that at least one
+check other than `tide` or `ok-to-test` exists. Otherwise, skip the PR and report that CI results
+are unavailable. A `CheckRun` reports its result in `conclusion` only after `status` is
+`COMPLETED`. A `StatusContext`, such as the Prow `tide` status, reports it in `state`.
 
 If `mergeable` is `UNKNOWN`, GitHub has not computed it yet. Do not treat `UNKNOWN` as a conflict.
 
