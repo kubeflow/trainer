@@ -47,8 +47,8 @@ spec:
       tlsConfig:
         ca:
           secret:
-            name: {{ .Values.prometheus.tlsConfig.ca.secret.name | default .Values.manager.config.certManagement.webhookSecretName | default (include "trainer.webhook.secret.name" .) }}
+            name: {{ .Values.prometheus.tlsConfig.ca.secret.name | default .Values.manager.config.certManagement.secretName | default (include "trainer.webhook.secret.name" .) }}
             key: {{ .Values.prometheus.tlsConfig.ca.secret.key | default "ca.crt" }}
-        serverName: {{ .Values.prometheus.tlsConfig.serverName | default (printf "%s.%s.svc" (.Values.manager.config.certManagement.webhookServiceName | default (include "trainer.webhook.service.name" .)) .Release.Namespace) }}
+        serverName: {{ .Values.prometheus.tlsConfig.serverName | default (printf "%s.%s.svc" (.Values.manager.config.certManagement.serviceName | default (include "trainer.webhook.service.name" .)) .Release.Namespace) }}
       {{- end }}
 {{- end }}
