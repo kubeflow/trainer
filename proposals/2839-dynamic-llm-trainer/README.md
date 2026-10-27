@@ -77,8 +77,8 @@ either.
 4. Introduce `FrameworkConfig` and a framework registry, so the SDK resolves the entrypoint and
    the argument rendering from the config rather than from a TorchTune branch — removing the
    four hardcoded TorchTune couplings.
-5. Add `TRLConfig` with typed per-method configs for SFT, DPO and GRPO, proving the extension
-   model with no new trainer class.
+5. Add `TRLConfig` with typed, Kubeflow-owned trainer configs (`SFTTrainer`, `DPOTrainer`,
+   `GRPOTrainer`). This proves the extension model with no new top-level trainer class.
 6. Provide an extension point for community config-driven frameworks — a `FrameworkConfig`
    subclass in any package, registered by import.
 7. In Phase 1, keep full backward compatibility with `CustomTrainer`,
@@ -132,6 +132,12 @@ As a data scientist, I fine-tune a model with TRL from the SDK using the same
 `BuiltinTrainer` I already use for TorchTune, swapping only the config:
 
 ```python
+from kubeflow.trainer import TrainerClient
+from kubeflow.trainer.types import (
+    BuiltinTrainer, HuggingFaceDatasetInitializer, HuggingFaceModelInitializer,
+    Initializer, SFTTrainer, TRLConfig,
+)
+
 TrainerClient().train(
     runtime=TrainerClient().get_runtime("trl-distributed"),
     initializer=Initializer(
@@ -140,7 +146,7 @@ TrainerClient().train(
     ),
     trainer=BuiltinTrainer(
         config=TRLConfig(
-            method=TRLSFTConfig(packing=True),
+            trainer=SFTTrainer(packing=True),
             learning_rate=2e-5,
             num_nodes=2,
         ),
@@ -157,6 +163,12 @@ tells me which parameters belong to GRPO, and passing a DPO-only parameter is an
 before the job is submitted, not a flag TRL silently ignores at runtime:
 
 ```python
+from kubeflow.trainer import TrainerClient
+from kubeflow.trainer.types import (
+    BuiltinTrainer, HuggingFaceDatasetInitializer, HuggingFaceModelInitializer,
+    GRPOTrainer, Initializer, TRLConfig,
+)
+
 TrainerClient().train(
     initializer=Initializer(
         model=HuggingFaceModelInitializer(storage_uri="hf://Qwen/Qwen2.5-0.5B"),
@@ -164,7 +176,7 @@ TrainerClient().train(
     ),
     trainer=BuiltinTrainer(
         config=TRLConfig(
-            method=TRLGRPOConfig(
+            trainer=GRPOTrainer(
                 beta=0.04,
                 num_generations=8,
                 reward_funcs=["think_format_reward"],
@@ -208,8 +220,8 @@ this — see [What torchrun gives up](#what-torchrun-gives-up).
 | Risk | Mitigation |
 |---|---|
 | **A silently degraded run looks like success.** The `trl-demo` failure exited 0 on both pods, so a two-node job that trained two isolated copies was indistinguishable from one that trained jointly. torchrun-first removes that particular cause, not the class. | The E2E test asserts the achieved world size from the logs, not just `Complete`. Closing the class needs a runtime→status channel, which is out of scope here — see [Open Questions](#open-questions). |
-| **TRL's surface is not frozen**, and typed configs mirroring its flags will drift. TRL moved PPO to `trl.experimental` and then dropped it from the package altogether. | The configs target the *script flags*, not the Python API, so a TRL upgrade changes the image rather than the SDK types, and drift is confined to the per-method config classes. The launch-path proof re-runs on every `trl` version bump. |
-| **TRL ignores unknown flags.** `trl/scripts/*.py` parse with `fail_with_unknown_args=False`, so a misapplied flag is dropped rather than rejected. | The typed per-method configs make a wrong-method parameter a construction-time `TypeError` in the SDK, before the TrainJob is created. This is the primary reason for the config shape in [Choosing the config shape](#choosing-the-config-shape). |
+| **TRL's surface is not frozen**, and typed configs mirroring its flags will drift. TRL moved PPO to `trl.experimental` and then dropped it from the package altogether. | The configs target the *script flags*, not the Python API, so a TRL upgrade changes the image rather than the SDK types, and drift is confined to the trainer config classes. The launch-path proof re-runs on every `trl` version bump. |
+| **TRL ignores unknown flags.** `trl/scripts/*.py` parse with `fail_with_unknown_args=False`, so a misapplied flag is dropped rather than rejected. | The typed trainer configs make a wrong-trainer parameter a construction-time `TypeError` in the SDK, before the TrainJob is created. This is the primary reason for the config shape in [Choosing the config shape](#choosing-the-config-shape). |
 | **`extra_args` reopens the silent-ignore hole** for anything passed through it, since those flags are not typed and TRL will not reject them. | Accepted by design: it is the escape hatch for the 161 shared flags, documented as unvalidated. Everything the KEP types is still checked at construction. |
 | **A framework registered twice** (in-tree and out-of-tree) claims the same label. | Registration is explicit and import-ordered; a later registration wins, which is what lets a fork shadow a stalled in-tree config. Documented, not silent. |
 
@@ -415,7 +427,7 @@ TRL has no such axis. Its scripts are model-agnostic, and the model and dataset 
 flags the SDK sets per job. Mirroring the TorchTune layout would therefore produce N runtimes
 that differ only in a default flag value. The method is not an axis either: the manifest's
 `sft` module is the raw-YAML default, and an SDK-submitted `TrainJob` carries
-`command: [torchrun, -m]` with the method's module as the first entry of `args`
+`command: [torchrun, -m]` with the trainer's module as the first entry of `args`
 (`TRLConfig.to_args()`), so one runtime serves SFT, DPO and GRPO alike.
 
 A runtime is still required, because the image must carry `trl` and its dependencies; the
@@ -429,7 +441,7 @@ second runtime with the same framework label, selected with `train(runtime=...)`
 per-method GRPO runtime (`cmd/trainers/grpo/`, `manifests/base/runtimes/grpo/`) with its own
 `train.py`. This KEP supersedes that layout: one `trl-trainer` image and one `trl-distributed`
 runtime cover GRPO through `trl.scripts.grpo`, with no bespoke training script to maintain. The
-GRPO work in #3718 lands as the `TRLGRPOConfig` and the GRPO E2E test rather than as a separate
+GRPO work in #3718 lands as the `GRPOTrainer` and the GRPO E2E test rather than as a separate
 image.
 
 **The server side stops here** — an image and a manifest, no control-plane code.
@@ -526,27 +538,34 @@ constructed, and importing it registers it.
 `command = ("tune", "run")`, a `to_args()` delegating to the existing emitter, and a
 `to_initializer_args()` carrying the `dataset.data_files=` / `data_dir=` overrides it emits today.
 
-#### `TRLConfig` and the per-method configs
+#### `TRLConfig` and the trainer configs
 
-`TRLConfig` carries the fields shared by every TRL method, and one typed slot — `method` —
-holding the config for the method being run. The subclass in that slot selects the script
-module.
+`TRLConfig` holds the fields that all TRL trainers share. It also has one typed slot,
+`trainer`, which holds the config for the TRL trainer to run. The class in that slot selects
+the script module. The slot classes take their names from TRL's trainers: `SFTTrainer`,
+`DPOTrainer` and `GRPOTrainer`. Users import them from `kubeflow.trainer.types`:
+
+```python
+from kubeflow.trainer.types import BuiltinTrainer, DPOTrainer, TRLConfig
+
+BuiltinTrainer(config=TRLConfig(trainer=DPOTrainer(beta=0.1), learning_rate=5e-7))
+```
 
 ```python
 # kubeflow/trainer/types/trl.py
 
 @dataclass(kw_only=True)
-class TRLMethodConfig(abc.ABC):
-    """Per-method TRL config. The subclass selects trl.scripts.<module>."""
+class TRLTrainerConfig(abc.ABC):
+    """Kubeflow-owned config for one TRL trainer. The subclass selects trl.scripts.<module>."""
     module: ClassVar[str]
 
     @abstractmethod
     def to_args(self) -> list[str]:
-        """Render the method-specific flags."""
+        """Render the trainer-specific flags."""
 
 
 @dataclass(kw_only=True)
-class TRLSFTConfig(TRLMethodConfig):
+class SFTTrainer(TRLTrainerConfig):
     module: ClassVar[str] = "sft"
     loss_type: Optional[Literal["nll", "dft", "chunked_nll"]] = None
     packing: Optional[bool] = None
@@ -554,7 +573,7 @@ class TRLSFTConfig(TRLMethodConfig):
 
 
 @dataclass(kw_only=True)
-class TRLDPOConfig(TRLMethodConfig):
+class DPOTrainer(TRLTrainerConfig):
     module: ClassVar[str] = "dpo"
     beta: Optional[float] = None                    # deviation from the reference model
     loss_type: Optional[list[str]] = None           # combinable; weighted by loss_weights
@@ -562,14 +581,14 @@ class TRLDPOConfig(TRLMethodConfig):
 
 
 @dataclass(kw_only=True)
-class TRLGRPOConfig(TRLMethodConfig):
+class GRPOTrainer(TRLTrainerConfig):
     module: ClassVar[str] = "grpo"
     beta: Optional[float] = None                    # KL coefficient
     loss_type: Optional[Literal[
         "grpo", "dr_grpo", "dapo", "bnpo", "cispo", "sapo", "luspo", "vespo"]] = None
     num_generations: Optional[int] = None
     # Upstream reward_funcs lives on GRPOScriptArguments, not GRPOConfig;
-    # merged here on purpose so one object covers the method's whole surface.
+    # merged here on purpose so one object covers the trainer's whole surface.
     reward_funcs: Optional[list[str]] = None
 
 
@@ -582,7 +601,7 @@ class TRLConfig(FrameworkConfig):
     # argv is `torchrun -m trl.scripts.<module> --flag value ...`.
     command: ClassVar[tuple[str, ...]] = ("torchrun", "-m")
 
-    method: TRLMethodConfig                         # the typed slot
+    trainer: TRLTrainerConfig                        # the typed slot
 
     # No model or dataset fields: both come from train(initializer=...),
     # exactly as for TorchTuneConfig.
@@ -605,13 +624,13 @@ class TRLConfig(FrameworkConfig):
 
     def to_args(self) -> list[str]:
         """[trl.scripts.<module>, --flag, value, ...]: the module name first
-        (torchrun's -m positional), then shared flags, the method's own, then
+        (torchrun's -m positional), then shared flags, the trainer's own, then
         extra_args. Bools become store_true flags, lists expand after their
         flag. num_nodes and resources_per_node are never rendered."""
         return (
-            [f"trl.scripts.{self.method.module}"]
+            [f"trl.scripts.{self.trainer.module}"]
             + self._shared_args()
-            + self.method.to_args()
+            + self.trainer.to_args()
             + self._extra_args()
         )
 
@@ -676,7 +695,7 @@ counts behind it, is in the [design note](https://claude.ai/code/artifact/294684
 
 | | **A. Flat + method enum** | **B. Per-method configs** | **C. Typed slot** (chosen) | **D. C + shared model/dataset specs** |
 |---|---|---|---|---|
-| Call | `TRLConfig(method=TRLMethod.GRPO, beta=0.04)` | `BuiltinTrainer(config=TRLGRPOConfig(...))` | `TRLConfig(method=TRLGRPOConfig(...), ...)` | four nested objects |
+| Call | `TRLConfig(method=TRLMethod.GRPO, beta=0.04)` | `BuiltinTrainer(config=GRPOTrainer(...))` | `TRLConfig(trainer=GRPOTrainer(...), ...)` | four nested objects |
 | Objects per job | 1 | 1 | 2 | 4 |
 | Wrong-method parameter | accepted, then **silently dropped by TRL** | `TypeError` at construction | `TypeError` at construction | as C |
 | Conflicting field types | **cannot be typed** | each declared once, correctly | each declared once, correctly | as C |
@@ -728,18 +747,28 @@ estimator *objects* as parameters (`GridSearchCV(estimator=..., cv=...)`); and i
 own API, `MLPolicy` carries an `MLPolicySource` union whose member selects the behaviour. TRL
 itself is organized this way, one config class per trainer.
 
-##### Naming the slot: `method`
+##### Naming the slot: `trainer`
 
-Both `method` and `trainer` were proposed. This KEP uses **`method`**, because the user already
-writes `train(trainer=BuiltinTrainer(...))`, so a nested `trainer=` inside that call would use
-one word for two different things. "Method" is also the word the ecosystem uses for the SFT /
-DPO / GRPO axis — TRL's README calls them "fine-tuning methods" reached "via trainers" — and it
-matches how sibling KEPs name a variant slot after the concept
-(KEP-3562's `algorithm=RandomSearch()`).
+The slot and its classes use TRL's trainer names. TRL has one trainer per technique
+(`SFTTrainer`, `DPOTrainer`, `GRPOTrainer`), and its users already know those names. So the
+slot is `trainer`, and the Kubeflow classes are `SFTTrainer`, `DPOTrainer` and `GRPOTrainer`.
+This follows the guiding principle of this KEP: for now, stay consistent with TRL.
 
-The classes are `TRLSFTConfig` rather than `SFTConfig` for two more reasons: it matches the
-existing `TorchTuneConfig` naming, and it avoids shadowing `from trl import SFTTrainer` in the
-same notebook. It also lets `LlamaFactorySFTConfig` land later without asymmetry.
+The classes are Kubeflow-owned. They are not TRL's classes and do not import TRL. See
+[Kubeflow-owned trainer configs](#kubeflow-owned-trainer-configs).
+
+Two name clashes are known:
+
+- **TRL's own classes.** `trl.DPOTrainer` and `kubeflow.trainer.types.DPOTrainer` share a
+  name. In a notebook, the last import wins. Users who import both must use the module
+  namespace, for example `types.DPOTrainer`.
+- **The SDK `*Trainer` suffix.** In the SDK today, a `*Trainer` class (`CustomTrainer`,
+  `BuiltinTrainer`) is the object a user passes to `train(trainer=...)`. `DPOTrainer` goes one
+  level deeper, inside `TRLConfig`. So `train(trainer=...)` and `TRLConfig(trainer=...)` use
+  one word for two levels.
+
+[Open Questions](#open-questions) records both clashes. The fallback is `*Config` names such as
+`TRLDPOConfig`.
 
 #### Wiring it up
 
@@ -844,7 +873,7 @@ config and is chosen with `train(runtime=...)` — no SDK field.
 | `TrainerClient.train()` | **No change** to the signature. |
 | `TrainJobTemplate` | **No change.** |
 | Python version | No new floor. `kw_only=True` needs 3.10, already the SDK's minimum. |
-| Public exports | New names only: `FrameworkConfig`, `TRLConfig`, `TRLMethodConfig`, `TRLSFTConfig`, `TRLDPOConfig`, `TRLGRPOConfig`. Nothing removed or renamed. |
+| Public exports | New names only: `FrameworkConfig`, `TRLConfig`, `TRLTrainerConfig`, `SFTTrainer`, `DPOTrainer`, `GRPOTrainer`. Nothing removed or renamed. |
 
 #### Phase 2: the move to `ConfigTrainer`
 
@@ -913,9 +942,9 @@ TRL branch to the plugin.
 
 Client side:
 
-- `to_args()` for each of `TRLSFTConfig`, `TRLDPOConfig`, `TRLGRPOConfig`: the module name is
+- `to_args()` for each of `SFTTrainer`, `DPOTrainer`, `GRPOTrainer`: the module name is
   the first element; bools render as store_true flags; lists expand after their flag.
-- Passing a method-specific parameter to the wrong method config raises `TypeError`.
+- Passing a parameter that belongs to another trainer raises `TypeError`.
 - `TRLConfig.to_initializer_args()` raises `ValueError` without an `Initializer`; with one it
   yields the `/workspace` model and dataset paths.
 - `TorchTuneConfig.to_initializer_args()` matches the `dataset.data_files=` / `data_dir=` output
@@ -970,7 +999,7 @@ image with no manifest is unreachable.
 | Phase | Contents |
 |---|---|
 | C1 | `FrameworkConfig`, the registry, `TorchTuneConfig` migrated onto it, `BuiltinTrainer.config` widened, the three call-site changes; unit tests. No user-visible change yet. |
-| C2 | `TRLConfig` and the three method configs; public exports; integration tests including the cross-repo contract |
+| C2 | `TRLConfig` and the three trainer configs; public exports; integration tests including the cross-repo contract |
 | C3 | Docs on sdk.kubeflow.org and an operator guide for building a runtime image for a new framework |
 
 C1 is a pure refactor with no behaviour change, so it can merge on its own; C2 is what makes
@@ -998,7 +1027,7 @@ follow-up KEP. It does not block any C phase.
   torchrun-native).
 - The torchrun-first launch pattern documented on kubeflow.org as operator guidance for building
   a runtime image.
-- SDK reference docs for `TRLConfig` and the method configs.
+- SDK reference docs for `TRLConfig` and the trainer configs.
 
 **GA**
 
@@ -1030,7 +1059,7 @@ follow-up KEP. It does not block any C phase.
    understand the torchrun limitations first, which this KEP now records. It is deliberately
    kept separate from shipping TRL, along with dynamic registration (see #2): both would need
    their own design discussion, and neither blocks TRL.
-4. **Flat exports, or a `kubeflow.trainer.trl` submodule?** `TRLSFTConfig` in the existing flat
+4. **Flat exports, or a `kubeflow.trainer.trl` submodule?** `SFTTrainer` in the existing flat
    `__all__` matches today's `__init__.py`; a submodule keeps the top level at one name per
    framework. Frozen once shipped, so it needs a decision before the first release rather than
    after.
@@ -1092,7 +1121,7 @@ because the runtime map has to be hand-maintained anyway. See
 
 ### B. Top-level per-method configs
 
-`BuiltinTrainer(config=TRLGRPOConfig(...))`, with no outer TRL config. Reads best at the call
+`BuiltinTrainer(config=GRPOTrainer(...))`, with no outer TRL config. Reads best at the call
 site, but three classes would claim the `trl` label in a registry keyed one config per framework,
 and the 161 shared flags would be re-frozen in every public signature or hoisted into a base that
 then *is* the outer config. See [Choosing the config shape](#choosing-the-config-shape).
