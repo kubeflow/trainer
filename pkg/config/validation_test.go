@@ -155,6 +155,39 @@ func TestValidate(t *testing.T) {
 			},
 			wantErr: nil,
 		},
+		"valid TLS options": {
+			cfg: &configapi.Configuration{
+				TLS: &configapi.TLSOptions{
+					MinVersion:       configapi.TLSVersion12,
+					CipherSuites:     []string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"},
+					CurvePreferences: []int32{29, 23},
+				},
+			},
+			wantErr: nil,
+		},
+		"invalid TLS options are rejected": {
+			cfg: &configapi.Configuration{
+				TLS: &configapi.TLSOptions{
+					MinVersion:       "0.9",
+					CipherSuites:     []string{"TLS_NOT_A_CIPHER"},
+					CurvePreferences: []int32{9999},
+				},
+			},
+			wantErr: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "tls.minVersion",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "tls.cipherSuites[0]",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "tls.curvePreferences",
+				},
+			},
+		},
 		"invalid concurrency zero": {
 			cfg: &configapi.Configuration{
 				Controller: &configapi.ControllerConfigurationSpec{

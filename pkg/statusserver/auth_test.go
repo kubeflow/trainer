@@ -276,10 +276,27 @@ func TestProjectedServiceAccountTokenAuthorizerAuthorizeKeyRotation(t *testing.T
 		}
 
 		gotAuthorized, err := authorizer.Authorize(ctx, step.authHeader, namespace, trainJobName)
-
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", step.name, err)
 		}
+
+		// The JWKS refetch after key publication is eventually consistent:
+		// go-oidc's RemoteKeySet publishes the result of an in-flight fetch
+		// slightly before it records that the fetch completed, so the
+		// authorization right after publishing a key can still observe the
+		// pre-rotation key set served to the previous step's unknown-key-ID
+		// probe. Retry until the rotated key is observed.
+		if step.wantAuthorized && !gotAuthorized {
+			deadline := time.Now().Add(2 * time.Second)
+			for !gotAuthorized && time.Now().Before(deadline) {
+				time.Sleep(10 * time.Millisecond)
+				gotAuthorized, err = authorizer.Authorize(ctx, step.authHeader, namespace, trainJobName)
+				if err != nil {
+					t.Fatalf("%s: unexpected error: %v", step.name, err)
+				}
+			}
+		}
+
 		if diff := cmp.Diff(step.wantAuthorized, gotAuthorized); len(diff) != 0 {
 			t.Fatalf("%s: unexpected authorization (-want,+got):\n%s", step.name, diff)
 		}

@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -975,10 +976,18 @@ tls:
     - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
     - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
 `)
+	curvePreferencesConfig := writeConfig("curve-preferences.yaml", `
+tls:
+  curvePreferences: [29, 23]
+`)
 	unknownConfig := writeConfig("unknown.yaml", `
 tls:
   minVersion: "1.3"
   cipherSuites: ["TLS_NOT_A_REAL_SUITE"]
+`)
+	unknownCurveConfig := writeConfig("unknown-curve.yaml", `
+tls:
+  curvePreferences: [9999]
 `)
 
 	testcases := map[string]struct {
@@ -986,6 +995,9 @@ tls:
 		wantNextProtos   []string
 		wantMinVersion   uint16
 		wantCipherSuites []uint16
+		wantCurvePrefs   []tls.CurveID
+		wantLoadErr      bool
+		wantLoadErrText  string
 	}{
 		"HTTP/2 is disabled by default": {
 			configFile:     "",
@@ -1008,16 +1020,35 @@ tls:
 				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
 			},
 		},
-		"unrecognized cipher suite is dropped without clobbering other settings": {
-			configFile:     unknownConfig,
+		"curvePreferences are resolved to their IDs": {
+			configFile:     curvePreferencesConfig,
 			wantNextProtos: []string{"http/1.1"},
-			wantMinVersion: tls.VersionTLS13,
+			wantCurvePrefs: []tls.CurveID{tls.X25519, tls.CurveP256},
+		},
+		"unrecognized cipher suite fails configuration loading": {
+			configFile:      unknownConfig,
+			wantLoadErr:     true,
+			wantLoadErrText: "tls.cipherSuites[0]",
+		},
+		"unsupported curve ID fails configuration loading": {
+			configFile:      unknownCurveConfig,
+			wantLoadErr:     true,
+			wantLoadErrText: "tls.curvePreferences",
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			options, _, err := Load(testScheme, tc.configFile)
+			if tc.wantLoadErr {
+				if err == nil {
+					t.Fatal("Expected load error, got nil")
+				}
+				if tc.wantLoadErrText != "" && !strings.Contains(err.Error(), tc.wantLoadErrText) {
+					t.Errorf("Load() error %q does not contain %q", err, tc.wantLoadErrText)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -1046,6 +1077,9 @@ tls:
 			}
 			if diff := cmp.Diff(tc.wantCipherSuites, got.CipherSuites, cmpopts.EquateEmpty()); len(diff) != 0 {
 				t.Errorf("Unexpected CipherSuites (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantCurvePrefs, got.CurvePreferences, cmpopts.EquateEmpty()); len(diff) != 0 {
+				t.Errorf("Unexpected CurvePreferences (-want,+got):\n%s", diff)
 			}
 		})
 	}

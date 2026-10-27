@@ -267,6 +267,24 @@ type TLSOptions struct {
 	// +kubebuilder:validation:items:MaxLength=100
 	CipherSuites []string `json:"cipherSuites,omitempty"`
 
+	// curvePreferences is the set of allowed TLS key exchange mechanisms,
+	// specified as numeric IANA TLS Supported Group IDs (see
+	// https://www.iana.org/assignments/tls-parameters/tls-parameters.xhtml#tls-parameters-8).
+	// Common values: 23 (secp256r1), 24 (secp384r1), 25 (secp521r1),
+	// 29 (x25519), 4587 (SecP256r1MLKEM768), 4588 (X25519MLKEM768),
+	// 4589 (SecP384r1MLKEM1024). Post-quantum hybrids are only negotiated over
+	// TLS 1.3, so include a classical curve if minVersion allows TLS 1.2.
+	// The set of supported values depends on the Go version used to build the
+	// controller. Go selects from this list using its internal preference
+	// order; list order is ignored. If empty, Go defaults apply.
+	// Unsupported IDs fail controller startup.
+	// +optional
+	// +listType=set
+	// +kubebuilder:validation:MaxItems=32
+	// +kubebuilder:validation:items:Minimum=1
+	// +kubebuilder:validation:items:Maximum=65535
+	CurvePreferences []int32 `json:"curvePreferences,omitempty"`
+
 	// nextProtos is the list of application-level protocols negotiated during
 	// the TLS handshake. Set to ["h2", "http/1.1"] to enable HTTP/2, or omit
 	// to disable it (mitigates CVE-2023-44487 and CVE-2023-39325).
