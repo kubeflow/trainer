@@ -32,24 +32,23 @@ import (
 
 func TestValidateCreateOptimizationJob(t *testing.T) {
 	cases := map[string]struct {
-		enableOptimizationJob bool
-		wantError             field.ErrorList
+		featureGates featuregatetesting.FeatureOverrides
+		wantError    field.ErrorList
 	}{
 		"OptimizationJob feature gate is disabled": {
+			featureGates: featuregatetesting.FeatureOverrides{features.OptimizationJob: false},
 			wantError: field.ErrorList{
 				field.Forbidden(field.NewPath("spec"), ""),
 			},
 		},
 		"OptimizationJob feature gate is enabled": {
-			enableOptimizationJob: true,
+			featureGates: featuregatetesting.FeatureOverrides{features.TrainJobStatus: true, features.OptimizationJob: true},
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
-			if tc.enableOptimizationJob {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OptimizationJob, true)
-			}
+			// Do not use t.Parallel() — SetFeatureGatesDuringTest mutates global state.
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureGates)
 			_, ctx := ktesting.NewTestContext(t)
 
 			validator := &OptimizationJobValidator{}

@@ -17,8 +17,6 @@ limitations under the License.
 package features
 
 import (
-	"fmt"
-
 	"k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
@@ -26,6 +24,7 @@ import (
 
 func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultFeatureGates))
+	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddDependencies(defaultFeatureGateDependencies))
 }
 
 const (
@@ -64,16 +63,13 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	OptimizationJob: {Default: false, PreRelease: featuregate.Alpha},
 }
 
+// defaultFeatureGateDependencies lists the features that each feature depends on.
+// Enabling a feature while any of its dependencies is disabled fails when the feature gates are set.
+var defaultFeatureGateDependencies = map[featuregate.Feature][]featuregate.Feature{
+	OptimizationJob: {TrainJobStatus},
+}
+
 // Enabled is helper for `utilfeature.DefaultFeatureGate.Enabled()`
 func Enabled(f featuregate.Feature) bool {
 	return utilfeature.DefaultFeatureGate.Enabled(f)
-}
-
-// ValidateDependencies returns an error when an enabled feature requires a disabled feature.
-// The Trainer controller manager calls it once the feature gates are set.
-func ValidateDependencies() error {
-	if Enabled(OptimizationJob) && !Enabled(TrainJobStatus) {
-		return fmt.Errorf("feature gate %s requires feature gate %s to be enabled", OptimizationJob, TrainJobStatus)
-	}
-	return nil
 }

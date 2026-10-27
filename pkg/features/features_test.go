@@ -17,32 +17,45 @@ limitations under the License.
 package features
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
-func TestValidateDependencies(t *testing.T) {
+func TestOptimizationJobDependencies(t *testing.T) {
 	cases := map[string]struct {
-		featureGates featuregatetesting.FeatureOverrides
+		featureGates map[string]bool
+		wantEnabled  bool
 		wantError    bool
 	}{
-		"OptimizationJob without TrainJobStatus is rejected": {
-			featureGates: featuregatetesting.FeatureOverrides{OptimizationJob: true},
-			wantError:    true,
+		"disabled by default": {},
+		"enabled with TrainJobStatus": {
+			featureGates: map[string]bool{string(OptimizationJob): true, string(TrainJobStatus): true},
+			wantEnabled:  true,
 		},
-		"OptimizationJob with TrainJobStatus is accepted": {
-			featureGates: featuregatetesting.FeatureOverrides{OptimizationJob: true, TrainJobStatus: true},
+		"requires TrainJobStatus": {
+			featureGates: map[string]bool{string(OptimizationJob): true},
+			wantError:    true,
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			// Do not use t.Parallel() — SetFeatureGatesDuringTest mutates global state.
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureGates)
-			err := ValidateDependencies()
-			if gotError := err != nil; gotError != tc.wantError {
-				t.Errorf("ValidateDependencies() error = %v, want error: %t", err, tc.wantError)
+			gate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
+			err := gate.SetFromMap(tc.featureGates)
+			if tc.wantError {
+				wantErr := fmt.Sprintf("%s is enabled, but depends on features that are disabled: [%s]", OptimizationJob, TrainJobStatus)
+				if err == nil || !strings.Contains(err.Error(), wantErr) {
+					t.Fatalf("SetFromMap() error = %v, want error containing %q", err, wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error from SetFromMap: %v", err)
+			}
+			if got := gate.Enabled(OptimizationJob); got != tc.wantEnabled {
+				t.Errorf("Enabled(%s) = %t, want %t", OptimizationJob, got, tc.wantEnabled)
 			}
 		})
 	}

@@ -104,12 +104,24 @@ func (f *Framework) RunManager(cfg *rest.Config, startControllers bool) (context
 	})
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), "failed to create manager")
 
-	// Alpha feature gates exercised by the integration suites.
-	gomega.ExpectWithOffset(1, utilfeature.DefaultMutableFeatureGate.Set(string(features.TrainJobDynamicResourceAllocation)+"=true,"+string(features.OptimizationJob)+"=true")).To(gomega.Succeed())
+	// Alpha feature gates exercised by the integration suites. TrainJobStatus is disabled while
+	// the runtimes are built, so the trainjobstatus plugin, which requires the status server
+	// configuration, is not registered.
+	gomega.ExpectWithOffset(1, utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+		string(features.TrainJobDynamicResourceAllocation): true,
+		string(features.TrainJobStatus):                    false,
+		string(features.OptimizationJob):                   false,
+	})).To(gomega.Succeed())
 
 	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer(), nil)
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())
 	gomega.ExpectWithOffset(1, runtimes).NotTo(gomega.BeNil())
+
+	// OptimizationJob depends on TrainJobStatus.
+	gomega.ExpectWithOffset(1, utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+		string(features.TrainJobStatus):  true,
+		string(features.OptimizationJob): true,
+	})).To(gomega.Succeed())
 
 	if startControllers {
 		failedCtrlName, err := controller.SetupControllers(mgr, runtimes, ctrlpkg.Options{
