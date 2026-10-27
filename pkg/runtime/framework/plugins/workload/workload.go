@@ -169,6 +169,9 @@ func (w *Workload) Build(ctx context.Context, info *runtime.Info, trainJob *trai
 	}
 
 	var objects []apiruntime.ApplyConfiguration
+	// The Workload and PodGroups are applied only when they don't exist, since most of their spec
+	// fields are immutable. Applying them on every reconcile might break running TrainJobs after a
+	// controller upgrade: if the new version computes a slightly different spec, the apply would be rejected.
 	if err := w.client.Get(ctx, client.ObjectKeyFromObject(workload), &schedulingv1beta1.Workload{}); err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			return nil, err
