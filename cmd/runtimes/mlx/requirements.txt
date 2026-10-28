@@ -1,6 +1,6 @@
 # MLX libraries.
 mlx[cuda13]==0.32.4
 mlx-data==0.1.0
-mlx-lm==0.31.3
+mlx-lm==0.32.2
 # HuggingFace libraries.
 datasets==5.1.0
