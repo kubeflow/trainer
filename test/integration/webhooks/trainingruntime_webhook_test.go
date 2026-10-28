@@ -21,6 +21,7 @@ import (
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -107,6 +108,108 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 		gomega.Expect(k8sClient.DeleteAllOf(ctx, &trainer.TrainingRuntime{}, client.InNamespace(ns.Name))).Should(gomega.Succeed())
 		gomega.Expect(k8sClient.DeleteAllOf(ctx, &trainer.ClusterTrainingRuntime{})).Should(gomega.Succeed())
 	})
+
+	for _, kind := range []string{trainer.TrainingRuntimeKind, trainer.ClusterTrainingRuntimeKind} {
+		ginkgo.Context(kind+" lifecycle validation", func() {
+			ginkgo.DescribeTable("Validates lifecycle fields", func(mutate func(*trainer.TrainingRuntimeSpec), errorMatcher gomega.OmegaMatcher) {
+				spec := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Spec
+				mutate(&spec)
+				var runtime client.Object
+				if kind == trainer.TrainingRuntimeKind {
+					runtime = &trainer.TrainingRuntime{ObjectMeta: metav1.ObjectMeta{Name: "runtime", Namespace: ns.Name}, Spec: spec}
+				} else {
+					runtime = &trainer.ClusterTrainingRuntime{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Spec: spec}
+				}
+				gomega.Expect(k8sClient.Create(ctx, runtime)).Should(errorMatcher)
+			},
+				ginkgo.Entry("accepts positive defaults and zero TTL", func(spec *trainer.TrainingRuntimeSpec) {
+					spec.RunPolicy = &trainer.RunPolicy{ActiveDeadlineSeconds: ptr.To[int64](1), TTLSecondsAfterFinished: ptr.To[int32](0)}
+				}, gomega.Succeed()),
+				ginkgo.Entry("rejects a negative runtime TTL", func(spec *trainer.TrainingRuntimeSpec) {
+					spec.RunPolicy = &trainer.RunPolicy{TTLSecondsAfterFinished: ptr.To[int32](-1)}
+				}, testingutil.BeInvalidError()),
+				ginkgo.Entry("rejects a zero runtime deadline", func(spec *trainer.TrainingRuntimeSpec) {
+					spec.RunPolicy = &trainer.RunPolicy{ActiveDeadlineSeconds: ptr.To[int64](0)}
+				}, testingutil.BeInvalidError()),
+				ginkgo.Entry("rejects a negative runtime deadline", func(spec *trainer.TrainingRuntimeSpec) {
+					spec.RunPolicy = &trainer.RunPolicy{ActiveDeadlineSeconds: ptr.To[int64](-1)}
+				}, testingutil.BeInvalidError()),
+				ginkgo.Entry("rejects JobSet TTL zero", func(spec *trainer.TrainingRuntimeSpec) {
+					spec.Template.Spec.TTLSecondsAfterFinished = ptr.To[int32](0)
+				}, gomega.MatchError(gomega.ContainSubstring("template.spec.ttlSecondsAfterFinished must be unset"))),
+				ginkgo.Entry("rejects a positive JobSet TTL", func(spec *trainer.TrainingRuntimeSpec) {
+					spec.Template.Spec.TTLSecondsAfterFinished = ptr.To[int32](60)
+				}, gomega.MatchError(gomega.ContainSubstring("template.spec.ttlSecondsAfterFinished must be unset"))),
+				ginkgo.Entry("rejects Job TTL zero", func(spec *trainer.TrainingRuntimeSpec) {
+					spec.Template.Spec.ReplicatedJobs[0].Template.Spec.TTLSecondsAfterFinished = ptr.To[int32](0)
+				}, gomega.MatchError(gomega.ContainSubstring("Job ttlSecondsAfterFinished must be unset"))),
+				ginkgo.Entry("rejects a positive Job TTL", func(spec *trainer.TrainingRuntimeSpec) {
+					spec.Template.Spec.ReplicatedJobs[0].Template.Spec.TTLSecondsAfterFinished = ptr.To[int32](60)
+				}, gomega.MatchError(gomega.ContainSubstring("Job ttlSecondsAfterFinished must be unset"))),
+				ginkgo.Entry("rejects a Job deadline", func(spec *trainer.TrainingRuntimeSpec) {
+					spec.Template.Spec.ReplicatedJobs[0].Template.Spec.ActiveDeadlineSeconds = ptr.To[int64](60)
+				}, gomega.MatchError(gomega.ContainSubstring("Job activeDeadlineSeconds must be unset"))),
+				ginkgo.Entry("rejects a Pod deadline", func(spec *trainer.TrainingRuntimeSpec) {
+					spec.Template.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec.ActiveDeadlineSeconds = ptr.To[int64](60)
+				}, gomega.MatchError(gomega.ContainSubstring("Pod activeDeadlineSeconds must be unset"))),
+			)
+
+			ginkgo.DescribeTable("Validates absent template paths", func(template map[string]interface{}, errorMatcher gomega.OmegaMatcher) {
+				spec := map[string]interface{}{"runPolicy": map[string]interface{}{"ttlSecondsAfterFinished": int64(0)}}
+				if template != nil {
+					spec["template"] = template
+				}
+				runtime := &unstructured.Unstructured{Object: map[string]interface{}{
+					"apiVersion": trainer.GroupVersion.String(),
+					"kind":       kind,
+					"metadata":   map[string]interface{}{"name": "runtime"},
+					"spec":       spec,
+				}}
+				if kind == trainer.TrainingRuntimeKind {
+					runtime.SetNamespace(ns.Name)
+				}
+				createErr := k8sClient.Create(ctx, runtime)
+				gomega.Expect(createErr).Should(errorMatcher)
+				if createErr != nil {
+					return
+				}
+				gomega.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(runtime), runtime)).Should(gomega.Succeed())
+				ttl, found, err := unstructured.NestedInt64(runtime.Object, "spec", "runPolicy", "ttlSecondsAfterFinished")
+				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+				gomega.Expect(found).Should(gomega.BeTrue())
+				gomega.Expect(ttl).Should(gomega.BeZero())
+			},
+				ginkgo.Entry("without template", nil, gomega.Succeed()),
+				ginkgo.Entry("without template spec", map[string]interface{}{"metadata": map[string]interface{}{"labels": map[string]interface{}{"test": "lifecycle"}}}, gomega.Succeed()),
+				ginkgo.Entry("without replicatedJobs", map[string]interface{}{"spec": map[string]interface{}{"suspend": true}}, gomega.Succeed()),
+				ginkgo.Entry("rejects a missing required Job template", map[string]interface{}{"spec": map[string]interface{}{"replicatedJobs": []interface{}{map[string]interface{}{"name": "node"}}}}, gomega.MatchError(gomega.ContainSubstring("spec.template.spec.replicatedJobs[0].template: Required value"))),
+				ginkgo.Entry("without Job spec", map[string]interface{}{"spec": map[string]interface{}{"replicatedJobs": []interface{}{map[string]interface{}{"name": "node", "template": map[string]interface{}{"metadata": map[string]interface{}{"labels": map[string]interface{}{"test": "lifecycle"}}}}}}}, gomega.Succeed()),
+				ginkgo.Entry("rejects a missing required Pod template", map[string]interface{}{"spec": map[string]interface{}{"replicatedJobs": []interface{}{map[string]interface{}{"name": "node", "template": map[string]interface{}{"spec": map[string]interface{}{"parallelism": int64(1)}}}}}}, gomega.MatchError(gomega.ContainSubstring("spec.template.spec.replicatedJobs[0].template.spec.template: Required value"))),
+				ginkgo.Entry("without Pod spec", map[string]interface{}{"spec": map[string]interface{}{"replicatedJobs": []interface{}{map[string]interface{}{"name": "node", "template": map[string]interface{}{"spec": map[string]interface{}{"template": map[string]interface{}{"metadata": map[string]interface{}{"labels": map[string]interface{}{"test": "lifecycle"}}}}}}}}}, gomega.Succeed()),
+			)
+
+			ginkgo.It("allows updating and clearing runtime defaults", func() {
+				runtime := &unstructured.Unstructured{Object: map[string]interface{}{
+					"apiVersion": trainer.GroupVersion.String(),
+					"kind":       kind,
+					"metadata":   map[string]interface{}{"name": "runtime"},
+					"spec": map[string]interface{}{
+						"runPolicy": map[string]interface{}{"activeDeadlineSeconds": int64(60), "ttlSecondsAfterFinished": int64(60)},
+						"mlPolicy":  map[string]interface{}{"numNodes": int64(1)},
+					},
+				}}
+				if kind == trainer.TrainingRuntimeKind {
+					runtime.SetNamespace(ns.Name)
+				}
+				gomega.Expect(k8sClient.Create(ctx, runtime)).Should(gomega.Succeed())
+				gomega.Expect(unstructured.SetNestedField(runtime.Object, int64(120), "spec", "runPolicy", "activeDeadlineSeconds")).Should(gomega.Succeed())
+				gomega.Expect(unstructured.SetNestedField(runtime.Object, int64(0), "spec", "runPolicy", "ttlSecondsAfterFinished")).Should(gomega.Succeed())
+				gomega.Expect(k8sClient.Update(ctx, runtime)).Should(gomega.Succeed())
+				unstructured.RemoveNestedField(runtime.Object, "spec", "runPolicy")
+				gomega.Expect(k8sClient.Update(ctx, runtime)).Should(gomega.Succeed())
+			})
+		})
+	}
 
 	ginkgo.When("Creating TrainingRuntime", func() {
 		ginkgo.DescribeTable("Validate TrainingRuntime on creation", func(trainingRuntime func() *trainer.TrainingRuntime, errorMatcher gomega.OmegaMatcher) {

@@ -55,6 +55,7 @@ tests:
               - trainjobs
             verbs:
               - create
+              - delete
               - get
               - list
               - patch

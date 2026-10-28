@@ -15668,6 +15668,22 @@
           }
         }
       },
+      "trainer.v1alpha1.RunPolicy": {
+        "description": "RunPolicy holds mutable lifecycle defaults captured in runtime snapshots. Explicit TrainJob values override their matching defaults.",
+        "type": "object",
+        "properties": {
+          "activeDeadlineSeconds": {
+            "description": "activeDeadlineSeconds is the default maximum active duration in seconds.",
+            "type": "integer",
+            "format": "int64"
+          },
+          "ttlSecondsAfterFinished": {
+            "description": "ttlSecondsAfterFinished is the default retention after completion or failure. Ignored for OptimizationJob trials.",
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "trainer.v1alpha1.RuntimePatch": {
         "description": "RuntimePatch represents a custom patch applied to the TrainJob's training runtime template. Patches are keyed by manager to provide clear ownership and avoid conflicts between controllers.",
         "type": "object",
@@ -15915,6 +15931,11 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.Trainer"
               }
             ]
+          },
+          "ttlSecondsAfterFinished": {
+            "description": "ttlSecondsAfterFinished is the retention after the TrainJob becomes Complete or Failed. Ignored for OptimizationJob trials. Zero makes the TrainJob eligible for immediate deletion. This field is mutable and overrides the runtime snapshot default; if unset, that default applies.",
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -15943,6 +15964,14 @@
               "name"
             ],
             "x-kubernetes-list-type": "map"
+          },
+          "startTime": {
+            "description": "startTime records when the TrainJob becomes active. It is cleared on suspension and reset on resume.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ]
           },
           "trainerStatus": {
             "description": "trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.\n\nThis field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).\n\nThis is an alpha feature and requires enabling the TrainJobStatus feature gate.",
@@ -16179,6 +16208,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.PodGroupPolicy"
+              }
+            ]
+          },
+          "runPolicy": {
+            "description": "runPolicy defines lifecycle defaults that referencing TrainJobs can override.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.RunPolicy"
               }
             ]
           },

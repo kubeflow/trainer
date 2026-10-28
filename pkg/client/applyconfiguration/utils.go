@@ -100,6 +100,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.ReplicatedJobPatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Result"):
 		return &trainerv1alpha1.ResultApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("RunPolicy"):
+		return &trainerv1alpha1.RunPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimePatch"):
 		return &trainerv1alpha1.RuntimePatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimeRef"):

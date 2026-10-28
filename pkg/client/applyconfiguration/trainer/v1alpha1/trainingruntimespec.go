@@ -27,6 +27,8 @@ type TrainingRuntimeSpecApplyConfiguration struct {
 	MLPolicy *MLPolicyApplyConfiguration `json:"mlPolicy,omitempty"`
 	// podGroupPolicy defines the configuration for the PodGroup to enable gang-scheduling via supported plugins.
 	PodGroupPolicy *PodGroupPolicyApplyConfiguration `json:"podGroupPolicy,omitempty"`
+	// runPolicy defines lifecycle defaults that referencing TrainJobs can override.
+	RunPolicy *RunPolicyApplyConfiguration `json:"runPolicy,omitempty"`
 	// template for the JobSet which will be used by TrainJob.
 	Template *JobSetTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }
@@ -50,6 +52,14 @@ func (b *TrainingRuntimeSpecApplyConfiguration) WithMLPolicy(value *MLPolicyAppl
 // If called multiple times, the PodGroupPolicy field is set to the value of the last call.
 func (b *TrainingRuntimeSpecApplyConfiguration) WithPodGroupPolicy(value *PodGroupPolicyApplyConfiguration) *TrainingRuntimeSpecApplyConfiguration {
 	b.PodGroupPolicy = value
+	return b
+}
+
+// WithRunPolicy sets the RunPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RunPolicy field is set to the value of the last call.
+func (b *TrainingRuntimeSpecApplyConfiguration) WithRunPolicy(value *RunPolicyApplyConfiguration) *TrainingRuntimeSpecApplyConfiguration {
+	b.RunPolicy = value
 	return b
 }
 

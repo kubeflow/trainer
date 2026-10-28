@@ -34,8 +34,81 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	jobruntimes "github.com/kubeflow/trainer/v2/pkg/runtime"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
+
+func TestSnapshotRunPolicy(t *testing.T) {
+	for _, kind := range []string{trainer.TrainingRuntimeKind, trainer.ClusterTrainingRuntimeKind} {
+		t.Run(kind, func(t *testing.T) {
+			for name, tc := range map[string]struct {
+				snapshotPolicy  *trainer.RunPolicy
+				missingTypeMeta bool
+				missing         bool
+				corrupt         bool
+				wantErr         bool
+			}{
+				"captured defaults":                         {snapshotPolicy: &trainer.RunPolicy{ActiveDeadlineSeconds: ptr.To[int64](60), TTLSecondsAfterFinished: ptr.To[int32](30)}},
+				"captured zero TTL":                         {snapshotPolicy: &trainer.RunPolicy{TTLSecondsAfterFinished: ptr.To[int32](0)}},
+				"old snapshot without policy":               {},
+				"snapshot without GVK or policy":            {missingTypeMeta: true},
+				"missing snapshot has no captured defaults": {missing: true},
+				"corrupt snapshot surfaces error":           {corrupt: true, wantErr: true},
+			} {
+				t.Run(name, func(t *testing.T) {
+					ctx := context.Background()
+					job := testingutil.MakeTrainJobWrapper("test-namespace", "policy-job").UID("policy-job-uid").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(kind), "policy-runtime").Obj()
+					meta := metav1.ObjectMeta{Name: "policy-runtime", Namespace: job.Namespace}
+					typeMeta := metav1.TypeMeta{APIVersion: trainer.SchemeGroupVersion.String(), Kind: kind}
+					if tc.missingTypeMeta {
+						typeMeta = metav1.TypeMeta{}
+					}
+					var snapshot client.Object
+					var live client.Object
+					livePolicy := &trainer.RunPolicy{TTLSecondsAfterFinished: ptr.To[int32](900)}
+					if kind == trainer.TrainingRuntimeKind {
+						snapshot = &trainer.TrainingRuntime{TypeMeta: typeMeta, ObjectMeta: meta, Spec: trainer.TrainingRuntimeSpec{RunPolicy: tc.snapshotPolicy}}
+						live = &trainer.TrainingRuntime{TypeMeta: typeMeta, ObjectMeta: meta, Spec: trainer.TrainingRuntimeSpec{RunPolicy: livePolicy}}
+					} else {
+						meta.Namespace = ""
+						snapshot = &trainer.ClusterTrainingRuntime{TypeMeta: typeMeta, ObjectMeta: meta, Spec: trainer.TrainingRuntimeSpec{RunPolicy: tc.snapshotPolicy}}
+						live = &trainer.ClusterTrainingRuntime{TypeMeta: typeMeta, ObjectMeta: meta, Spec: trainer.TrainingRuntimeSpec{RunPolicy: livePolicy}}
+					}
+					data, err := yaml.Marshal(snapshot)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if tc.corrupt {
+						data = []byte("invalid: [")
+					}
+					cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+						Name: job.Name + runtimeSnapshotSuffix, Namespace: job.Namespace,
+						OwnerReferences: []metav1.OwnerReference{{UID: job.UID, Controller: ptr.To(true)}},
+					}, Data: map[string]string{runtimeDataKey: string(data)}}
+					builder := testingutil.NewClientBuilder().WithObjects(job, live)
+					if !tc.missing {
+						builder.WithObjects(cm)
+					}
+					cli := builder.Build()
+					var rt jobruntimes.Runtime = &TrainingRuntime{client: cli}
+					if kind == trainer.ClusterTrainingRuntimeKind {
+						rt = &ClusterTrainingRuntime{TrainingRuntime: &TrainingRuntime{client: cli}}
+					}
+					got, err := rt.RunPolicy(ctx, job)
+					if (err != nil) != tc.wantErr {
+						t.Fatalf("Unexpected policy error: %v", err)
+					}
+					if !tc.wantErr {
+						if diff := cmp.Diff(tc.snapshotPolicy, got); diff != "" {
+							t.Errorf("Unexpected policy (-want,+got): %s", diff)
+						}
+					}
+				})
+			}
+		})
+	}
+}
 
 func TestGetRuntimeSnapshot(t *testing.T) {
 	cases := map[string]struct {
@@ -437,6 +510,86 @@ spec:
 				}
 			}
 
+		})
+	}
+}
+
+func TestGetRuntimeSnapshotMissingGVK(t *testing.T) {
+	for _, kind := range []string{trainer.TrainingRuntimeKind, trainer.ClusterTrainingRuntimeKind} {
+		t.Run(kind, func(t *testing.T) {
+			for name, tc := range map[string]struct {
+				typeMeta       metav1.TypeMeta
+				wrongName      bool
+				wrongRefKind   bool
+				wrongRefGroup  bool
+				omitRuntimeRef bool
+				wantErr        bool
+			}{
+				"restores absent GVK":                              {},
+				"restores absent GVK with omitted reference types": {omitRuntimeRef: true},
+				"rejects absent GVK with wrong name":               {wrongName: true, wantErr: true},
+				"rejects absent GVK with wrong reference kind":     {wrongRefKind: true, wantErr: true},
+				"rejects absent GVK with wrong reference group":    {wrongRefGroup: true, wantErr: true},
+				"rejects explicit wrong kind": {typeMeta: metav1.TypeMeta{
+					APIVersion: trainer.SchemeGroupVersion.String(), Kind: "OtherRuntime",
+				}, wantErr: true},
+				"rejects explicit wrong group": {typeMeta: metav1.TypeMeta{
+					APIVersion: "other.example/v1alpha1", Kind: kind,
+				}, wantErr: true},
+				"rejects missing kind":       {typeMeta: metav1.TypeMeta{APIVersion: trainer.SchemeGroupVersion.String()}, wantErr: true},
+				"rejects missing apiVersion": {typeMeta: metav1.TypeMeta{Kind: kind}, wantErr: true},
+			} {
+				t.Run(name, func(t *testing.T) {
+					ctx := context.Background()
+					job := testingutil.MakeTrainJobWrapper("test-namespace", "test-job").UID("job-uid").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(kind), "test-runtime").Obj()
+					if tc.omitRuntimeRef {
+						job.Spec.RuntimeRef.Kind = nil
+						job.Spec.RuntimeRef.APIGroup = nil
+					}
+					if tc.wrongRefKind {
+						job.Spec.RuntimeRef.Kind = ptr.To("OtherRuntime")
+					}
+					if tc.wrongRefGroup {
+						job.Spec.RuntimeRef.APIGroup = ptr.To("other.example")
+					}
+					var snapshot client.Object = &trainer.TrainingRuntime{TypeMeta: tc.typeMeta}
+					var runtimeObj client.Object = &trainer.TrainingRuntime{}
+					if kind == trainer.ClusterTrainingRuntimeKind {
+						snapshot = &trainer.ClusterTrainingRuntime{TypeMeta: tc.typeMeta}
+						runtimeObj = &trainer.ClusterTrainingRuntime{}
+					}
+					snapshot.SetName(job.Spec.RuntimeRef.Name)
+					if tc.wrongName {
+						snapshot.SetName("other-runtime")
+					}
+					data, err := yaml.Marshal(snapshot)
+					if err != nil {
+						t.Fatal(err)
+					}
+					cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+						Name: job.Name + runtimeSnapshotSuffix, Namespace: job.Namespace,
+						OwnerReferences: []metav1.OwnerReference{{UID: job.UID, Controller: ptr.To(true)}},
+					}, Data: map[string]string{runtimeDataKey: string(data)}}
+					c := testingutil.NewClientBuilder().WithObjects(cm).Build()
+					err = getRuntimeSnapshot(ctx, c, job, runtimeObj)
+					if (err != nil) != tc.wantErr {
+						t.Fatalf("Unexpected snapshot error: %v", err)
+					}
+					if !tc.wantErr {
+						if got := runtimeObj.GetObjectKind().GroupVersionKind(); got != trainer.SchemeGroupVersion.WithKind(kind) {
+							t.Errorf("Unexpected restored GVK: %v", got)
+						}
+					}
+					stored := &corev1.ConfigMap{}
+					if err := c.Get(ctx, client.ObjectKeyFromObject(cm), stored); err != nil {
+						t.Fatal(err)
+					}
+					if diff := cmp.Diff(cm.Data, stored.Data); diff != "" {
+						t.Errorf("Snapshot data changed (-want,+got): %s", diff)
+					}
+				})
+			}
 		})
 	}
 }

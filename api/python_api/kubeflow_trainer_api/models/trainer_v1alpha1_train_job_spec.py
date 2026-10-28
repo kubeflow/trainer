@@ -51,7 +51,8 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
     runtime_ref: TrainerV1alpha1RuntimeRef = Field(description="runtimeRef is the reference to the training runtime.", alias="runtimeRef")
     suspend: Optional[StrictBool] = Field(default=None, description="suspend defines whether to suspend the running TrainJob.")
     trainer: Optional[TrainerV1alpha1Trainer] = Field(default=None, description="trainer defines the configuration of the trainer.")
-    __properties: ClassVar[List[str]] = ["activeDeadlineSeconds", "initializer", "managedBy", "runtimePatches", "runtimeRef", "suspend", "trainer"]
+    ttl_seconds_after_finished: Optional[StrictInt] = Field(default=None, description="ttlSecondsAfterFinished is the retention after the TrainJob becomes Complete or Failed. Ignored for OptimizationJob trials. Zero makes the TrainJob eligible for immediate deletion. This field is mutable and overrides the runtime snapshot default; if unset, that default applies.", alias="ttlSecondsAfterFinished")
+    __properties: ClassVar[List[str]] = ["activeDeadlineSeconds", "initializer", "managedBy", "runtimePatches", "runtimeRef", "suspend", "trainer", "ttlSecondsAfterFinished"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -126,7 +127,8 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
             "runtimePatches": [TrainerV1alpha1RuntimePatch.from_dict(_item) for _item in obj["runtimePatches"]] if obj.get("runtimePatches") is not None else None,
             "runtimeRef": TrainerV1alpha1RuntimeRef.from_dict(obj["runtimeRef"]) if obj.get("runtimeRef") is not None else None,
             "suspend": obj.get("suspend"),
-            "trainer": TrainerV1alpha1Trainer.from_dict(obj["trainer"]) if obj.get("trainer") is not None else None
+            "trainer": TrainerV1alpha1Trainer.from_dict(obj["trainer"]) if obj.get("trainer") is not None else None,
+            "ttlSecondsAfterFinished": obj.get("ttlSecondsAfterFinished")
         })
         return _obj
 
