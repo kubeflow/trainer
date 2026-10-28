@@ -388,6 +388,36 @@ func TestValidateCreate(t *testing.T) {
 				}
 			}(),
 		},
+		"negative resource quantities are rejected": {
+			obj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Trainer(&trainer.Trainer{
+					ResourcesPerNode: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("-1000")},
+					},
+				}).
+				RuntimePatches([]trainer.RuntimePatch{sidecarPatch("test.io/manager", nil,
+					&corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("-1")},
+					},
+				)}).
+				Obj(),
+			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
+					},
+				}).Obj(),
+			wantError: func() field.ErrorList {
+				sidecarPath := field.NewPath("spec", "runtimePatches").Index(0).
+					Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).
+					Child("template", "spec", "template", "spec", "containers").Index(0)
+				return field.ErrorList{
+					field.Invalid(field.NewPath("spec", "trainer", "resourcesPerNode", "requests").Key("cpu"), "-1k", ""),
+					field.Invalid(sidecarPath.Child("resources", "limits").Key("nvidia.com/gpu"), "-1", ""),
+				}
+			}(),
+		},
 		"requests equal to limits and requests without limits are accepted": {
 			obj: testingutil.MakeTrainJobWrapper("default", "test").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").

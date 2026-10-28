@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -252,7 +254,7 @@ func validatePodFields(trainJob *trainer.TrainJob) field.ErrorList {
 	if trainJob.Spec.Trainer != nil {
 		trainerPath := specPath.Child("trainer")
 		allErrs = append(allErrs, validateEnvNames(trainJob.Spec.Trainer.Env, trainerPath.Child("env"))...)
-		allErrs = append(allErrs, validateRequestsWithinLimits(trainJob.Spec.Trainer.ResourcesPerNode, trainerPath.Child("resourcesPerNode"))...)
+		allErrs = append(allErrs, validateResourceRequirements(trainJob.Spec.Trainer.ResourcesPerNode, trainerPath.Child("resourcesPerNode"))...)
 	}
 	if trainJob.Spec.Initializer != nil {
 		initializerPath := specPath.Child("initializer")
@@ -282,12 +284,12 @@ func validatePodFields(trainJob *trainer.TrainJob) field.ErrorList {
 			for k, c := range podSpec.Containers {
 				containerPath := rJobPath.Child("containers").Index(k)
 				allErrs = append(allErrs, validateEnvNames(c.Env, containerPath.Child("env"))...)
-				allErrs = append(allErrs, validateRequestsWithinLimits(c.Resources, containerPath.Child("resources"))...)
+				allErrs = append(allErrs, validateResourceRequirements(c.Resources, containerPath.Child("resources"))...)
 			}
 			for k, c := range podSpec.InitContainers {
 				containerPath := rJobPath.Child("initContainers").Index(k)
 				allErrs = append(allErrs, validateEnvNames(c.Env, containerPath.Child("env"))...)
-				allErrs = append(allErrs, validateRequestsWithinLimits(c.Resources, containerPath.Child("resources"))...)
+				allErrs = append(allErrs, validateResourceRequirements(c.Resources, containerPath.Child("resources"))...)
 			}
 		}
 	}
@@ -306,15 +308,30 @@ func validateEnvNames(envs []corev1.EnvVar, fldPath *field.Path) field.ErrorList
 	return allErrs
 }
 
-func validateRequestsWithinLimits(resources *corev1.ResourceRequirements, fldPath *field.Path) field.ErrorList {
+// validateResourceRequirements rejects negative quantities and requests above their limit,
+// which the API server rejects on Pods. A negative request also reaches the PodGroup that the
+// gang-scheduling plugins build from the per-Pod requests.
+func validateResourceRequirements(resources *corev1.ResourceRequirements, fldPath *field.Path) field.ErrorList {
 	if resources == nil {
 		return nil
 	}
 	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateNonNegativeQuantities(resources.Requests, fldPath.Child("requests"))...)
+	allErrs = append(allErrs, validateNonNegativeQuantities(resources.Limits, fldPath.Child("limits"))...)
 	for name, limit := range resources.Limits {
 		if request, ok := resources.Requests[name]; ok && request.Cmp(limit) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("requests").Key(string(name)), request.String(),
 				fmt.Sprintf("must be less than or equal to %s limit of %s", name, limit.String())))
+		}
+	}
+	return allErrs
+}
+
+func validateNonNegativeQuantities(resources corev1.ResourceList, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, name := range slices.Sorted(maps.Keys(resources)) {
+		if quantity := resources[name]; quantity.Sign() < 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(string(name)), quantity.String(), "must be greater than or equal to 0"))
 		}
 	}
 	return allErrs

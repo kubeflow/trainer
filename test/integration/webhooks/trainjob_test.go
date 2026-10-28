@@ -292,6 +292,18 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				testingutil.BeForbiddenError()),
+			ginkgo.Entry("Should fail in creating trainJob with a negative resourcesPerNode request",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+						Trainer(&trainer.Trainer{
+							ResourcesPerNode: &corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("-1000")},
+							},
+						}).
+						Obj()
+				},
+				testingutil.BeForbiddenError()),
 			ginkgo.Entry("Should fail in creating trainJob with a dataset initializer env name containing '='",
 				func() *trainer.TrainJob {
 					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
