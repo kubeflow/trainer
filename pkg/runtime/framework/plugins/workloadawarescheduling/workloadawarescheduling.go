@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package workload
+package workloadawarescheduling
 
 import (
 	"context"
@@ -52,7 +52,7 @@ import (
 )
 
 const (
-	Name = "Workload"
+	Name = "WorkloadAwareScheduling"
 
 	// maxNameLength is the maximum length of the generated Workload, PodGroupTemplate, and PodGroup
 	// names, which must be DNS labels.
@@ -63,20 +63,20 @@ const (
 	resourceClaimsErrorMsg = "must not be set when the runtime sets spec.scheduling.replicatedJobs[].job.resourceClaims"
 )
 
-// Workload plugin integrates TrainJob with the Kubernetes Workload-Aware Scheduling APIs.
-type Workload struct {
+// WorkloadAwareScheduling plugin integrates TrainJob with the Kubernetes Workload-Aware Scheduling APIs.
+type WorkloadAwareScheduling struct {
 	client client.Client
 }
 
-var _ framework.CustomValidationPlugin = (*Workload)(nil)
-var _ framework.EnforceSchedulingPlugin = (*Workload)(nil)
-var _ framework.ComponentBuilderPlugin = (*Workload)(nil)
-var _ framework.ComponentDeleterPlugin = (*Workload)(nil)
-var _ framework.WatchExtensionPlugin = (*Workload)(nil)
+var _ framework.CustomValidationPlugin = (*WorkloadAwareScheduling)(nil)
+var _ framework.EnforceSchedulingPlugin = (*WorkloadAwareScheduling)(nil)
+var _ framework.ComponentBuilderPlugin = (*WorkloadAwareScheduling)(nil)
+var _ framework.ComponentDeleterPlugin = (*WorkloadAwareScheduling)(nil)
+var _ framework.WatchExtensionPlugin = (*WorkloadAwareScheduling)(nil)
 
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=workloads;podgroups,verbs=create;get;list;watch;patch;delete
 
-// New returns the Workload plugin. It fails when the cluster doesn't serve the Workload and PodGroup
+// New returns the WorkloadAwareScheduling plugin. It fails when the cluster doesn't serve the Workload and PodGroup
 // APIs, so the controller doesn't start with the TrainJobWorkloadAwareScheduling feature gate enabled
 // on a cluster without Workload-Aware Scheduling.
 func New(_ context.Context, c client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
@@ -87,14 +87,14 @@ func New(_ context.Context, c client.Client, _ client.FieldIndexer, _ *configapi
 				features.TrainJobWorkloadAwareScheduling, gvk, err)
 		}
 	}
-	return &Workload{client: c}, nil
+	return &WorkloadAwareScheduling{client: c}, nil
 }
 
-func (w *Workload) Name() string {
+func (w *WorkloadAwareScheduling) Name() string {
 	return Name
 }
 
-func (w *Workload) Validate(_ context.Context, info *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (w *WorkloadAwareScheduling) Validate(_ context.Context, info *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	if info == nil || newObj == nil || !hasJobResourceClaims(info.RuntimePolicy.Scheduling) {
 		return nil, nil
 	}
@@ -141,7 +141,7 @@ func hasJobResourceClaims(scheduling *trainer.TrainingRuntimeScheduling) bool {
 
 // EnforceScheduling assigns the Pods of every PodSet to the PodGroup of the scheduling group which
 // its ReplicatedJob belongs to.
-func (w *Workload) EnforceScheduling(info *runtime.Info, trainJob *trainer.TrainJob) error {
+func (w *WorkloadAwareScheduling) EnforceScheduling(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	if info == nil || trainJob == nil || info.RuntimePolicy.Scheduling == nil {
 		return nil
 	}
@@ -158,7 +158,7 @@ func (w *Workload) EnforceScheduling(info *runtime.Info, trainJob *trainer.Train
 
 // Build builds the Workload and the PodGroups of the TrainJob. The Workload and the PodGroups are
 // never updated once created, so only the missing objects are built.
-func (w *Workload) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
+func (w *WorkloadAwareScheduling) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
 	// Delete() removes the Workload and PodGroups while suspended, so do not recreate them here.
 	if info == nil || trainJob == nil || info.RuntimePolicy.Scheduling == nil || ptr.Deref(trainJob.Spec.Suspend, false) {
 		return nil, nil
@@ -221,7 +221,7 @@ func (w *Workload) Build(ctx context.Context, info *runtime.Info, trainJob *trai
 }
 
 // Delete returns the Workload and PodGroups of a suspended, complete, or failed TrainJob.
-func (w *Workload) Delete(ctx context.Context, trainJob *trainer.TrainJob) ([]client.Object, error) {
+func (w *WorkloadAwareScheduling) Delete(ctx context.Context, trainJob *trainer.TrainJob) ([]client.Object, error) {
 	if trainJob == nil || (!trainjob.IsTrainJobFinished(trainJob) && !ptr.Deref(trainJob.Spec.Suspend, false)) {
 		return nil, nil
 	}
@@ -247,7 +247,7 @@ func (w *Workload) Delete(ctx context.Context, trainJob *trainer.TrainJob) ([]cl
 	return objects, nil
 }
 
-func (w *Workload) ReconcilerBuilders() []runtime.ReconcilerBuilder {
+func (w *WorkloadAwareScheduling) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	return []runtime.ReconcilerBuilder{
 		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
 			return b.Watches(

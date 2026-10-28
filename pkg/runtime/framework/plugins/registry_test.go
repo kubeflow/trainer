@@ -35,7 +35,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/trainjobstatus"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
-	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/workload"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/workloadawarescheduling"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/xgboost"
 )
 
@@ -51,18 +51,18 @@ func TestNewRegistry(t *testing.T) {
 				trainjobstatus.Name,
 			),
 		},
-		"Workload plugin is registered when the TrainJobWorkloadAwareScheduling feature gate is enabled": {
+		"WorkloadAwareScheduling plugin is registered when the TrainJobWorkloadAwareScheduling feature gate is enabled": {
 			featureGates: []featuregate.Feature{features.TrainJobWorkloadAwareScheduling},
 			wantRegistry: sets.New(
 				coscheduling.Name, flux.Name, volcano.Name, mpi.Name, plainml.Name, torch.Name, jobset.Name, jax.Name, xgboost.Name,
-				workload.Name,
+				workloadawarescheduling.Name,
 			),
 		},
-		"TrainJobStatus and Workload plugins are registered when both feature gates are enabled": {
+		"TrainJobStatus and WorkloadAwareScheduling plugins are registered when both feature gates are enabled": {
 			featureGates: []featuregate.Feature{features.TrainJobStatus, features.TrainJobWorkloadAwareScheduling},
 			wantRegistry: sets.New(
 				coscheduling.Name, flux.Name, volcano.Name, mpi.Name, plainml.Name, torch.Name, jobset.Name, jax.Name, xgboost.Name,
-				trainjobstatus.Name, workload.Name,
+				trainjobstatus.Name, workloadawarescheduling.Name,
 			),
 		},
 	}

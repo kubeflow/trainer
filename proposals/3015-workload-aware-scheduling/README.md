@@ -1082,7 +1082,7 @@ Following prior art in the Kubernetes Job controller:
 
 ### Workload Runtime Plugin
 
-The integration is implemented as a plugin in `pkg/runtime/framework/plugins/workload/workload.go`,
+The integration is implemented as a plugin in `pkg/runtime/framework/plugins/workloadawarescheduling/workloadawarescheduling.go`,
 following the existing Extensions Framework pattern used by Coscheduling and Volcano. The plugin is
 registered when the `TrainJobWorkloadAwareScheduling` feature gate is enabled, and is a no-op for
 runtimes that do not set `spec.scheduling`.
@@ -1224,7 +1224,7 @@ Gang-of-gangs additionally requires:
 
 ### Unit Tests
 
-In `pkg/runtime/framework/plugins/workload`:
+In `pkg/runtime/framework/plugins/workloadawarescheduling`:
 
 - No-op behavior when the runtime does not set `spec.scheduling`.
 - `PodGroupTemplate` generation for each mode: level 1 (single template), level 2 (one template

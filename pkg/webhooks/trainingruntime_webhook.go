@@ -34,7 +34,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/features"
-	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/workload"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/workloadawarescheduling"
 	trainingruntime "github.com/kubeflow/trainer/v2/pkg/util/trainingruntime"
 )
 
@@ -172,7 +172,7 @@ func validateScheduling(ctx context.Context, newSpec, oldSpec *trainer.TrainingR
 	}
 
 	// Run the validation from the workload builder library.
-	allErrs = append(allErrs, workload.ValidateScheduling(ctx, newSpec)...)
+	allErrs = append(allErrs, workloadawarescheduling.ValidateScheduling(ctx, newSpec)...)
 
 	rJobs := newSpec.Template.Spec.ReplicatedJobs
 	if len(scheduling.ReplicatedJobs) == 0 {

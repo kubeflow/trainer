@@ -2879,7 +2879,7 @@ func TestRunEnforceSchedulingPlugins(t *testing.T) {
 		trainJob        *trainer.TrainJob
 		wantRuntimeInfo *runtime.Info
 	}{
-		"workload plugin is applied to runtime.Info": {
+		"WorkloadAwareScheduling plugin is applied to runtime.Info": {
 			registry: fwkplugins.NewRegistry(),
 			runtimeInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{

@@ -60,7 +60,7 @@ func WithVolcanoPodGroupRESTMapping(b *fake.ClientBuilder) *fake.ClientBuilder {
 
 // WithWorkloadRESTMapping makes the fake client's REST mapper know the scheduling.k8s.io/v1beta1
 // Workload and PodGroup kinds, as on a cluster which serves the Workload-Aware Scheduling APIs.
-// The Workload plugin can't be initialized with clients built without it.
+// The WorkloadAwareScheduling plugin can't be initialized with clients built without it.
 func WithWorkloadRESTMapping(b *fake.ClientBuilder) *fake.ClientBuilder {
 	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{schedulingv1beta1.SchemeGroupVersion})
 	mapper.Add(schedulingv1beta1.SchemeGroupVersion.WithKind("Workload"), meta.RESTScopeNamespace)

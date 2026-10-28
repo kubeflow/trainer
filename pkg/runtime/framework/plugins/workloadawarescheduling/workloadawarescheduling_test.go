@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package workload
+package workloadawarescheduling
 
 import (
 	"context"
@@ -750,7 +750,7 @@ func TestWorkload(t *testing.T) {
 			cli := clientBuilder.Build()
 			plugin, err := New(ctx, cli, utiltesting.AsIndex(clientBuilder), nil)
 			if err != nil {
-				t.Fatalf("Failed to initialize Workload plugin: %v", err)
+				t.Fatalf("Failed to initialize WorkloadAwareScheduling plugin: %v", err)
 			}
 
 			// Test EnforceScheduling
@@ -1066,7 +1066,7 @@ func TestDelete(t *testing.T) {
 			cli := clientBuilder.Build()
 			plugin, err := New(ctx, cli, utiltesting.AsIndex(clientBuilder), nil)
 			if err != nil {
-				t.Fatalf("Failed to initialize Workload plugin: %v", err)
+				t.Fatalf("Failed to initialize WorkloadAwareScheduling plugin: %v", err)
 			}
 
 			objs, err := plugin.(framework.ComponentDeleterPlugin).Delete(ctx, c.trainJob)
@@ -1263,9 +1263,9 @@ func TestValidate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			p, err := New(context.Background(), utiltesting.WithWorkloadRESTMapping(utiltesting.NewClientBuilder()).Build(), nil, nil)
 			if err != nil {
-				t.Fatalf("Failed to initialize Workload plugin: %v", err)
+				t.Fatalf("Failed to initialize WorkloadAwareScheduling plugin: %v", err)
 			}
-			_, gotError := p.(*Workload).Validate(context.Background(), tc.info, tc.oldObj, tc.newObj)
+			_, gotError := p.(*WorkloadAwareScheduling).Validate(context.Background(), tc.info, tc.oldObj, tc.newObj)
 			if diff := cmp.Diff(tc.wantError, gotError, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); len(diff) != 0 {
 				t.Errorf("Unexpected error from Validate (-want, +got): %s", diff)
 			}
