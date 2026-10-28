@@ -67,6 +67,13 @@ Megatron-Core with Tensor Parallelism for large transformers
 Training on Apple Silicon with MLX framework
 ::::
 
+::::{grid-item-card} MPI
+:link: mpi
+:link-type: doc
+
+MPI runtimes for DeepSpeed, MLX and custom images
+::::
+
 ::::{grid-item-card} Flux
 :link: flux
 :link-type: doc
@@ -165,6 +172,7 @@ jax
 jax-tpu
 deepspeed
 mlx
+mpi
 xgboost
 megatron
 flux
