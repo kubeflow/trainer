@@ -262,29 +262,11 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 }
 
 // validateRuntimePatchesPodSpec validates volumeMounts and tolerations introduced by each runtime patch.
-// VolumeMounts are checked against the volumes of the merged JobSet spec, so a patch can mount volumes
-// defined in the runtime template or in any runtime patch.
 func validateRuntimePatchesPodSpec(jobSetSpec *jobsetv1alpha2ac.JobSetSpecApplyConfiguration, runtimePatchesPath *field.Path, trainJob *trainer.TrainJob) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if len(trainJob.Spec.RuntimePatches) == 0 {
 		return allErrs
-	}
-
-	// Build map[rJobName]sets.Set[string] of merged volume names once up front
-	volumeNamesByRJob := make(map[string]sets.Set[string])
-	for _, rJob := range jobSetSpec.ReplicatedJobs {
-		if rJob.Name == nil || rJob.Template == nil || rJob.Template.Spec == nil ||
-			rJob.Template.Spec.Template == nil || rJob.Template.Spec.Template.Spec == nil {
-			continue
-		}
-		volumeNames := sets.New[string]()
-		for _, vol := range rJob.Template.Spec.Template.Spec.Volumes {
-			if vol.Name != nil {
-				volumeNames.Insert(*vol.Name)
-			}
-		}
-		volumeNamesByRJob[*rJob.Name] = volumeNames
 	}
 
 	// For each runtime patch, validate the fields it introduces
@@ -302,20 +284,15 @@ func validateRuntimePatchesPodSpec(jobSetSpec *jobsetv1alpha2ac.JobSetSpecApplyC
 				continue
 			}
 
-			volumeNames, ok := volumeNamesByRJob[patchRJob.Name]
-			if !ok {
-				continue
-			}
-
 			patchPodSpec := patchRJob.Template.Spec.Template.Spec
 			replicatedJobPath := patchPath.Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(j)
 			podSpecPath := replicatedJobPath.Child("template", "spec", "template", "spec")
 
 			// Validate InitContainers from this patch
-			allErrs = append(allErrs, validateVolumeMountsPatch(podSpecPath.Child("initContainers"), patchPodSpec.InitContainers, volumeNames)...)
+			allErrs = append(allErrs, validateVolumeMountsPatch(podSpecPath.Child("initContainers"), patchPodSpec.InitContainers)...)
 
 			// Validate Containers from this patch
-			allErrs = append(allErrs, validateVolumeMountsPatch(podSpecPath.Child("containers"), patchPodSpec.Containers, volumeNames)...)
+			allErrs = append(allErrs, validateVolumeMountsPatch(podSpecPath.Child("containers"), patchPodSpec.Containers)...)
 
 			// Validate Tolerations from this patch
 			for t, tol := range patchPodSpec.Tolerations {
@@ -353,7 +330,7 @@ func validateRuntimePatchesPodSpec(jobSetSpec *jobsetv1alpha2ac.JobSetSpecApplyC
 // Note: Volume existence is not validated here because plugins may inject volumes during
 // the EnforceMLPolicy stage (after ValidateObjects). Kubernetes will validate volume
 // references when the Pod is created.
-func validateVolumeMountsPatch(fldPath *field.Path, containers []trainer.ContainerPatch, volumeNames sets.Set[string]) field.ErrorList {
+func validateVolumeMountsPatch(fldPath *field.Path, containers []trainer.ContainerPatch) field.ErrorList {
 	var allErrs field.ErrorList
 
 	for k, container := range containers {
