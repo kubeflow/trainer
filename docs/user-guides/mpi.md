@@ -1,7 +1,6 @@
 # MPI Guide
 
-This guide describes how TrainJob runs MPI workloads, such as DeepSpeed and MLX, and how the
-`spec.trainer` fields of a TrainJob reach the MPI launcher and the worker nodes.
+This guide describes how to run MPI on Kubernetes with TrainJob.
 
 ## Prerequisites
 
