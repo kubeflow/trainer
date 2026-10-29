@@ -122,12 +122,12 @@ for job in jobs:
 ### Viewing Logs
 
 ```python
-for log_line in client.get_job_logs(job_name, node_index=0, follow=True):
+for log_line in client.get_job_logs(job_name, follow=True):
     print(log_line, end='')
 
 for node_index in range(trainer.num_nodes):
     print(f"\n=== Logs from node {node_index} ===")
-    for log_line in client.get_job_logs(job_name, node_index=node_index):
+    for log_line in client.get_job_logs(job_name, step=f"node-{node_index}"):
         print(log_line, end='')
 ```
 
