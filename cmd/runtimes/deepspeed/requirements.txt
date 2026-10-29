@@ -5,5 +5,5 @@ deepspeed==0.19.8
 mpi4py==4.1.2
 # HuggingFace libraries.
 datasets==5.1.0
-transformers==5.20.2
+transformers==5.21.0
 SentencePiece==0.2.2
