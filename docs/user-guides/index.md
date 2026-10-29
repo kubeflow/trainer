@@ -172,9 +172,9 @@ jax
 jax-tpu
 deepspeed
 mlx
-mpi
 xgboost
 megatron
+mpi
 flux
 trainjob-progress
 data-cache

@@ -69,7 +69,8 @@ kubectl get clustertrainingruntime deepspeed-distributed -o jsonpath='{.spec.mlP
 The `slots` value of each hostfile line is the number of MPI processes that `mpirun` starts on
 that node. `spec.trainer.numProcPerNode` sets it and overrides the value of the runtime. When the
 TrainJob does not set it and the runtime value is `1`, Kubeflow Trainer sets it to the number of
-GPUs per node in `resourcesPerNode`, so a TrainJob with 4 GPUs per node starts 4 processes per node.
+GPUs per node from `spec.trainer.resourcesPerNode`, or from the runtime resources when the TrainJob
+does not set them, so a TrainJob with 4 GPUs per node starts 4 processes per node.
 
 You can check the generated hostfile with the following command:
 
@@ -89,8 +90,9 @@ the nodes as follows:
 | `env`              | Yes      | Only with `runLauncherAsNode: true`                        |
 | `resourcesPerNode` | Yes      | Only with `runLauncherAsNode: true`                        |
 
-Since `mpirun` starts the processes on the nodes over SSH, use `mpirun -x <NAME>` to forward an
-environment variable from the launcher to all MPI processes.
+The `env` of the nodes is set on the SSH server container, and the processes that `mpirun` starts
+over SSH do not inherit it. Use `mpirun -x <NAME>` to forward an environment variable from the
+launcher to all MPI processes.
 
 With `runLauncherAsNode: false`, the nodes keep the resources of the runtime. You can set them with
 [runtime patches](../operator-guides/runtime-patches) on the `node` container of the `node`
@@ -102,10 +104,14 @@ replicatedJob.
 application and the same MPI version. Both OpenMPI 4 and OpenMPI 5 are supported. Besides OpenMPI
 and the training code, the image must provide what the runtime expects on the nodes:
 
-- The OpenSSH server and client, and the `sshd` configuration file that the node command uses. The
-  built-in runtimes start `sshd` with `/home/mpiuser/.sshd_config`, listening on port 2222.
+- The OpenSSH server and client, and their configuration. The built-in runtimes start `sshd` with
+  `/home/mpiuser/.sshd_config`, listening on port 2222, and `/etc/ssh/ssh_config` makes the SSH
+  client connect to port 2222 without host key checks. Both files come from the
+  `mpioperator/base` image.
 - A user that matches the security context of the runtime, and whose home holds the SSH keys mount
   path. The built-in runtimes use `mpiuser` with UID 1000 and `/home/mpiuser/.ssh`.
+- OpenMPI and the training dependencies on the default `PATH` of SSH sessions, since the processes
+  that `mpirun` starts over SSH do not inherit the `ENV` of the image.
 
 The simplest way to meet these requirements is to extend the image of the runtime:
 
