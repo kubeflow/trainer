@@ -133,8 +133,8 @@ COPY train.py /home/mpiuser/train.py
 
 ## Create a TrainJob
 
-The following TrainJob runs a training script on two nodes with 4 GPUs each, using the
-`deepspeed-distributed` runtime:
+The following TrainJob runs two MPI processes on each of two nodes, using the
+`deepspeed-distributed` runtime, and prints the rank of every process and the Pod it runs on:
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
@@ -148,25 +148,36 @@ spec:
     apiGroup: trainer.kubeflow.org
   trainer:
     numNodes: 2
-    image: docker.io/my-org/my-mpi-image:latest
+    numProcPerNode: 2
     command:
       - mpirun
       - python3
-      - /home/mpiuser/train.py
-    resourcesPerNode:
-      limits:
-        nvidia.com/gpu: 4
+      - -c
+      - |
+        import os, socket
+        rank, size = os.environ["OMPI_COMM_WORLD_RANK"], os.environ["OMPI_COMM_WORLD_SIZE"]
+        print(f"Rank {rank} of {size} on {socket.gethostname()}")
 ```
 
 Since the runtime enables `runLauncherAsNode`, the TrainJob creates one launcher Pod and one node
-Pod, both with 4 GPUs. Since the runtime sets `numProcPerNode: 1`, each node gets 4 slots, and
-`mpirun` starts 8 processes.
+Pod, and `mpirun` starts 4 processes. To train on GPUs, set `resourcesPerNode`, for example with
+`nvidia.com/gpu: 4`, and leave out `numProcPerNode`, so that each node gets one slot per GPU.
 
 `mpirun` forwards the output of every process to the launcher, so read the logs from the launcher
 Pod:
 
 ```sh
 kubectl logs -l jobset.sigs.k8s.io/jobset-name=my-mpi-job,jobset.sigs.k8s.io/replicatedjob-name=launcher
+```
+
+You should see the output of the four processes as follows:
+
+```
+Warning: Permanently added '[my-mpi-job-node-0-0.my-mpi-job]:2222' (ECDSA) to the list of known hosts.
+Rank 0 of 4 on my-mpi-job-launcher-0-0
+Rank 1 of 4 on my-mpi-job-launcher-0-0
+Rank 2 of 4 on my-mpi-job-node-0-0
+Rank 3 of 4 on my-mpi-job-node-0-0
 ```
 
 ## Next Steps
