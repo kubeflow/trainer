@@ -66,10 +66,7 @@ kubectl get clustertrainingruntime deepspeed-distributed -o jsonpath='{.spec.mlP
 ### Processes per Node
 
 The `slots` value of each hostfile line is the number of MPI processes that `mpirun` starts on
-that node. `spec.trainer.numProcPerNode` sets it and overrides the value of the runtime. When the
-TrainJob does not set it and the runtime value is `1`, Kubeflow Trainer sets it to the number of
-GPUs per node from `spec.trainer.resourcesPerNode`, or from the runtime resources when the TrainJob
-does not set them, so a TrainJob with 4 GPUs per node starts 4 processes per node.
+that node. `spec.trainer.numProcPerNode` sets it and overrides the value of the runtime. When this value is omitted, Kubeflow Trainer sets it to the number of GPUs per node. For example, a TrainJob with 4 GPUs per node starts 4 processes per node.
 
 You can check the generated hostfile with the following command:
 
