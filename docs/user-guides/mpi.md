@@ -33,7 +33,7 @@ Since the hostfile is already configured, the TrainJob command does not need the
 
 ## Choose an MPI Runtime
 
-Kubeflow Trainer includes two MPI runtimes:
+Kubeflow Trainer includes two builtin MPI runtimes:
 
 - [`deepspeed-distributed`](https://github.com/kubeflow/trainer/blob/master/manifests/base/runtimes/deepspeed_distributed.yaml),
   used in [the DeepSpeed guide](deepspeed).
