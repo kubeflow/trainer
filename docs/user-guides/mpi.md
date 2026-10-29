@@ -48,6 +48,12 @@ MPI runtimes. A runtime uses MPI when its `spec.mlPolicy` has the `mpi` field:
 kubectl get clustertrainingruntime deepspeed-distributed -o jsonpath='{.spec.mlPolicy}'
 ```
 
+You should see the MPI policy of the runtime as follows:
+
+```json
+{"mpi":{"mpiImplementation":"OpenMPI","numProcPerNode":1,"runLauncherAsNode":true,"sshAuthMountPath":"/home/mpiuser/.ssh"},"numNodes":1}
+```
+
 ## Configure the Training Nodes
 
 ### Number of Nodes
@@ -72,6 +78,14 @@ You can check the generated hostfile with the following command:
 
 ```sh
 kubectl get configmap <trainjob-name>-mpi-hostfile -o jsonpath='{.data.hostfile}'
+```
+
+For example, a TrainJob named `my-mpi-job` with `numNodes: 2` and 4 GPUs per node, using the
+`deepspeed-distributed` runtime, gets one line for the node Pod and one for the launcher Pod:
+
+```
+my-mpi-job-node-0-0.my-mpi-job slots=4
+my-mpi-job-launcher-0-0.my-mpi-job slots=4
 ```
 
 ### Trainer Fields on the Launcher and the Nodes
