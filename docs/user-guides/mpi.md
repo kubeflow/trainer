@@ -16,6 +16,8 @@ An MPI runtime is a `ClusterTrainingRuntime` or `TrainingRuntime` with
   nodes over SSH and starts the MPI processes there.
 - `node`: runs the SSH server and waits for `mpirun` to start the MPI processes.
 
+Kubeflow Trainer currently supports OpenMPI 4 and OpenMPI 5.
+
 For every TrainJob, Kubeflow Trainer generates:
 
 - An SSH key pair in the `<trainjob-name>-mpi-ssh-auth` Secret, mounted on the launcher and on the
@@ -111,8 +113,8 @@ replicatedJob.
 ## Use a Custom Image
 
 `spec.trainer.image` runs on the launcher and on the nodes, so all MPI processes run the same
-application and the same MPI version. Both OpenMPI 4 and OpenMPI 5 are supported. Besides OpenMPI
-and the training code, the image must provide what the runtime expects on the nodes:
+application and the same MPI version. Besides OpenMPI and the training code, the image must
+provide what the runtime expects on the nodes:
 
 - The OpenSSH server and client, and their configuration. The built-in runtimes start `sshd` with
   `/home/mpiuser/.sshd_config`, listening on port 2222, and `/etc/ssh/ssh_config` makes the SSH
