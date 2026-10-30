@@ -1587,7 +1587,7 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"objectives", "parameters", "trainJobTemplate"},
+				Required: []string{"objectives", "searchAlgorithm", "parameters", "trainJobTemplate"},
 			},
 		},
 		Dependencies: []string{

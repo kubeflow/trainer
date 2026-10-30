@@ -15310,6 +15310,7 @@
         "type": "object",
         "required": [
           "objectives",
+          "searchAlgorithm",
           "parameters",
           "trainJobTemplate"
         ],
