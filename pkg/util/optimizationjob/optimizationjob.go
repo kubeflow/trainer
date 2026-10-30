@@ -59,20 +59,35 @@ func getAlgorithmName(optJob *trainer.OptimizationJob) string {
 	return ""
 }
 
+const (
+	TrialNameSeparator      = "-trial-"
+	TrialRandomSuffixLength = 8
+	TrialSuffixLength       = len(TrialNameSeparator) + TrialRandomSuffixLength // 15
+)
+
 // GenerateTrialName gives each trial a random suffix, including trials with
 // identical parameter assignments.
 func GenerateTrialName(optJobName string) string {
-	return generateTrialName(optJobName, utilrand.String(8))
+	return generateTrialName(optJobName, utilrand.String(TrialRandomSuffixLength))
 }
 
 func generateTrialName(optJobName, randomSuffix string) string {
-	const separator = "-trial-"
-	maxPrefix := 63 - len(separator) - len(randomSuffix)
+	maxPrefix := 63 - TrialSuffixLength
 	prefix := optJobName
 	if len(prefix) > maxPrefix {
 		prefix = strings.TrimRight(prefix[:maxPrefix], "-")
 	}
-	return prefix + separator + randomSuffix
+	return prefix + TrialNameSeparator + randomSuffix
+}
+
+// MaxOptimizationJobNameLength returns the maximum allowed length of an OptimizationJob name
+// for a given maximum TrainJob name length.
+func MaxOptimizationJobNameLength(maxTrainJobLength int) int {
+	maxLen := maxTrainJobLength - TrialSuffixLength
+	if maxLen < 0 {
+		return 0
+	}
+	return maxLen
 }
 
 var ErrObjectiveMetricMissing = errors.New("objective metric is missing")

@@ -165,6 +165,38 @@ func TestGenerateTrialName(t *testing.T) {
 	})
 }
 
+func TestMaxOptimizationJobNameLength(t *testing.T) {
+	cases := map[string]struct {
+		maxTrainJobLen int
+		wantLen        int
+	}{
+		"dataset-initializer with max TrainJob length 33": {
+			maxTrainJobLen: 33,
+			wantLen:        18,
+		},
+		"node with max TrainJob length 48": {
+			maxTrainJobLen: 48,
+			wantLen:        33,
+		},
+		"launcher with max TrainJob length 44": {
+			maxTrainJobLen: 44,
+			wantLen:        29,
+		},
+		"trainJob length less than trial suffix length clamps to 0": {
+			maxTrainJobLen: 10,
+			wantLen:        0,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := MaxOptimizationJobNameLength(tc.maxTrainJobLen)
+			if got != tc.wantLen {
+				t.Errorf("MaxOptimizationJobNameLength(%d) = %d, want %d", tc.maxTrainJobLen, got, tc.wantLen)
+			}
+		})
+	}
+}
+
 func TestGetFinalObjectiveMetric(t *testing.T) {
 	cases := map[string]struct {
 		metrics         []trainer.Metric

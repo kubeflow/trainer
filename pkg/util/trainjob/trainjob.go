@@ -17,6 +17,8 @@ limitations under the License.
 package trainjob
 
 import (
+	"strconv"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
@@ -49,6 +51,29 @@ func RuntimeRefIsTrainingRuntime(ref trainer.RuntimeRef) bool {
 func RuntimeRefIsClusterTrainingRuntime(ref trainer.RuntimeRef) bool {
 	return ptr.Equal(ref.APIGroup, &trainer.GroupVersion.Group) &&
 		ptr.Equal(ref.Kind, ptr.To(trainer.ClusterTrainingRuntimeKind))
+}
+
+// MaxTrainJobNameLength returns the maximum allowed length of a TrainJob name for a given
+// replicatedJob name, replicas, and completions. The limit is derived from JobSet's pod name
+// scheme (<jobset>-<replicatedJob>-<maxJobIndex>-<maxPodIndex>-<5-char-hash>), which must not
+// exceed the Kubernetes DNS-1035 label limit of 63 characters.
+func MaxTrainJobNameLength(rJobName string, replicas, completions int32) int {
+	if replicas < 1 {
+		replicas = 1
+	}
+	if completions < 1 {
+		completions = 1
+	}
+	maxJobIndex := strconv.Itoa(int(replicas - 1))
+	maxPodIndex := strconv.Itoa(int(completions - 1))
+	// Pod name is: fmt.Sprintf("%s-%s-%s-%s-abcde", trainJobName, rJobName, maxJobIndex, maxPodIndex)
+	// The separators and suffix add 1 + 1 + 1 + 1 + 5 = 9 extra characters.
+	extraPodChars := len(rJobName) + len(maxJobIndex) + len(maxPodIndex) + 9
+	maxLen := 63 - extraPodChars
+	if maxLen < 0 {
+		return 0
+	}
+	return maxLen
 }
 
 // ResourceClaimsPaths returns the paths of the DRA resource claims which the TrainJob declares:
