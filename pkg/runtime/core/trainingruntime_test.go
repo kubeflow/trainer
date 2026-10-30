@@ -3007,7 +3007,7 @@ func TestToApplyConfig(t *testing.T) {
 	}
 }
 
-func TestNewRuntimeInfoResourcesPerNode(t *testing.T) {
+func TestNewRuntimeInfo(t *testing.T) {
 	gpu := corev1.ResourceName("nvidia.com/gpu")
 	replicatedJob := func(name string, labels map[string]string) jobsetv1alpha2.ReplicatedJob {
 		rJob := jobsetv1alpha2.ReplicatedJob{Name: name}
