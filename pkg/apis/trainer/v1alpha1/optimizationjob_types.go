@@ -169,6 +169,8 @@ type Double string
 
 // UniformSpace defines a continuous uniform distribution over [Min, Max].
 // +kubebuilder:validation:XValidation:rule="double(self.min) < double(self.max)",message="min must be strictly less than max"
+// +kubebuilder:validation:XValidation:rule="self.type != 'Int' || self.min.matches('^-?(0|[1-9][0-9]{0,14})$')",message="must be an integer written without a fractional part or exponent, with at most 15 digits, when type is Int",fieldPath=".min"
+// +kubebuilder:validation:XValidation:rule="self.type != 'Int' || self.max.matches('^-?(0|[1-9][0-9]{0,14})$')",message="must be an integer written without a fractional part or exponent, with at most 15 digits, when type is Int",fieldPath=".max"
 type UniformSpace struct {
 	// min is the minimum value of the uniform search space.
 	// +kubebuilder:validation:Type=string
@@ -191,6 +193,8 @@ type UniformSpace struct {
 // LogUniformSpace defines a continuous log-uniform distribution over [Min, Max].
 // +kubebuilder:validation:XValidation:rule="double(self.min) > 0.0",message="min must be strictly greater than 0"
 // +kubebuilder:validation:XValidation:rule="double(self.min) < double(self.max)",message="min must be strictly less than max"
+// +kubebuilder:validation:XValidation:rule="self.type != 'Int' || self.min.matches('^-?(0|[1-9][0-9]{0,14})$')",message="must be an integer written without a fractional part or exponent, with at most 15 digits, when type is Int",fieldPath=".min"
+// +kubebuilder:validation:XValidation:rule="self.type != 'Int' || self.max.matches('^-?(0|[1-9][0-9]{0,14})$')",message="must be an integer written without a fractional part or exponent, with at most 15 digits, when type is Int",fieldPath=".max"
 type LogUniformSpace struct {
 	// min is the minimum value of the log-uniform search space.
 	// +kubebuilder:validation:Type=string
