@@ -185,7 +185,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	masterEnvVars := []corev1ac.EnvVarApplyConfiguration{
 		*corev1ac.EnvVar().
 			WithName(constants.TorchEnvMasterAddr).
-			WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
+			WithValue(runtime.NodeCoordinatorHost(info, trainJob.Name)),
 		*corev1ac.EnvVar().
 			WithName(constants.TorchEnvMasterPort).
 			WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
@@ -209,9 +209,9 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
 			if numNodes > 1 || numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal > 1 || numProcPerNode.Type == intstr.String && gpuQ > 1 {
 				newCommand = append(newCommand,
-					fmt.Sprintf("%s=%s-%s-0-0.%s:%d",
+					fmt.Sprintf("%s=%s:%d",
 						constants.TorchTuneArgRdzvEndpoint,
-						trainJob.Name, constants.Node, trainJob.Name, constants.ContainerTrainerPort,
+						runtime.NodeCoordinatorHost(info, trainJob.Name), constants.ContainerTrainerPort,
 					),
 				)
 			}

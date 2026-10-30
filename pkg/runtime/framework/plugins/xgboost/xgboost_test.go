@@ -331,6 +331,74 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
+		"tracker URI uses the JobSet network subdomain": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							XGBoostPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+				runtime.WithTemplateSpecObjApply(&jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					Network: jobsetv1alpha2ac.Network().WithSubdomain("custom-subdomain"),
+				}),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						XGBoostPolicy().
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						Network: jobsetv1alpha2ac.Network().WithSubdomain("custom-subdomain"),
+					},
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](1),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name: constants.Node,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.XGBoostEnvTrackerURI),
+									Value: ptr.To(fmt.Sprintf("test-job-%s-0-0.custom-subdomain", constants.Node)),
+								},
+								{
+									Name:  ptr.To(constants.XGBoostEnvTrackerPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name: ptr.To(constants.XGBoostEnvTaskID),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.XGBoostEnvNumWorker),
+									Value: ptr.To("1"),
+								},
+							},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
 		"trainer is nil - DMLC_NUM_WORKER uses the GPUs in the runtime": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(

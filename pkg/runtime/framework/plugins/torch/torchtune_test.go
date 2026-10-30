@@ -17,17 +17,24 @@ limitations under the License.
 package torch
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/ptr"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -273,6 +280,77 @@ func TestExtractOverridesFromRuntime(t *testing.T) {
 			got := extractOverridesFromRuntime(tc.info)
 			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Errorf("Unexpected overrides (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestTorchTuneRdzvEndpoint(t *testing.T) {
+	cases := map[string]struct {
+		objApply     any
+		wantEndpoint string
+	}{
+		"rendezvous endpoint uses the TrainJob name as the subdomain by default": {
+			wantEndpoint: fmt.Sprintf("--rdzv_endpoint=torchtune-job-node-0-0.torchtune-job:%d", constants.ContainerTrainerPort),
+		},
+		"rendezvous endpoint uses the JobSet network subdomain": {
+			objApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+				Network: jobsetv1alpha2ac.Network().WithSubdomain("custom-subdomain"),
+			},
+			wantEndpoint: fmt.Sprintf("--rdzv_endpoint=torchtune-job-node-0-0.custom-subdomain:%d", constants.ContainerTrainerPort),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+			p, err := New(ctx, utiltesting.NewClientBuilder().Build(), nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize Torch plugin: %v", err)
+			}
+
+			trainJob := utiltesting.MakeTrainJobWrapper("default", "torchtune-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(2).
+						NumProcPerNode(8).
+						Container(
+							"ghcr.io/kubeflow/trainer/torchtune-trainer",
+							[]string{"tune", "run"},
+							nil,
+							corev1.ResourceList{"example.com/gpu": resource.MustParse("8")},
+						).
+						Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.3-70b",
+				).
+				Obj()
+			opts := []runtime.InfoOption{
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 2, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			}
+			if tc.objApply != nil {
+				opts = append(opts, runtime.WithTemplateSpecObjApply(tc.objApply))
+			}
+			info := runtime.NewInfo(opts...)
+
+			if err := p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(info, trainJob); err != nil {
+				t.Fatalf("Unexpected error from EnforceMLPolicy: %v", err)
+			}
+			if got := trainJob.Spec.Trainer.Command[len(constants.TorchTuneEntrypoint)]; got != tc.wantEndpoint {
+				t.Errorf("Unexpected rendezvous endpoint (-want,+got):\n%s", cmp.Diff(tc.wantEndpoint, got))
 			}
 		})
 	}

@@ -907,3 +907,78 @@ func TestFindContainerByName(t *testing.T) {
 		})
 	}
 }
+
+func TestPodNetworkSubdomain(t *testing.T) {
+	cases := map[string]struct {
+		info         *Info
+		trainJobName string
+		want         string
+	}{
+		"no template object falls back to the TrainJob name": {
+			info:         NewInfo(),
+			trainJobName: "test-job",
+			want:         "test-job",
+		},
+		"template object of another type falls back to the TrainJob name": {
+			info:         NewInfo(WithTemplateSpecObjApply(&batchv1ac.JobSpecApplyConfiguration{})),
+			trainJobName: "test-job",
+			want:         "test-job",
+		},
+		"JobSet without network falls back to the TrainJob name": {
+			info:         NewInfo(WithTemplateSpecObjApply(&jobsetv1alpha2ac.JobSetSpecApplyConfiguration{})),
+			trainJobName: "test-job",
+			want:         "test-job",
+		},
+		"JobSet network without subdomain falls back to the TrainJob name": {
+			info: NewInfo(WithTemplateSpecObjApply(&jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+				Network: jobsetv1alpha2ac.Network().WithEnableDNSHostnames(true),
+			})),
+			trainJobName: "test-job",
+			want:         "test-job",
+		},
+		"JobSet network subdomain is used": {
+			info: NewInfo(WithTemplateSpecObjApply(&jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+				Network: jobsetv1alpha2ac.Network().WithSubdomain("custom-subdomain"),
+			})),
+			trainJobName: "test-job",
+			want:         "custom-subdomain",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := PodNetworkSubdomain(tc.info, tc.trainJobName)
+			if diff := cmp.Diff(tc.want, got); len(diff) != 0 {
+				t.Errorf("Unexpected subdomain (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestNodeCoordinatorHost(t *testing.T) {
+	cases := map[string]struct {
+		info         *Info
+		trainJobName string
+		want         string
+	}{
+		"default subdomain": {
+			info:         NewInfo(),
+			trainJobName: "test-job",
+			want:         "test-job-node-0-0.test-job",
+		},
+		"JobSet network subdomain": {
+			info: NewInfo(WithTemplateSpecObjApply(&jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+				Network: jobsetv1alpha2ac.Network().WithSubdomain("custom-subdomain"),
+			})),
+			trainJobName: "test-job",
+			want:         "test-job-node-0-0.custom-subdomain",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := NodeCoordinatorHost(tc.info, tc.trainJobName)
+			if diff := cmp.Diff(tc.want, got); len(diff) != 0 {
+				t.Errorf("Unexpected coordinator host (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
