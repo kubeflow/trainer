@@ -179,8 +179,8 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 		os.Exit(1)
 	}
 
-	if err := metrics.SetupServer(mgr, &cfg.Metrics, cfg.TLS); err != nil {
-		setupLog.Error(err, "Could not create metrics server")
+	if err := metrics.Setup(mgr, &cfg.Metrics, cfg.TLS); err != nil {
+		setupLog.Error(err, "Could not create metrics server and instrumentation")
 		os.Exit(1)
 	}
 
