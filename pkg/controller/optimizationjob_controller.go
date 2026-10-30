@@ -129,11 +129,7 @@ func (r *OptimizationJobReconciler) expectTrialCreation(key types.NamespacedName
 		expectations = &trialCreationExpectations{uid: uid, names: make(map[string]time.Time)}
 		r.pendingTrials[key] = expectations
 	}
-	c := r.clock
-	if c == nil {
-		c = clock.RealClock{}
-	}
-	expectations.names[name] = c.Now()
+	expectations.names[name] = r.clock.Now()
 }
 
 func (r *OptimizationJobReconciler) forgetTrialCreation(key types.NamespacedName, name string) {
@@ -166,13 +162,9 @@ func (r *OptimizationJobReconciler) observeTrialCreations(key types.NamespacedNa
 	if len(expectations.names) == 0 {
 		delete(r.pendingTrials, key)
 	}
-	c := r.clock
-	if c == nil {
-		c = clock.RealClock{}
-	}
 	var overdue []string
 	for name, createdAt := range expectations.names {
-		if c.Since(createdAt) >= trialExpectationVerifyDelay {
+		if r.clock.Since(createdAt) >= trialExpectationVerifyDelay {
 			overdue = append(overdue, name)
 		}
 	}
@@ -553,6 +545,7 @@ func (r *OptimizationJobReconciler) createTrainJobs(ctx context.Context, optJob 
 					r.forgetTrialCreation(client.ObjectKeyFromObject(optJob), newTrainJob.Name)
 				} else {
 					// The Create was committed despite the error.
+					log.V(1).Info("TrainJob trial was committed despite Create error", "trainJob", newTrainJob.Name, "error", err)
 					continue
 				}
 			}

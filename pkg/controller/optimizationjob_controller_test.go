@@ -437,7 +437,7 @@ func TestBuildSuggestionRequest_ReconstructsTrialHistory(t *testing.T) {
 	}
 }
 
-func TestReconcile_OptimizationJobReconciler(t *testing.T) {
+func TestReconcileOptimizationJob(t *testing.T) {
 	serviceName := optimizationjob.GetAlgorithmServiceName(getBaseOptJob())
 	completedTrial := func(name string, metrics []trainer.Metric) *trainer.TrainJob {
 		return &trainer.TrainJob{
@@ -1120,6 +1120,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				Recorder:              &events.FakeRecorder{},
 				SearchAlgorithmClient: algorithmClient,
 				APIReader:             mockCli,
+				clock:                 clocktesting.NewFakePassiveClock(time.Now()),
 				pendingTrials:         make(map[types.NamespacedName]*trialCreationExpectations),
 			}
 
@@ -1247,6 +1248,22 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 		}
 	}
 
+	makeTrainJob := func(name string) *trainer.TrainJob {
+		return &trainer.TrainJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: "default",
+				OwnerReferences: []metav1.OwnerReference{{
+					APIVersion: trainer.GroupVersion.String(),
+					Kind:       trainer.OptimizationJobKind,
+					Name:       "test-optjob",
+					UID:        "optjob-uid",
+					Controller: ptr.To(true),
+				}},
+			},
+		}
+	}
+
 	getAlgorithmServiceAndDeploy := func(optJob *trainer.OptimizationJob) (*corev1.Service, *appsv1.Deployment) {
 		svcName := optimizationjob.GetAlgorithmServiceName(optJob)
 		svc := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: svcName, Namespace: optJob.Namespace}}
@@ -1261,6 +1278,7 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 
 	cases := map[string]struct {
 		objs                []client.Object
+		omitOptJob          bool
 		cachedTrainJobs     sets.Set[string]
 		pendingTrials       map[string]time.Duration // Maps trial name to age offset
 		failCreate          map[int]bool             // call index -> persisted?
@@ -1268,47 +1286,34 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 		wantResult          ctrl.Result
 		wantErr             bool
 		wantSuggestionCalls int
+		wantRequestNumber   *int32
 		wantPendingTrials   int
-		verifyFollowup      func(t *testing.T, ctx context.Context, r *OptimizationJobReconciler, baseClient client.Client, req reconcile.Request, suggestions *mockSearchAlgorithmClient, cachedTrainJobs *sets.Set[string], failCreate *map[int]bool)
+		wantTrainJobs       *int
 	}{
 		"hidden trials hold the parallel budget": {
 			cachedTrainJobs:   sets.New[string](),
 			pendingTrials:     map[string]time.Duration{"trial-1": 0, "trial-2": 0},
-			wantResult:        ctrl.Result{RequeueAfter: time.Second},
+			wantResult:        ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
 			wantPendingTrials: 2,
 		},
 		"partially observed trials hold budget": {
 			cachedTrainJobs:   sets.New[string]("trial-1"),
 			pendingTrials:     map[string]time.Duration{"trial-2": 0},
-			wantResult:        ctrl.Result{RequeueAfter: time.Second},
+			wantResult:        ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
 			wantPendingTrials: 1,
 		},
 		"overdue trial that is still live retains slot": {
-			objs: []client.Object{
-				&trainer.TrainJob{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "trial-1",
-						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{{
-							APIVersion: trainer.GroupVersion.String(),
-							Kind:       trainer.OptimizationJobKind,
-							Name:       "test-optjob",
-							UID:        "optjob-uid",
-							Controller: ptr.To(true),
-						}},
-					},
-				},
-			},
+			objs:              []client.Object{makeTrainJob("trial-1")},
 			cachedTrainJobs:   sets.New[string](),
 			pendingTrials:     map[string]time.Duration{"trial-1": -40 * time.Second},
-			wantResult:        ctrl.Result{RequeueAfter: time.Second},
+			wantResult:        ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
 			wantPendingTrials: 1,
 		},
 		"overdue trial that was deleted frees its slot": {
 			objs:                []client.Object{},
 			cachedTrainJobs:     sets.New[string](),
 			pendingTrials:       map[string]time.Duration{"trial-1": -40 * time.Second},
-			wantResult:          ctrl.Result{RequeueAfter: time.Second},
+			wantResult:          ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
 			wantSuggestionCalls: 1,
 			wantPendingTrials:   2,
 		},
@@ -1330,7 +1335,7 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 			},
 			cachedTrainJobs:     sets.New[string](),
 			pendingTrials:       map[string]time.Duration{"trial-1": -40 * time.Second},
-			wantResult:          ctrl.Result{RequeueAfter: time.Second},
+			wantResult:          ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
 			wantSuggestionCalls: 1,
 			wantPendingTrials:   2,
 		},
@@ -1341,31 +1346,18 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 			wantErr:           true,
 			wantPendingTrials: 1,
 		},
-		"create rejected clears slot and can be retried": {
+		"create rejected clears slot and returns error": {
 			failCreate:          map[int]bool{1: false, 2: false},
 			wantSuggestionCalls: 1,
 			wantErr:             true,
 			wantPendingTrials:   0,
-			verifyFollowup: func(t *testing.T, ctx context.Context, r *OptimizationJobReconciler, baseClient client.Client, req reconcile.Request, suggestions *mockSearchAlgorithmClient, cachedTrainJobs *sets.Set[string], failCreate *map[int]bool) {
-				*failCreate = nil
-				res, err := r.Reconcile(ctx, req)
-				if err != nil {
-					t.Fatalf("Reconcile() on retry failed: %v", err)
-				}
-				if diff := cmp.Diff(ctrl.Result{RequeueAfter: trialCacheRequeueDelay}, res); len(diff) != 0 {
-					t.Errorf("Unexpected Reconcile() retry result (-want, +got): \n%s", diff)
-				}
-				if suggestions.calls != 2 {
-					t.Fatalf("suggestion calls after retry = %d, want 2", suggestions.calls)
-				}
-				var trainJobs trainer.TrainJobList
-				if err := baseClient.List(ctx, &trainJobs, client.InNamespace("default")); err != nil {
-					t.Fatal(err)
-				}
-				if len(trainJobs.Items) != 2 {
-					t.Fatalf("created %d trials after retry, want 2", len(trainJobs.Items))
-				}
-			},
+			wantTrainJobs:       ptr.To(0),
+		},
+		"retry after create rejected succeeds when slot was cleared": {
+			wantSuggestionCalls: 1,
+			wantResult:          ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
+			wantPendingTrials:   2,
+			wantTrainJobs:       ptr.To(2),
 		},
 		"response lost after object was saved retains slot": {
 			failCreate:          map[int]bool{1: true, 2: true},
@@ -1373,77 +1365,33 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 			wantErr:             false,
 			wantResult:          ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
 			wantPendingTrials:   2,
+			wantTrainJobs:       ptr.To(2),
 		},
-		"partial batch create failure retains succeeded trial while retrying failed trial": {
+		"partial batch create failure retains succeeded trial": {
 			cachedTrainJobs:     sets.New[string](),
 			failCreate:          map[int]bool{2: false},
 			wantSuggestionCalls: 1,
 			wantErr:             true,
 			wantPendingTrials:   1,
-			verifyFollowup: func(t *testing.T, ctx context.Context, r *OptimizationJobReconciler, baseClient client.Client, req reconcile.Request, suggestions *mockSearchAlgorithmClient, cachedTrainJobs *sets.Set[string], failCreate *map[int]bool) {
-				var trainJobs trainer.TrainJobList
-				if err := baseClient.List(ctx, &trainJobs, client.InNamespace("default")); err != nil {
-					t.Fatal(err)
-				}
-				if len(trainJobs.Items) != 1 {
-					t.Fatalf("created %d trials in first reconcile, want 1", len(trainJobs.Items))
-				}
-
-				*failCreate = nil
-				// While the first created trial is still hidden from cache, pendingTrials > 0 holds
-				// the budget and delays spawning more trials.
-				res, err := r.Reconcile(ctx, req)
-				if err != nil {
-					t.Fatalf("Reconcile() while first trial is hidden failed: %v", err)
-				}
-				if diff := cmp.Diff(ctrl.Result{RequeueAfter: trialCacheRequeueDelay}, res); len(diff) != 0 {
-					t.Errorf("Unexpected Reconcile() result while hidden (-want, +got): \n%s", diff)
-				}
-				if suggestions.calls != 1 {
-					t.Fatalf("suggestion calls while first trial is hidden = %d, want 1", suggestions.calls)
-				}
-				if err := baseClient.List(ctx, &trainJobs, client.InNamespace("default")); err != nil {
-					t.Fatal(err)
-				}
-				if len(trainJobs.Items) != 1 {
-					t.Fatalf("created %d trials while first trial is hidden, want 1", len(trainJobs.Items))
-				}
-
-				// Once the cache observes the first trial, pendingTrials drops to 0, allowing the
-				// reconciler to request the remaining 1 trial to satisfy ParallelTrials=2.
-				*cachedTrainJobs = sets.New[string](trainJobs.Items[0].Name)
-				res, err = r.Reconcile(ctx, req)
-				if err != nil {
-					t.Fatalf("Reconcile() after first trial observed failed: %v", err)
-				}
-				if diff := cmp.Diff(ctrl.Result{RequeueAfter: trialCacheRequeueDelay}, res); len(diff) != 0 {
-					t.Errorf("Unexpected Reconcile() result (-want, +got): \n%s", diff)
-				}
-				if suggestions.calls != 2 {
-					t.Fatalf("suggestion calls after cache catchup = %d, want 2", suggestions.calls)
-				}
-				if suggestions.lastReq.CurrentRequestNumber != 1 {
-					t.Fatalf("last request number = %d, want 1", suggestions.lastReq.CurrentRequestNumber)
-				}
-				if err := baseClient.List(ctx, &trainJobs, client.InNamespace("default")); err != nil {
-					t.Fatal(err)
-				}
-				if len(trainJobs.Items) != 2 {
-					t.Fatalf("created %d trials after second trial spawned, want 2", len(trainJobs.Items))
-				}
-
-				// The replacement trial is now pending; another reconcile while it is hidden requeues.
-				res, err = r.Reconcile(ctx, req)
-				if err != nil {
-					t.Fatalf("Reconcile() while second trial is hidden failed: %v", err)
-				}
-				if diff := cmp.Diff(ctrl.Result{RequeueAfter: trialCacheRequeueDelay}, res); len(diff) != 0 {
-					t.Errorf("Unexpected Reconcile() result (-want, +got): \n%s", diff)
-				}
-				if suggestions.calls != 2 {
-					t.Fatalf("suggestion calls = %d, want 2", suggestions.calls)
-				}
-			},
+			wantTrainJobs:       ptr.To(1),
+		},
+		"retry while succeeded trial is still hidden delays spawning more trials": {
+			objs:              []client.Object{makeTrainJob("trial-1")},
+			cachedTrainJobs:   sets.New[string](),
+			pendingTrials:     map[string]time.Duration{"trial-1": 0},
+			wantResult:        ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
+			wantPendingTrials: 1,
+			wantTrainJobs:     ptr.To(1),
+		},
+		"retry after succeeded trial is observed by cache requests remaining trial": {
+			objs:                []client.Object{makeTrainJob("trial-1")},
+			cachedTrainJobs:     sets.New[string]("trial-1"),
+			pendingTrials:       map[string]time.Duration{"trial-1": 0},
+			wantResult:          ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
+			wantSuggestionCalls: 1,
+			wantRequestNumber:   ptr.To[int32](1),
+			wantPendingTrials:   1,
+			wantTrainJobs:       ptr.To(2),
 		},
 		"expectations cleared on job Complete": {
 			objs: []client.Object{
@@ -1470,6 +1418,53 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 			pendingTrials:     map[string]time.Duration{"trial-1": 0},
 			wantPendingTrials: 0,
 		},
+		"expectations cleared on job Failed": {
+			objs: []client.Object{
+				&trainer.TrainJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "failed-trial",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: trainer.GroupVersion.String(),
+							Kind:       trainer.OptimizationJobKind,
+							Name:       "test-optjob",
+							UID:        "optjob-uid",
+							Controller: ptr.To(true),
+						}},
+					},
+					Status: trainer.TrainJobStatus{
+						Conditions: []metav1.Condition{
+							{Type: trainer.TrainJobFailed, Status: metav1.ConditionTrue},
+						},
+					},
+				},
+			},
+			pendingTrials:     map[string]time.Duration{"trial-1": 0},
+			wantPendingTrials: 0,
+		},
+		"expectations cleared on unsupported algorithm": {
+			objs: []client.Object{
+				&trainer.OptimizationJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-optjob",
+						Namespace: metav1.NamespaceDefault,
+						UID:       types.UID("optjob-uid"),
+					},
+					Spec: trainer.OptimizationJobSpec{
+						NumTrials:       3,
+						ParallelTrials:  2,
+						SearchAlgorithm: &trainer.SearchAlgorithm{},
+					},
+				},
+			},
+			pendingTrials:     map[string]time.Duration{"trial-1": 0},
+			wantPendingTrials: 0,
+		},
+		"expectations cleared when OptimizationJob not found": {
+			omitOptJob:        true,
+			pendingTrials:     map[string]time.Duration{"trial-1": 0},
+			wantPendingTrials: 0,
+		},
 	}
 
 	for name, tc := range cases {
@@ -1487,9 +1482,9 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 			}
 
 			initObjs := tc.objs
-			if !hasOptJob {
+			if !tc.omitOptJob && !hasOptJob {
 				initObjs = append(initObjs, optJob, svc, deploy)
-			} else {
+			} else if !tc.omitOptJob {
 				initObjs = append(initObjs, svc, deploy)
 			}
 
@@ -1537,15 +1532,19 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 					}
 					return c.Create(ctx, obj, opts...)
 				},
-				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					if liveReadErr != nil {
+			})
+
+			var apiReader client.Reader = baseClient
+			if liveReadErr != nil {
+				apiReader = interceptor.NewClient(baseClient, interceptor.Funcs{
+					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 						if _, ok := obj.(*trainer.TrainJob); ok {
 							return liveReadErr
 						}
-					}
-					return c.Get(ctx, key, obj, opts...)
-				},
-			})
+						return c.Get(ctx, key, obj, opts...)
+					},
+				})
+			}
 
 			suggestions := &mockSearchAlgorithmClient{
 				mockedAssignments: [][]trainer.ParameterAssignment{
@@ -1554,13 +1553,14 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 				},
 			}
 
+			now := time.Now()
 			r := &OptimizationJobReconciler{
 				Client:                clientWithInterceptors,
 				Scheme:                baseClient.Scheme(),
 				Recorder:              &events.FakeRecorder{},
 				SearchAlgorithmClient: suggestions,
-				APIReader:             clientWithInterceptors,
-				clock:                 clocktesting.NewFakePassiveClock(time.Now()),
+				APIReader:             apiReader,
+				clock:                 clocktesting.NewFakePassiveClock(now),
 				pendingTrials:         make(map[types.NamespacedName]*trialCreationExpectations),
 			}
 
@@ -1570,7 +1570,7 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 					names: make(map[string]time.Time),
 				}
 				for name, ageOffset := range tc.pendingTrials {
-					r.pendingTrials[optJobKey].names[name] = time.Now().Add(ageOffset)
+					r.pendingTrials[optJobKey].names[name] = now.Add(ageOffset)
 				}
 			}
 
@@ -1586,6 +1586,14 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 			if suggestions.calls != tc.wantSuggestionCalls {
 				t.Errorf("suggestion calls = %d, want %d", suggestions.calls, tc.wantSuggestionCalls)
 			}
+			if tc.wantRequestNumber != nil {
+				if suggestions.lastReq == nil {
+					t.Fatalf("lastReq is nil, want request number %d", *tc.wantRequestNumber)
+				}
+				if suggestions.lastReq.CurrentRequestNumber != *tc.wantRequestNumber {
+					t.Errorf("last request number = %d, want %d", suggestions.lastReq.CurrentRequestNumber, *tc.wantRequestNumber)
+				}
+			}
 
 			gotPending := 0
 			if exps, ok := r.pendingTrials[optJobKey]; ok {
@@ -1595,8 +1603,14 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 				t.Errorf("Unexpected pending trials count (-want, +got): \n%s", diff)
 			}
 
-			if tc.verifyFollowup != nil {
-				tc.verifyFollowup(t, ctx, r, baseClient, req, suggestions, &cachedTrainJobs, &failCreate)
+			if tc.wantTrainJobs != nil {
+				var trainJobs trainer.TrainJobList
+				if err := baseClient.List(ctx, &trainJobs, client.InNamespace("default")); err != nil {
+					t.Fatalf("Failed to list TrainJobs from baseClient: %v", err)
+				}
+				if len(trainJobs.Items) != *tc.wantTrainJobs {
+					t.Errorf("TrainJobs count in baseClient = %d, want %d", len(trainJobs.Items), *tc.wantTrainJobs)
+				}
 			}
 		})
 	}
