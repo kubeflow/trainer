@@ -136,33 +136,65 @@ func TestGetAlgorithmName(t *testing.T) {
 
 func TestGenerateTrialName(t *testing.T) {
 	t.Run("random suffixes distinguish trials", func(t *testing.T) {
-		name1 := generateTrialName("my-optjob", "abc12345")
-		name2 := generateTrialName("my-optjob", "def67890")
+		name1 := generateTrialName("my-optjob", "12345")
+		name2 := generateTrialName("my-optjob", "67890")
 		if name1 == name2 {
 			t.Fatalf("trial names must differ for different suffixes: %q", name1)
 		}
-		if name1 != "my-optjob-trial-abc12345" {
+		if name1 != "my-optjob-t-12345" {
 			t.Errorf("unexpected trial name %q", name1)
 		}
 	})
 
 	t.Run("generated suffix has expected format", func(t *testing.T) {
 		name := GenerateTrialName("my-optjob")
-		if !strings.HasPrefix(name, "my-optjob-trial-") || len(name) != len("my-optjob-trial-")+8 {
+		if !strings.HasPrefix(name, "my-optjob-t-") || len(name) != len("my-optjob-t-")+5 {
 			t.Errorf("unexpected generated trial name %q", name)
 		}
 	})
 
 	t.Run("length limit of 63 characters is enforced", func(t *testing.T) {
 		longName := strings.Repeat("x", 60)
-		trialName := generateTrialName(longName, "abc12345")
+		trialName := generateTrialName(longName, "12345")
 		if len(trialName) > 63 {
 			t.Errorf("GenerateTrialName length %d exceeds 63 characters: %q", len(trialName), trialName)
 		}
-		if !strings.Contains(trialName, "-trial-") {
-			t.Errorf("GenerateTrialName does not contain '-trial-': %q", trialName)
+		if !strings.Contains(trialName, "-t-") {
+			t.Errorf("GenerateTrialName does not contain '-t-': %q", trialName)
 		}
 	})
+}
+
+func TestMaxOptimizationJobNameLength(t *testing.T) {
+	cases := map[string]struct {
+		maxTrainJobLen int
+		wantLen        int
+	}{
+		"dataset-initializer with max TrainJob length 33": {
+			maxTrainJobLen: 33,
+			wantLen:        25,
+		},
+		"node with max TrainJob length 48": {
+			maxTrainJobLen: 48,
+			wantLen:        40,
+		},
+		"launcher with max TrainJob length 44": {
+			maxTrainJobLen: 44,
+			wantLen:        36,
+		},
+		"trainJob length less than trial suffix length clamps to 0": {
+			maxTrainJobLen: 5,
+			wantLen:        0,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := MaxOptimizationJobNameLength(tc.maxTrainJobLen)
+			if got != tc.wantLen {
+				t.Errorf("MaxOptimizationJobNameLength(%d) = %d, want %d", tc.maxTrainJobLen, got, tc.wantLen)
+			}
+		})
+	}
 }
 
 func TestGetFinalObjectiveMetric(t *testing.T) {
