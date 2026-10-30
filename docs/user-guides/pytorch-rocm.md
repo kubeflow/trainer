@@ -350,6 +350,6 @@ job_id = client.train(
 
 ## Next Steps
 
-- Learn more about [PyTorch ROCm support](https://pytorch.org/docs/stable/notes/hip_rocm.html).
+- Learn more about [PyTorch ROCm support](https://docs.pytorch.org/docs/stable/notes/hip.html).
 - Explore [AMD ROCm documentation](https://rocm.docs.amd.com/).
 - Learn about the [AMD GPU Operator for Kubernetes](https://instinct.docs.amd.com/projects/gpu-operator/en/latest/).
