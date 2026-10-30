@@ -32,6 +32,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/features"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 	"github.com/kubeflow/trainer/v2/test/integration/framework"
+	"github.com/kubeflow/trainer/v2/test/util"
 )
 
 var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
@@ -197,6 +198,11 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 					return testingutil.MakeOptimizationJobWrapper(ns.Name, strings.Repeat("a", 63)).Obj()
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should fail in creating optimizationJob with name exceeding 63 characters",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, strings.Repeat("a", 64)).Obj()
+				},
+				testingutil.BeForbiddenError()),
 			ginkgo.Entry("Should fail in creating optimizationJob with uppercase letters in the name",
 				func() *trainer.OptimizationJob {
 					return testingutil.MakeOptimizationJobWrapper(ns.Name, "Invalid-job-name").Obj()
@@ -217,6 +223,52 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 					return testingutil.MakeOptimizationJobWrapper(ns.Name, "jobname-").Obj()
 				},
 				testingutil.BeInvalidError()),
+		)
+	})
+
+	ginkgo.When("Creating OptimizationJob with a referenced ClusterTrainingRuntime", func() {
+		runtimeName := "optjob-runtime"
+		var clusterTrainingRuntime *trainer.ClusterTrainingRuntime
+
+		ginkgo.BeforeEach(func() {
+			clusterTrainingRuntime = testingutil.MakeClusterTrainingRuntimeWrapper(runtimeName).RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(
+					testingutil.MakeClusterTrainingRuntimeWrapper(runtimeName).Spec).Obj()).Obj()
+			gomega.Expect(k8sClient.Create(ctx, clusterTrainingRuntime)).To(gomega.Succeed())
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterTrainingRuntime), clusterTrainingRuntime)).Should(gomega.Succeed())
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+		})
+
+		ginkgo.AfterEach(func() {
+			_ = k8sClient.Delete(ctx, clusterTrainingRuntime)
+		})
+
+		ginkgo.DescribeTable("Validate OptimizationJob name length against runtime constraints", func(optimizationJob func() *trainer.OptimizationJob, errorMatcher gomega.OmegaMatcher) {
+			gomega.Expect(k8sClient.Create(ctx, optimizationJob())).Should(errorMatcher)
+		},
+			ginkgo.Entry("Should succeed in creating optimizationJob with name at maximum allowed length for runtime (18 chars for dataset-initializer)",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, strings.Repeat("a", 18)).
+						TrainJobTemplate(trainer.TrainJobTemplateSpec{
+							Spec: trainer.TrainJobSpec{
+								RuntimeRef: trainer.RuntimeRef{Name: runtimeName},
+							},
+						}).
+						Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail in creating optimizationJob with name exceeding maximum allowed length for runtime (19 chars for dataset-initializer)",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, strings.Repeat("a", 19)).
+						TrainJobTemplate(trainer.TrainJobTemplateSpec{
+							Spec: trainer.TrainJobSpec{
+								RuntimeRef: trainer.RuntimeRef{Name: runtimeName},
+							},
+						}).
+						Obj()
+				},
+				testingutil.BeForbiddenError()),
 		)
 	})
 

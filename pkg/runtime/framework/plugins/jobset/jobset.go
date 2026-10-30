@@ -258,6 +258,57 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 		}
 	}
 
+	// Validate TrainJob name length against JobSet pod and job name constraints.
+	if oldObj == nil {
+		minMaxLen := 63
+		limitingRJob := ""
+		for _, rJob := range jobSetSpec.ReplicatedJobs {
+			if rJob.Name == nil || *rJob.Name == "" {
+				continue
+			}
+			rJobName := *rJob.Name
+			replicas := ptr.Deref(rJob.Replicas, constants.DefaultJobReplicas)
+			if replicas < 1 {
+				replicas = 1
+			}
+			completions := int32(1)
+			ancestor := ""
+			if rJob.Template != nil && rJob.Template.ObjectMetaApplyConfiguration != nil && rJob.Template.Labels != nil {
+				ancestor = rJob.Template.Labels[constants.LabelTrainJobAncestor]
+			}
+			if ancestor == constants.AncestorTrainer {
+				numNodes := ptr.Deref(ptr.Deref(info.FindPodSetByAncestor(constants.AncestorTrainer), runtime.PodSet{}).Count, 1)
+				if newObj.Spec.Trainer != nil && newObj.Spec.Trainer.NumNodes != nil {
+					numNodes = *newObj.Spec.Trainer.NumNodes
+				}
+				completions = numNodes / replicas
+			} else {
+				if ps := info.FindPodSetByName(rJobName); ps != nil && ps.Count != nil {
+					completions = *ps.Count / replicas
+				} else if rJob.Template != nil && rJob.Template.Spec != nil && rJob.Template.Spec.Completions != nil {
+					completions = *rJob.Template.Spec.Completions
+				} else if rJob.Template != nil && rJob.Template.Spec != nil && rJob.Template.Spec.Parallelism != nil {
+					completions = *rJob.Template.Spec.Parallelism
+				}
+			}
+			if completions < 1 {
+				completions = 1
+			}
+			maxLen := trainjob.MaxTrainJobNameLength(rJobName, replicas, completions)
+			if maxLen < minMaxLen {
+				minMaxLen = maxLen
+				limitingRJob = rJobName
+			}
+		}
+		if len(newObj.Name) > minMaxLen && limitingRJob != "" {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("metadata", "name"),
+				newObj.Name,
+				fmt.Sprintf("TrainJob name is too long, pod names generated for replicatedJob %q will exceed 63 characters (maximum length is %d)", limitingRJob, minMaxLen),
+			))
+		}
+	}
+
 	return nil, allErrs
 }
 

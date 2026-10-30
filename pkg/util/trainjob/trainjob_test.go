@@ -434,3 +434,69 @@ func TestForEachRuntimePatchPodSpec(t *testing.T) {
 		t.Errorf("Unexpected ForEachRuntimePatchPodSpec visits (-want,+got):\n%s", diff)
 	}
 }
+
+func TestMaxTrainJobNameLength(t *testing.T) {
+	cases := map[string]struct {
+		rJobName    string
+		replicas    int32
+		completions int32
+		wantLen     int
+	}{
+		"node with 1 replica and 1 completion": {
+			rJobName:    "node",
+			replicas:    1,
+			completions: 1,
+			wantLen:     48,
+		},
+		"node with 1 replica and 10 completions (single pod index digit)": {
+			rJobName:    "node",
+			replicas:    1,
+			completions: 10,
+			wantLen:     48,
+		},
+		"node with 1 replica and 11 completions (two pod index digits)": {
+			rJobName:    "node",
+			replicas:    1,
+			completions: 11,
+			wantLen:     47,
+		},
+		"node with 11 replicas and 1 completion (two job index digits)": {
+			rJobName:    "node",
+			replicas:    11,
+			completions: 1,
+			wantLen:     47,
+		},
+		"launcher with 1 replica and 1 completion": {
+			rJobName:    "launcher",
+			replicas:    1,
+			completions: 1,
+			wantLen:     44,
+		},
+		"dataset-initializer with 1 replica and 1 completion": {
+			rJobName:    "dataset-initializer",
+			replicas:    1,
+			completions: 1,
+			wantLen:     33,
+		},
+		"zero or negative replicas and completions default to 1": {
+			rJobName:    "node",
+			replicas:    0,
+			completions: -5,
+			wantLen:     48,
+		},
+		"extremely long replicatedJob name clamps to 0": {
+			rJobName:    "this-replicated-job-name-is-way-too-long-and-exceeds-the-limit",
+			replicas:    1,
+			completions: 1,
+			wantLen:     0,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := MaxTrainJobNameLength(tc.rJobName, tc.replicas, tc.completions)
+			if got != tc.wantLen {
+				t.Errorf("MaxTrainJobNameLength(%q, %d, %d) = %d, want %d", tc.rJobName, tc.replicas, tc.completions, got, tc.wantLen)
+			}
+		})
+	}
+}
