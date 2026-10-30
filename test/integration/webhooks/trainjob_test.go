@@ -22,6 +22,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
@@ -256,6 +257,70 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 				},
 				testingutil.BeForbiddenError()),
 
+			ginkgo.Entry("Should succeed in creating trainJob with valid trainer env names and resources",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+						Trainer(&trainer.Trainer{
+							Env: []corev1.EnvVar{{Name: "LR_SCHEDULER", Value: "cosine"}, {Name: "my.config-1", Value: "on"}},
+							ResourcesPerNode: &corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+								Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+							},
+						}).
+						Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail in creating trainJob with a trainer env name containing '='",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+						Trainer(&trainer.Trainer{Env: []corev1.EnvVar{{Name: "A=B", Value: "1"}}}).
+						Obj()
+				},
+				testingutil.BeForbiddenError()),
+			ginkgo.Entry("Should fail in creating trainJob with resourcesPerNode requests above limits",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+						Trainer(&trainer.Trainer{
+							ResourcesPerNode: &corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+								Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+							},
+						}).
+						Obj()
+				},
+				testingutil.BeForbiddenError()),
+			ginkgo.Entry("Should fail in creating trainJob with a negative resourcesPerNode request",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+						Trainer(&trainer.Trainer{
+							ResourcesPerNode: &corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("-1000")},
+							},
+						}).
+						Obj()
+				},
+				testingutil.BeForbiddenError()),
+			ginkgo.Entry("Should fail in creating trainJob with a dataset initializer env name containing '='",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeName).
+						Initializer(
+							testingutil.MakeTrainJobInitializerWrapper().
+								DatasetInitializer(
+									testingutil.MakeTrainJobDatasetInitializerWrapper().
+										StorageUri("hf://trainjob-model").
+										Env(corev1.EnvVar{Name: "A=B", Value: "1"}).
+										Obj(),
+								).
+								Obj(),
+						).
+						Obj()
+				},
+				testingutil.BeForbiddenError()),
 			ginkgo.Entry("Should fail in creating TrainJob with Flux numProcPerNode < 1",
 				func() *trainer.TrainJob {
 					trainingRuntime.Spec.MLPolicy = &trainer.MLPolicy{
