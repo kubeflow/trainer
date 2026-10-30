@@ -12,13 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 from kubernetes.client.rest import ApiException
 
 import pkg.initializers.utils.utils as utils
-from pkg.initializers.dataset.cache import CacheInitializer, parse_cache_storage_uri
+from pkg.initializers.dataset.cache import (
+    CacheInitializer,
+    get_namespace,
+    parse_cache_storage_uri,
+)
+
+
+def test_get_namespace_reads_service_account_namespace():
+    namespace_file = mock_open(read_data="trainer-ns\n")
+
+    with patch("builtins.open", namespace_file):
+        assert get_namespace() == "trainer-ns"
+
+    namespace_file.assert_called_once_with(
+        "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+    )
+
+
+def test_get_namespace_defaults_when_namespace_file_is_missing(caplog):
+    with patch("builtins.open", side_effect=FileNotFoundError):
+        assert get_namespace() == "default"
+
+    assert "Service account namespace file not found" in caplog.text
 
 
 @pytest.mark.parametrize(
