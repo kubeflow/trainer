@@ -118,6 +118,22 @@ func getBaseOptJob() *trainer.OptimizationJob {
 	}
 }
 
+func makeDistinctAssignments(n int) [][]trainer.ParameterAssignment {
+	assignments := make([][]trainer.ParameterAssignment, n)
+	for i := range assignments {
+		assignments[i] = []trainer.ParameterAssignment{{Name: "lr", Value: fmt.Sprintf("0.%04d", i)}}
+	}
+	return assignments
+}
+
+func makeWantTrialParams(n int) map[string]bool {
+	want := make(map[string]bool, n)
+	for _, assignment := range makeDistinctAssignments(n) {
+		want[constants.EnvVarPrefix+assignment[0].Name+"="+assignment[0].Value] = true
+	}
+	return want
+}
+
 func TestBuildSuggestionRequest_SearchSpaceMapping(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -475,6 +491,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 		wantErr               bool
 		getWantOptJob         func() *trainer.OptimizationJob
 		wantTrainJobs         int
+		wantTrainJobParams    map[string]bool
 		wantDeployDeleted     bool
 		wantSvcDeleted        bool
 		wantFailureMessage    string
@@ -588,6 +605,37 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
 				job.Spec.ParallelTrials = 2
+				job.Status = &trainer.OptimizationJobStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    constants.OptimizationJobCreated,
+							Status:  metav1.ConditionTrue,
+							Reason:  "AlgorithmServiceCreated",
+							Message: "Search algorithm service is running",
+						},
+					},
+				}
+				return job
+			},
+		},
+		"create all trials at the CRD maximum": {
+			getInitObjects: func() []client.Object {
+				job := getBaseOptJob()
+				job.Spec.NumTrials = 100
+				job.Spec.ParallelTrials = 100
+				return []client.Object{job, optDeploy, optSvc}
+			},
+			searchAlgorithmClient: &mockSearchAlgorithmClient{
+				mockedAssignments: makeDistinctAssignments(100),
+			},
+			wantRequestNumber:   100,
+			wantSuggestionCalls: 1,
+			wantTrainJobs:       100,
+			wantTrainJobParams:  makeWantTrialParams(100),
+			getWantOptJob: func() *trainer.OptimizationJob {
+				job := getBaseOptJob()
+				job.Spec.NumTrials = 100
+				job.Spec.ParallelTrials = 100
 				job.Status = &trainer.OptimizationJobStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -1205,9 +1253,25 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				if len(trainJobs.Items) != tc.wantTrainJobs {
 					t.Errorf("Expected %d TrainJobs, got %d", tc.wantTrainJobs, len(trainJobs.Items))
 				}
-				if tc.wantTrainJobs == 2 && len(trainJobs.Items) >= 2 {
-					if name1, name2 := trainJobs.Items[0].Name, trainJobs.Items[1].Name; name1 == name2 {
-						t.Errorf("expected distinct TrainJob names, got %q for both trials", name1)
+				seenNames := make(map[string]bool, len(trainJobs.Items))
+				for _, tj := range trainJobs.Items {
+					if seenNames[tj.Name] {
+						t.Errorf("expected distinct TrainJob names, got %q more than once", tj.Name)
+					}
+					seenNames[tj.Name] = true
+				}
+				if tc.wantTrainJobParams != nil {
+					gotParams := make(map[string]bool, len(trainJobs.Items))
+					for _, tj := range trainJobs.Items {
+						if tj.Labels[constants.OptimizationJobNameLabel] != "test-optjob" {
+							t.Errorf("TrainJob %q missing OptimizationJob label, got labels %v", tj.Name, tj.Labels)
+						}
+						for _, env := range tj.Spec.Trainer.Env {
+							gotParams[env.Name+"="+env.Value] = true
+						}
+					}
+					if diff := cmp.Diff(tc.wantTrainJobParams, gotParams); len(diff) != 0 {
+						t.Errorf("Unexpected TrainJob parameters (-want, +got): \n%s", diff)
 					}
 				}
 			}
@@ -1226,6 +1290,98 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				if !apierrors.IsNotFound(getErr) {
 					t.Errorf("expected Service to be deleted, got err: %v", getErr)
 				}
+			}
+		})
+	}
+}
+
+func TestCreateTrainJobs(t *testing.T) {
+	cases := map[string]struct {
+		trialsToSpawn int32
+		// returnedSuggestions is how many suggestions the search algorithm returns; defaults to trialsToSpawn.
+		returnedSuggestions int
+		cancelCtx           bool
+		failCreateTrainJob  bool
+		wantErrContains     string
+		wantErrCount        int
+		wantTrainJobs       int
+	}{
+		"create every requested trial": {
+			trialsToSpawn: 50,
+			wantTrainJobs: 50,
+		},
+		"create only trialsToSpawn trials when the search algorithm returns more suggestions": {
+			trialsToSpawn:       3,
+			returnedSuggestions: 5,
+			wantTrainJobs:       3,
+		},
+		"aggregate errors from every failed trial": {
+			trialsToSpawn:      3,
+			failCreateTrainJob: true,
+			wantErrContains:    "mock trainjob creation failed",
+			wantErrCount:       3,
+		},
+		"stop creating trials when context is cancelled": {
+			trialsToSpawn:   50,
+			cancelCtx:       true,
+			wantErrContains: context.Canceled.Error(),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			testScheme := runtime.NewScheme()
+			_ = trainer.AddToScheme(testScheme)
+			baseCli := utiltesting.NewClientBuilder().WithScheme(testScheme).Build()
+
+			returnedSuggestions := int(tc.trialsToSpawn)
+			if tc.returnedSuggestions > 0 {
+				returnedSuggestions = tc.returnedSuggestions
+			}
+			r := &OptimizationJobReconciler{
+				Client: &mockFailingClient{
+					Client:             baseCli,
+					failCreateTrainJob: tc.failCreateTrainJob,
+				},
+				Scheme:   testScheme,
+				Recorder: &events.FakeRecorder{},
+				SearchAlgorithmClient: &mockSearchAlgorithmClient{
+					mockedAssignments: makeDistinctAssignments(returnedSuggestions),
+				},
+			}
+
+			optJob := getBaseOptJob()
+			optJob.Spec.NumTrials = tc.trialsToSpawn
+			optJob.Spec.ParallelTrials = tc.trialsToSpawn
+
+			if tc.cancelCtx {
+				cancel()
+			}
+			err := r.createTrainJobs(ctx, optJob, nil, tc.trialsToSpawn)
+			if tc.wantErrContains == "" {
+				if err != nil {
+					t.Fatalf("createTrainJobs() returned unexpected error: %v", err)
+				}
+			} else {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErrContains) {
+					t.Fatalf("createTrainJobs() error = %v, want error containing %q", err, tc.wantErrContains)
+				}
+				if tc.wantErrCount > 0 {
+					if got := strings.Count(err.Error(), tc.wantErrContains); got != tc.wantErrCount {
+						t.Errorf("expected %d aggregated trial errors, got %d: %v", tc.wantErrCount, got, err)
+					}
+				}
+			}
+
+			var trainJobs trainer.TrainJobList
+			if err := baseCli.List(context.Background(), &trainJobs); err != nil {
+				t.Fatalf("Failed to list TrainJobs: %v", err)
+			}
+			if len(trainJobs.Items) != tc.wantTrainJobs {
+				t.Errorf("Expected %d TrainJobs, got %d", tc.wantTrainJobs, len(trainJobs.Items))
 			}
 		})
 	}
