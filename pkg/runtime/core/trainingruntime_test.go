@@ -3006,3 +3006,81 @@ func TestToApplyConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestNewRuntimeInfoResourcesPerNode(t *testing.T) {
+	gpu := corev1.ResourceName("nvidia.com/gpu")
+	replicatedJob := func(name string, labels map[string]string) jobsetv1alpha2.ReplicatedJob {
+		rJob := jobsetv1alpha2.ReplicatedJob{Name: name}
+		rJob.Template.Labels = labels
+		rJob.Template.Spec.Template.Spec.Containers = []corev1.Container{{Name: constants.Node}}
+		return rJob
+	}
+	trainerAncestor := map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}
+	mpiPolicy := func(runLauncherAsNode bool) *trainer.MLPolicy {
+		return &trainer.MLPolicy{
+			NumNodes: ptr.To[int32](1),
+			MLPolicySource: trainer.MLPolicySource{
+				MPI: &trainer.MPIMLPolicySource{RunLauncherAsNode: ptr.To(runLauncherAsNode)},
+			},
+		}
+	}
+	cases := map[string]struct {
+		replicatedJobs []jobsetv1alpha2.ReplicatedJob
+		mlPolicy       *trainer.MLPolicy
+		wantGPUs       map[string]int64
+	}{
+		"MPI runtime with the launcher not running as a node": {
+			replicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+				replicatedJob(constants.Node, nil),
+				replicatedJob(constants.Launcher, trainerAncestor),
+			},
+			mlPolicy: mpiPolicy(false),
+			wantGPUs: map[string]int64{constants.Node: 4, constants.Launcher: 0},
+		},
+		"MPI runtime with the launcher running as a node": {
+			replicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+				replicatedJob(constants.Node, nil),
+				replicatedJob(constants.Launcher, trainerAncestor),
+			},
+			mlPolicy: mpiPolicy(true),
+			wantGPUs: map[string]int64{constants.Node: 4, constants.Launcher: 4},
+		},
+		"Torch runtime": {
+			replicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+				replicatedJob(constants.Node, trainerAncestor),
+			},
+			mlPolicy: &trainer.MLPolicy{
+				NumNodes:       ptr.To[int32](1),
+				MLPolicySource: trainer.MLPolicySource{Torch: &trainer.TorchMLPolicySource{}},
+			},
+			wantGPUs: map[string]int64{constants.Node: 4},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(&trainer.Trainer{
+					ResourcesPerNode: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{gpu: resource.MustParse("4")},
+					},
+				}).
+				Obj()
+			jobSetTemplateSpec := trainer.JobSetTemplateSpec{
+				Spec: jobsetv1alpha2.JobSetSpec{ReplicatedJobs: tc.replicatedJobs},
+			}
+
+			info, err := (&TrainingRuntime{}).newRuntimeInfo(trainJob, jobSetTemplateSpec, tc.mlPolicy, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			gotGPUs := make(map[string]int64)
+			for _, ps := range info.TemplateSpec.PodSets {
+				gotGPUs[ps.Name] = ps.SinglePodRequests.Name(gpu, resource.DecimalSI).Value()
+			}
+			if diff := cmp.Diff(tc.wantGPUs, gotGPUs); len(diff) != 0 {
+				t.Errorf("Unexpected GPUs per Pod (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}

@@ -216,9 +216,12 @@ func (r *TrainingRuntime) newRuntimeInfo(
 			}
 		}
 		isTrainerAncestor := ancestor != nil && *ancestor == constants.AncestorTrainer && mlPolicy != nil
-		isMPILauncherAsNode := mlPolicy != nil && mlPolicy.MPI != nil &&
-			ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false) && ptr.Deref(rJob.Name, "") == constants.Node
-		if isTrainerAncestor || isMPILauncherAsNode {
+		// For MPI, the processes run on the node replicatedJob, and on the launcher, which is the
+		// trainer ancestor, only when it runs as a node.
+		isMPI := mlPolicy != nil && mlPolicy.MPI != nil
+		isTrainerNode := isTrainerAncestor && (!isMPI || ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false))
+		isMPINode := isMPI && ptr.Deref(rJob.Name, "") == constants.Node
+		if isTrainerNode || isMPINode {
 			if applyPodSpec := jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec; applyPodSpec != nil {
 				if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil {
 					applyTrainerPodResourceClaims(applyPodSpec, jobTrainer.ResourceClaimsPerNode)
