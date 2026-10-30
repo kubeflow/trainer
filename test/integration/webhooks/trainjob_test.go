@@ -460,14 +460,22 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				gomega.Succeed()),
-			ginkgo.Entry("Should succeed to create TrainJob with name exactly 63 characters",
+			ginkgo.Entry("Should succeed to create TrainJob with name at maximum allowed length for runtime",
 				func() *trainer.TrainJob {
 					return testingutil.MakeTrainJobWrapper(ns.Name,
-						"abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijk"). // 63 chars
+						strings.Repeat("a", 33)). // 33 chars: max length for dataset-initializer
 						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeName).
 						Obj()
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create TrainJob with name exceeding maximum allowed length for runtime",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name,
+						strings.Repeat("a", 34)). // 34 chars: exceeds 33 max length for dataset-initializer
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeName).
+						Obj()
+				},
+				testingutil.BeForbiddenError()),
 			ginkgo.Entry("Should fail to create TrainJob with uppercase letters in name",
 				func() *trainer.TrainJob {
 					return testingutil.MakeTrainJobWrapper(ns.Name, "Invalid-job-name").
@@ -1103,7 +1111,7 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 				gomega.Succeed()),
 			ginkgo.Entry("Should fail to update TrainJob terminationGracePeriodSeconds after creation",
 				func() *trainer.TrainJob {
-					return testingutil.MakeTrainJobWrapper(ns.Name, "immutable-termination-grace-period").
+					return testingutil.MakeTrainJobWrapper(ns.Name, "immutable-term-grace-period").
 						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
 						RuntimePatches([]trainer.RuntimePatch{
 							{
