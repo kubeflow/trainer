@@ -907,3 +907,87 @@ func TestFindContainerByName(t *testing.T) {
 		})
 	}
 }
+
+func TestPodGroupRequests(t *testing.T) {
+	podSets := func() PodSets {
+		return PodSets{
+			{
+				Name:  "dataset-initializer",
+				Count: ptr.To[int32](1),
+				SinglePodRequests: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("4"),
+				},
+			},
+			{
+				Name:  "node",
+				Count: ptr.To[int32](2),
+				SinglePodRequests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("0.5Gi"),
+				},
+			},
+		}
+	}
+	cases := map[string]struct {
+		podGroupPolicy *trainer.PodGroupPolicy
+		wantMembers    int32
+		wantResources  corev1.ResourceList
+	}{
+		"all PodSets participate when podGroupPolicy is nil": {
+			wantMembers: 3,
+			wantResources: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("6"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		"all PodSets participate when targetReplicatedJobs is not set": {
+			podGroupPolicy: &trainer.PodGroupPolicy{},
+			wantMembers:    3,
+			wantResources: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("6"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		"multiple targetReplicatedJobs participate": {
+			podGroupPolicy: &trainer.PodGroupPolicy{
+				TargetReplicatedJobs: []string{"node", "dataset-initializer"},
+			},
+			wantMembers: 3,
+			wantResources: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("6"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		"only targetReplicatedJobs participate": {
+			podGroupPolicy: &trainer.PodGroupPolicy{
+				TargetReplicatedJobs: []string{"node"},
+			},
+			wantMembers: 2,
+			wantResources: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+	}
+	quantityCmp := cmp.Comparer(func(a, b resource.Quantity) bool { return a.Cmp(b) == 0 })
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			info := &Info{
+				RuntimePolicy: RuntimePolicy{PodGroupPolicy: tc.podGroupPolicy},
+				TemplateSpec:  TemplateSpec{PodSets: podSets()},
+			}
+			// Aggregate twice to verify the PodSet requests are not mutated.
+			info.PodGroupRequests()
+			gotMembers, gotResources := info.PodGroupRequests()
+			if gotMembers != tc.wantMembers {
+				t.Errorf("Unexpected members from PodGroupRequests, want: %d, got: %d", tc.wantMembers, gotMembers)
+			}
+			if diff := cmp.Diff(tc.wantResources, gotResources, quantityCmp); len(diff) != 0 {
+				t.Errorf("Unexpected resources from PodGroupRequests (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(podSets(), info.TemplateSpec.PodSets, quantityCmp); len(diff) != 0 {
+				t.Errorf("Unexpected PodSets mutation from PodGroupRequests (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}

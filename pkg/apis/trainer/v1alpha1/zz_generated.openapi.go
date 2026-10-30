@@ -1701,6 +1701,25 @@ func schema_pkg_apis_trainer_v1alpha1_PodGroupPolicy(ref common.ReferenceCallbac
 				Description: "PodGroupPolicy represents a PodGroup configuration for gang-scheduling.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
+					"targetReplicatedJobs": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "targetReplicatedJobs is the list of ReplicatedJob names whose Pods participate in the PodGroup. The PodGroup minMember and minResources are calculated only from the selected ReplicatedJobs, and the PodGroup label or annotation is injected only into their Pod templates. For example, sequential initializer Jobs can be left out of the trainer gang. If unset, all ReplicatedJobs participate in the PodGroup.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 					"coscheduling": {
 						SchemaProps: spec.SchemaProps{
 							Description: "coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.",

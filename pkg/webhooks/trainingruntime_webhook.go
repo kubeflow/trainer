@@ -37,6 +37,8 @@ const (
 	rJobReplicasErrorMsg       = "must be greater than or equal to 1"
 	rJobContainerNamesErrorMsg = "must contain the required container for the ancestor: %s"
 	rJobContainerClaimErrorMsg = "references resourceClaim %q which is not defined in the Pod's resourceClaims"
+
+	podGroupTargetNotFoundErrorMsg = "must reference a ReplicatedJob defined in spec.template.spec.replicatedJobs"
 )
 
 var (
@@ -71,7 +73,32 @@ func (w *TrainingRuntimeValidator) ValidateCreate(ctx context.Context, obj *trai
 			constants.RuntimeDeprecationPolicyURL,
 		))
 	}
-	return warnings, validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+	return warnings, validateTrainingRuntimeSpec(&obj.Spec).ToAggregate()
+}
+
+func validateTrainingRuntimeSpec(spec *trainer.TrainingRuntimeSpec) field.ErrorList {
+	allErrs := validateReplicatedJobs(spec.Template.Spec.ReplicatedJobs)
+	return append(allErrs, validatePodGroupPolicy(spec.PodGroupPolicy, spec.Template.Spec.ReplicatedJobs)...)
+}
+
+// validatePodGroupPolicy validates that every PodGroupPolicy targetReplicatedJobs entry references
+// a ReplicatedJob defined in the runtime template. Duplicate and empty entries are rejected by the CRD schema.
+func validatePodGroupPolicy(podGroupPolicy *trainer.PodGroupPolicy, rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorList {
+	if podGroupPolicy == nil {
+		return nil
+	}
+	rJobNames := sets.New[string]()
+	for _, rJob := range rJobs {
+		rJobNames.Insert(rJob.Name)
+	}
+	targetsPath := field.NewPath("spec").Child("podGroupPolicy").Child("targetReplicatedJobs")
+	var allErrs field.ErrorList
+	for idx, target := range podGroupPolicy.TargetReplicatedJobs {
+		if !rJobNames.Has(target) {
+			allErrs = append(allErrs, field.Invalid(targetsPath.Index(idx), target, podGroupTargetNotFoundErrorMsg))
+		}
+	}
+	return allErrs
 }
 
 func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorList {
@@ -141,7 +168,7 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 func (w *TrainingRuntimeValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.TrainingRuntime) (admission.Warnings, error) {
 	log := ctrl.LoggerFrom(ctx).WithName("trainingruntime-webhook")
 	log.V(5).Info("Validating update", "trainingRuntime", klog.KObj(newObj))
-	return nil, validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+	return nil, validateTrainingRuntimeSpec(&newObj.Spec).ToAggregate()
 }
 
 func (w *TrainingRuntimeValidator) ValidateDelete(ctx context.Context, obj *trainer.TrainingRuntime) (admission.Warnings, error) {

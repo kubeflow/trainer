@@ -135,6 +135,19 @@ type JobSetTemplateSpec struct {
 // PodGroupPolicy represents a PodGroup configuration for gang-scheduling.
 // +kubebuilder:validation:AtMostOneOf=coscheduling;volcano
 type PodGroupPolicy struct {
+	// targetReplicatedJobs is the list of ReplicatedJob names whose Pods participate in the PodGroup.
+	// The PodGroup minMember and minResources are calculated only from the selected ReplicatedJobs,
+	// and the PodGroup label or annotation is injected only into their Pod templates.
+	// For example, sequential initializer Jobs can be left out of the trainer gang.
+	// If unset, all ReplicatedJobs participate in the PodGroup.
+	// +listType=set
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
+	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:items:MaxLength=63
+	// +optional
+	TargetReplicatedJobs []string `json:"targetReplicatedJobs,omitempty"`
+
 	// Configuration for gang-scheduling using various plugins.
 	PodGroupPolicySource `json:",inline"`
 }

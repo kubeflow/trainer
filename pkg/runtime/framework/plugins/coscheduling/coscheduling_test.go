@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -176,6 +177,92 @@ func TestCoScheduling(t *testing.T) {
 				utiltesting.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "trainJob").
 					MinMember(1).
 					MinResources(corev1.ResourceList{}).
+					SchedulingTimeout(30).
+					ControllerReference(trainerv1alpha1.GroupVersion.WithKind(trainerv1alpha1.TrainJobKind), "trainJob", "trainJob").
+					Obj(),
+			},
+		},
+		"succeeded to build PodGroup only from targetReplicatedJobs": {
+			info: &runtime.Info{
+				Scheduler: &runtime.Scheduler{},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{
+						TargetReplicatedJobs: []string{"node"},
+						PodGroupPolicySource: trainerv1alpha1.PodGroupPolicySource{
+							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{
+								ScheduleTimeoutSeconds: ptr.To[int32](30),
+							},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "dataset-initializer",
+							Count: ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU: resource.MustParse("4"),
+							},
+						},
+						{
+							Name:  "node",
+							Count: ptr.To[int32](2),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("0.5Gi"),
+							},
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				UID("trainJob").
+				Obj(),
+			wantInfo: &runtime.Info{
+				Scheduler: &runtime.Scheduler{
+					PodLabels: map[string]string{
+						"scheduling.x-k8s.io/pod-group": "trainJob",
+					},
+					TargetReplicatedJobs: sets.New("node"),
+				},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{
+						TargetReplicatedJobs: []string{"node"},
+						PodGroupPolicySource: trainerv1alpha1.PodGroupPolicySource{
+							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{
+								ScheduleTimeoutSeconds: ptr.To[int32](30),
+							},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "dataset-initializer",
+							Count: ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU: resource.MustParse("4"),
+							},
+						},
+						{
+							Name:  "node",
+							Count: ptr.To[int32](2),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("0.5Gi"),
+							},
+						},
+					},
+				},
+			},
+			objs: []client.Object{},
+			wantObjs: []apiruntime.Object{
+				utiltesting.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "trainJob").
+					MinMember(2).
+					MinResources(corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+					}).
 					SchedulingTimeout(30).
 					ControllerReference(trainerv1alpha1.GroupVersion.WithKind(trainerv1alpha1.TrainJobKind), "trainJob", "trainJob").
 					Obj(),

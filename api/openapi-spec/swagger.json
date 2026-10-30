@@ -15442,6 +15442,14 @@
               }
             ]
           },
+          "targetReplicatedJobs": {
+            "description": "targetReplicatedJobs is the list of ReplicatedJob names whose Pods participate in the PodGroup. The PodGroup minMember and minResources are calculated only from the selected ReplicatedJobs, and the PodGroup label or annotation is injected only into their Pod templates. For example, sequential initializer Jobs can be left out of the trainer gang. If unset, all ReplicatedJobs participate in the PodGroup.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "x-kubernetes-list-type": "set"
+          },
           "volcano": {
             "description": "volcano plugin for gang-scheduling.",
             "allOf": [
