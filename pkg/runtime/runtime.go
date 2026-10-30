@@ -20,10 +20,12 @@ import (
 	"iter"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	resourcehelpers "k8s.io/component-helpers/resource"
 	"k8s.io/utils/ptr"
@@ -346,6 +348,47 @@ func ReplicatedJobReplicas(info *Info, rJobName string) int32 {
 		}
 	}
 	return constants.DefaultJobReplicas
+}
+
+// MaxTrainJobNameLength returns the maximum allowed length of a TrainJob name across all
+// PodSets in the Info object for the given TrainJob.
+// If no PodSets are defined, it returns validation.DNS1035LabelMaxLength.
+func MaxTrainJobNameLength(info *Info, trainJob *trainer.TrainJob) int {
+	if info == nil {
+		return validation.DNS1035LabelMaxLength
+	}
+	minMaxLen := validation.DNS1035LabelMaxLength
+
+	for _, ps := range info.TemplateSpec.PodSets {
+		rJobName := ps.Name
+		replicas := ReplicatedJobReplicas(info, rJobName)
+		if replicas < 1 {
+			replicas = 1
+		}
+		count := ptr.Deref(ps.Count, 1)
+
+		if trainJob != nil && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
+			if rJobName == constants.Node || (ptr.Deref(ps.Ancestor, "") == constants.AncestorTrainer && rJobName != constants.Launcher) {
+				count = *trainJob.Spec.Trainer.NumNodes
+			}
+		}
+
+		completions := count / replicas
+		if completions < 1 {
+			completions = 1
+		}
+
+		maxJobIndex := strconv.Itoa(int(replicas - 1))
+		maxPodIndex := strconv.Itoa(int(completions - 1))
+		// Pod name is: fmt.Sprintf("%s-%s-%s-%s-abcde", trainJobName, rJobName, maxJobIndex, maxPodIndex)
+		// The separators and suffix add 1 + 1 + 1 + 1 + 5 = 9 extra characters.
+		extraPodChars := len(rJobName) + len(maxJobIndex) + len(maxPodIndex) + 9
+		maxLen := max(validation.DNS1035LabelMaxLength-extraPodChars, 0)
+		if maxLen < minMaxLen {
+			minMaxLen = maxLen
+		}
+	}
+	return minMaxLen
 }
 
 // GetNumGPUPerNode returns the GPU count if found in container resources.
