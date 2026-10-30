@@ -22,6 +22,21 @@ import pkg.initializers.utils.utils as utils
 from pkg.initializers.model.s3 import S3
 
 
+def test_load_config_preserves_default_ignore_patterns(mock_env_vars):
+    mock_env_vars(STORAGE_URI="s3://models/path")
+
+    s3_model_instance = S3()
+    s3_model_instance.load_config()
+
+    assert s3_model_instance.config.ignore_patterns == [
+        "*.msgpack",
+        "*.h5",
+        "*.bin",
+        "*.pt",
+        "*.pth",
+    ]
+
+
 # Test cases for config loading
 @pytest.mark.parametrize(
     "test_name, test_config, expected",
