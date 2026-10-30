@@ -178,8 +178,8 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	allErrs = append(allErrs, j.checkRuntimePatchesImmutability(ctx, oldObj, newObj)...)
 
 	// Validate per-patch: ensure patched resources exist in the runtime template
-	for _, runtimePatch := range newObj.Spec.RuntimePatches {
-		allErrs = append(allErrs, validation.IsDomainPrefixedPath(runtimePatchesPath.Child("manager"), runtimePatch.Manager)...)
+	for i, runtimePatch := range newObj.Spec.RuntimePatches {
+		allErrs = append(allErrs, validation.IsDomainPrefixedPath(runtimePatchesPath.Index(i).Child("manager"), runtimePatch.Manager)...)
 		if runtimePatch.TrainingRuntimeSpec == nil || runtimePatch.TrainingRuntimeSpec.Template == nil ||
 			runtimePatch.TrainingRuntimeSpec.Template.Spec == nil {
 			continue

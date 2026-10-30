@@ -3374,6 +3374,21 @@ func TestValidate(t *testing.T) {
 					},
 				}).Obj(),
 		},
+		"invalid runtimePatches manager reports the index of the offending patch": {
+			info: &runtime.Info{TemplateSpec: runtime.TemplateSpec{
+				ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{},
+			}},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimePatches([]trainer.RuntimePatch{
+					{Manager: "test.io/manager"},
+					{Manager: "not-domain-prefixed"},
+				}).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimePatchesPath.Index(1).Child("manager"), "not-domain-prefixed",
+					`must be a domain-prefixed path (such as "acme.io/foo")`),
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
