@@ -289,11 +289,27 @@ func RuntimeRefToRuntimeRegistryKey(runtimeRef trainer.RuntimeRef) string {
 	}.String()
 }
 
+// isTrainerReplicatedJobWithPodSpec reports whether rJob is the trainer replicatedJob and
+// declares a Pod spec whose containers can be read.
+// The Job template, its metadata, and the Job and Pod specs are all optional in the runtime
+// API, so each one is checked before it is dereferenced.
+func isTrainerReplicatedJobWithPodSpec(rJob jobsetv1alpha2ac.ReplicatedJobApplyConfiguration) bool {
+	if rJob.Template == nil || rJob.Template.Spec == nil ||
+		rJob.Template.Spec.Template == nil || rJob.Template.Spec.Template.Spec == nil {
+		return false
+	}
+	if ptr.Deref(rJob.Name, "") == constants.Node {
+		return true
+	}
+	return rJob.Template.ObjectMetaApplyConfiguration != nil &&
+		rJob.Template.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer
+}
+
 // ExtractResourcePerNodeFromRuntime extracts the Trainer resource per node from the Info object.
 func ExtractResourcePerNodeFromRuntime(info *Info) *corev1.ResourceRequirements {
 	if jobSetSpec, ok := TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info); ok {
 		for _, rJob := range jobSetSpec.ReplicatedJobs {
-			if rJob.Name != nil && *rJob.Name == constants.Node || rJob.Template.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer {
+			if isTrainerReplicatedJobWithPodSpec(rJob) {
 				for _, container := range rJob.Template.Spec.Template.Spec.Containers {
 					if container.Name != nil && *container.Name == constants.Node && container.Resources != nil {
 						res := &corev1.ResourceRequirements{
