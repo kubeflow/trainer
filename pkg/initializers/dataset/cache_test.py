@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
@@ -25,22 +26,49 @@ from pkg.initializers.dataset.cache import (
 )
 
 
-def test_get_namespace_reads_service_account_namespace():
-    namespace_file = mock_open(read_data="trainer-ns\n")
+@dataclass
+class TestCase:
+    __test__ = False
 
-    with patch("builtins.open", namespace_file):
-        assert get_namespace() == "trainer-ns"
+    name: str
+    namespace_file_contents: str | None
+    expected_namespace: str
+    expected_warning: str | None = None
 
-    namespace_file.assert_called_once_with(
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        TestCase(
+            name="reads service account namespace",
+            namespace_file_contents="trainer-ns\n",
+            expected_namespace="trainer-ns",
+        ),
+        TestCase(
+            name="defaults when namespace file is missing",
+            namespace_file_contents=None,
+            expected_namespace="default",
+            expected_warning="Service account namespace file not found",
+        ),
+    ],
+    ids=lambda test_case: test_case.name,
+)
+def test_get_namespace(test_case, caplog):
+    if test_case.namespace_file_contents is None:
+        namespace_file_patch = patch("builtins.open", side_effect=FileNotFoundError)
+    else:
+        namespace_file_patch = patch(
+            "builtins.open", mock_open(read_data=test_case.namespace_file_contents)
+        )
+
+    with namespace_file_patch as mock_file:
+        assert get_namespace() == test_case.expected_namespace
+
+    mock_file.assert_called_once_with(
         "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
     )
-
-
-def test_get_namespace_defaults_when_namespace_file_is_missing(caplog):
-    with patch("builtins.open", side_effect=FileNotFoundError):
-        assert get_namespace() == "default"
-
-    assert "Service account namespace file not found" in caplog.text
+    if test_case.expected_warning:
+        assert test_case.expected_warning in caplog.text
 
 
 @pytest.mark.parametrize(
