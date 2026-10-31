@@ -221,7 +221,7 @@ func (r *TrainingRuntime) newRuntimeInfo(
 				ancestor = &labelAncestor
 			}
 		}
-		isTrainerAncestor := ancestor != nil && *ancestor == constants.AncestorTrainer && mlPolicy != nil
+		isTrainerAncestor := ancestor != nil && *ancestor == constants.AncestorTrainer
 		isMPILauncherAsNode := mlPolicy != nil && mlPolicy.MPI != nil &&
 			ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false) && ptr.Deref(rJob.Name, "") == constants.Node
 		if isTrainerAncestor || isMPILauncherAsNode {
