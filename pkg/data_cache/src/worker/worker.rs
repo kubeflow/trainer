@@ -49,6 +49,10 @@ impl DataLoader {
         table: &str,
         start_index: u64,
     ) -> datafusion::common::Result<()> {
+        // `register_table` errors on a taken name and nothing here deregisters,
+        // so a resent `do_put` would fail forever.
+        ctx.deregister_table(table)
+            .map_err(|e| DataFusionError::Execution(format!("Failed to clear table: {}", e)))?;
         let memtable =
             IndexableMemTable::load(self.data_source.clone(), None, &ctx.state(), start_index)
                 .await

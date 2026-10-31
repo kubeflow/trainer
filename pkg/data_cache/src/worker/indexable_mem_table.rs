@@ -22,7 +22,7 @@ use datafusion::datasource::memory::MemorySourceConfig;
 use datafusion::execution::SessionState;
 use datafusion::logical_expr::{BinaryExpr, Expr, TableProviderFilterPushDown};
 use datafusion::physical_plan::ExecutionPlan;
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use std::any::Any;
 use std::sync::Arc;
 use tracing::{error, info};
@@ -76,7 +76,7 @@ impl IndexableMemTable {
 
         let mut current_start = start_index;
         let stream = exec.execute(0, _state.task_ctx())?;
-        let _ = stream
+        stream
             .map_ok(|batch| {
                 let num_rows = batch.num_rows() as u64;
                 let current_end = current_start + num_rows - 1;
@@ -87,8 +87,8 @@ impl IndexableMemTable {
 
                 current_start = current_end + 1;
             })
-            .collect::<Vec<_>>()
-            .await;
+            .try_collect::<Vec<_>>()
+            .await?;
 
         info!("Number of batches: {}", data.len());
 
@@ -228,8 +228,20 @@ mod tests {
         record_batch::RecordBatch,
     };
     use datafusion::assert_batches_eq;
+    use datafusion::catalog::Session;
     use datafusion::datasource::MemTable;
+    use datafusion::datasource::TableType;
+    use datafusion::error::Result as DataFusionResult;
+    use datafusion::execution::context::TaskContext;
+    use datafusion::logical_expr::Expr;
+    use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
+    use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
+    use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
+    use datafusion::physical_plan::{
+        DisplayAs, DisplayFormatType, PlanProperties, SendableRecordBatchStream,
+    };
     use datafusion::prelude::{SessionConfig, SessionContext};
+    use std::any::Any;
     use std::sync::Arc;
 
     fn create_schema() -> Arc<Schema> {
@@ -404,6 +416,127 @@ mod tests {
         let result = fetch_partitions(batches, &[0, 4], &[3, 7], 2, 5).await;
 
         assert_eq!(result.len(), 2, "Expected both batches for boundary query");
+        Ok(())
+    }
+
+    #[derive(Debug)]
+    struct HalfFailingScanExec {
+        schema: SchemaRef,
+        properties: Arc<PlanProperties>,
+    }
+
+    impl DisplayAs for HalfFailingScanExec {
+        fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "HalfFailingScanExec")
+        }
+    }
+
+    impl ExecutionPlan for HalfFailingScanExec {
+        fn name(&self) -> &str {
+            "HalfFailingScanExec"
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn properties(&self) -> &Arc<PlanProperties> {
+            &self.properties
+        }
+
+        fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+            vec![]
+        }
+
+        fn with_new_children(
+            self: Arc<Self>,
+            _children: Vec<Arc<dyn ExecutionPlan>>,
+        ) -> DataFusionResult<Arc<dyn ExecutionPlan>> {
+            Ok(self)
+        }
+
+        fn execute(
+            &self,
+            _partition: usize,
+            _context: Arc<TaskContext>,
+        ) -> DataFusionResult<SendableRecordBatchStream> {
+            let good = RecordBatch::try_new(
+                self.schema.clone(),
+                vec![
+                    Arc::new(UInt64Array::from(vec![0u64, 1])),
+                    Arc::new(StringArray::from(vec!["A", "B"])),
+                ],
+            )?;
+            let items: Vec<DataFusionResult<RecordBatch>> = vec![
+                Ok(good),
+                Err(DataFusionError::Execution(
+                    "parquet read failed".to_string(),
+                )),
+            ];
+            Ok(Box::pin(RecordBatchStreamAdapter::new(
+                self.schema.clone(),
+                futures::stream::iter(items),
+            )))
+        }
+    }
+
+    #[derive(Debug)]
+    struct HalfFailingScanTable {
+        schema: SchemaRef,
+    }
+
+    #[async_trait]
+    impl TableProvider for HalfFailingScanTable {
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn schema(&self) -> SchemaRef {
+            self.schema.clone()
+        }
+
+        fn table_type(&self) -> TableType {
+            TableType::Base
+        }
+
+        async fn scan(
+            &self,
+            _state: &dyn Session,
+            _projection: Option<&Vec<usize>>,
+            _filter: &[Expr],
+            _limit: Option<usize>,
+        ) -> DataFusionResult<Arc<dyn ExecutionPlan>> {
+            let properties = Arc::new(PlanProperties::new(
+                EquivalenceProperties::new(self.schema.clone()),
+                Partitioning::UnknownPartitioning(1),
+                EmissionType::Incremental,
+                Boundedness::Bounded,
+            ));
+            Ok(Arc::new(HalfFailingScanExec {
+                schema: self.schema.clone(),
+                properties,
+            }))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_load_surfaces_a_mid_scan_read_error() -> Result<(), Box<dyn std::error::Error>> {
+        let schema = create_schema();
+        let table = HalfFailingScanTable {
+            schema: schema.clone(),
+        };
+        let ctx = SessionContext::new();
+
+        let result = IndexableMemTable::load(Arc::new(table), None, &ctx.state(), 0).await;
+
+        let err = match result {
+            Ok(_) => panic!("a failed read must not yield a truncated memtable"),
+            Err(e) => e.to_string(),
+        };
+        assert!(
+            err.contains("parquet read failed"),
+            "the failure has to come from the scan, got: {err}"
+        );
         Ok(())
     }
 }
