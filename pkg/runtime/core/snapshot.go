@@ -22,8 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
-	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
@@ -38,7 +37,7 @@ const (
 // getRuntimeSnapshot retrieves the runtime snapshot from the ConfigMap and unmarshalls the value into runtimeObj.
 // Returns an error if the snapshot ConfigMap doesn't exist or if the data is invalid. The value of runtimeObj is
 // only valid if no error was returned.
-func getRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.TrainJob, runtimeObj client.Object) error {
+func getRuntimeSnapshot(ctx context.Context, c client.Reader, trainJob *trainer.TrainJob, runtimeObj client.Object) error {
 	cm := &corev1.ConfigMap{}
 	cmKey := client.ObjectKey{
 		Name:      trainJob.Name + runtimeSnapshotSuffix,
@@ -96,7 +95,8 @@ func getRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.
 
 // createRuntimeSnapshot creates a ConfigMap containing a YAML-serialized snapshot of the runtime configuration.
 // The ConfigMap is owned by the TrainJob and will be automatically deleted when the TrainJob is deleted.
-// An existing configmap will be overwritten. Callers must only invoke this when no snapshot exists.
+// The ConfigMap is created, never updated: if one already exists, an AlreadyExists error is returned and the
+// existing snapshot is left untouched, since it is the source of truth for the TrainJob.
 func createRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.TrainJob, runtimeObj client.Object) error {
 	// client.Get() does not populate TypeMeta on typed objects, so the GVK must be resolved
 	// from the scheme before serializing. Otherwise the stored snapshot has an empty
@@ -113,23 +113,28 @@ func createRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *train
 		return fmt.Errorf("marshaling runtime to YAML: %w", err)
 	}
 
-	// Create ConfigMap ApplyConfiguration with runtime snapshot
-	cmAC := corev1ac.ConfigMap(trainJob.Name+runtimeSnapshotSuffix, trainJob.Namespace).
-		WithOwnerReferences(
-			metav1ac.OwnerReference().
-				WithAPIVersion(trainer.GroupVersion.String()).
-				WithKind(trainer.TrainJobKind).
-				WithName(trainJob.Name).
-				WithUID(trainJob.UID).
-				WithController(true).
-				WithBlockOwnerDeletion(true),
-		).
-		WithData(map[string]string{
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      trainJob.Name + runtimeSnapshotSuffix,
+			Namespace: trainJob.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         trainer.GroupVersion.String(),
+					Kind:               trainer.TrainJobKind,
+					Name:               trainJob.Name,
+					UID:                trainJob.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+		},
+		Data: map[string]string{
 			runtimeDataKey: string(runtimeYAML),
-		})
+		},
+	}
 
-	if err := c.Apply(ctx, cmAC, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
-		return fmt.Errorf("applying runtime snapshot ConfigMap: %w", err)
+	if err := c.Create(ctx, cm, client.FieldOwner("trainer")); err != nil {
+		return fmt.Errorf("creating runtime snapshot ConfigMap: %w", err)
 	}
 
 	return nil

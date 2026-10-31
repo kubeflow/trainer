@@ -38,7 +38,7 @@ func TestRuntimes(t *testing.T) {
 			clientBuilder := testingutil.NewClientBuilder()
 			c := clientBuilder.Build()
 
-			newRuntimes, err := New(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			newRuntimes, err := New(ctx, c, c, testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize runtimes: %v", err)
 			}
