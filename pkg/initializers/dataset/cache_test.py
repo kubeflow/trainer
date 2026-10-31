@@ -12,13 +12,63 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest.mock import MagicMock, patch
+from dataclasses import dataclass
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 from kubernetes.client.rest import ApiException
 
 import pkg.initializers.utils.utils as utils
-from pkg.initializers.dataset.cache import CacheInitializer, parse_cache_storage_uri
+from pkg.initializers.dataset.cache import (
+    CacheInitializer,
+    get_namespace,
+    parse_cache_storage_uri,
+)
+
+
+@dataclass
+class TestCase:
+    __test__ = False
+
+    name: str
+    namespace_file_contents: str | None
+    expected_namespace: str
+    expected_warning: str | None = None
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        TestCase(
+            name="reads service account namespace",
+            namespace_file_contents="trainer-ns\n",
+            expected_namespace="trainer-ns",
+        ),
+        TestCase(
+            name="defaults when namespace file is missing",
+            namespace_file_contents=None,
+            expected_namespace="default",
+            expected_warning="Service account namespace file not found",
+        ),
+    ],
+    ids=lambda test_case: test_case.name,
+)
+def test_get_namespace(test_case, caplog):
+    if test_case.namespace_file_contents is None:
+        namespace_file_patch = patch("builtins.open", side_effect=FileNotFoundError)
+    else:
+        namespace_file_patch = patch(
+            "builtins.open", mock_open(read_data=test_case.namespace_file_contents)
+        )
+
+    with namespace_file_patch as mock_file:
+        assert get_namespace() == test_case.expected_namespace
+
+    mock_file.assert_called_once_with(
+        "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+    )
+    if test_case.expected_warning:
+        assert test_case.expected_warning in caplog.text
 
 
 @pytest.mark.parametrize(
