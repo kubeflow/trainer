@@ -204,8 +204,6 @@ spec:
                 - name
                 x-kubernetes-list-type: map
               searchAlgorithm:
-                default:
-                  random: {}
                 description: searchAlgorithm is the algorithm to use for searching
                   over the hyperparameters.
                 properties:
@@ -6598,6 +6596,7 @@ spec:
             required:
             - objectives
             - parameters
+            - searchAlgorithm
             - trainJobTemplate
             type: object
             x-kubernetes-validations:

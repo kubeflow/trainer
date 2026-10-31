@@ -79,8 +79,7 @@ type OptimizationJobSpec struct {
 	Objectives []Objective `json:"objectives,omitempty"`
 
 	// searchAlgorithm is the algorithm to use for searching over the hyperparameters.
-	// +kubebuilder:default={random: {}}
-	// +optional
+	// +required
 	SearchAlgorithm *SearchAlgorithm `json:"searchAlgorithm,omitempty"`
 
 	// parameters is the list of hyperparameters to search over.

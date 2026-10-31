@@ -88,6 +88,13 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should fail in creating optimizationJob without searchAlgorithm",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
+						SearchAlgorithm(nil).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
 			ginkgo.Entry("Should fail in creating optimizationJob with a negative random search seed",
 				func() *trainer.OptimizationJob {
 					return testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
