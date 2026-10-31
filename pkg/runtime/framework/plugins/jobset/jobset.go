@@ -64,6 +64,27 @@ var (
 	errorPodCountNotDivisibleByReplicas = errors.New("replicatedJob Pod count must be divisible by replicas")
 )
 
+func validateInitializerStorageUriEnv(storageUri *string, env []corev1.EnvVar, envPath *field.Path) field.ErrorList {
+	if storageUri == nil {
+		return nil
+	}
+	for _, envVar := range env {
+		if envVar.Name == jobsetplgconsts.InitializerEnvStorageUri {
+			return field.ErrorList{
+				field.Invalid(
+					envPath,
+					env,
+					fmt.Sprintf(
+						"must not set %q in env when storageUri is configured",
+						jobsetplgconsts.InitializerEnvStorageUri,
+					),
+				),
+			}
+		}
+	}
+	return nil
+}
+
 type JobSet struct {
 	client     client.Client
 	restMapper meta.RESTMapper
@@ -143,6 +164,11 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 				allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volumeMount with name - %s in container %s of the %s job", jobsetplgconsts.VolumeNameInitializer, constants.DatasetInitializer, constants.DatasetInitializer)))
 			}
 		}
+		allErrs = append(allErrs, validateInitializerStorageUriEnv(
+			newObj.Spec.Initializer.Dataset.StorageUri,
+			newObj.Spec.Initializer.Dataset.Env,
+			field.NewPath("spec").Child("initializer").Child("dataset").Child("env"),
+		)...)
 	}
 
 	if newObj.Spec.Initializer != nil && newObj.Spec.Initializer.Model != nil {
@@ -173,6 +199,11 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 				allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volumeMount with name - %s in container %s of the %s job", jobsetplgconsts.VolumeNameInitializer, constants.ModelInitializer, constants.ModelInitializer)))
 			}
 		}
+		allErrs = append(allErrs, validateInitializerStorageUriEnv(
+			newObj.Spec.Initializer.Model.StorageUri,
+			newObj.Spec.Initializer.Model.Env,
+			field.NewPath("spec").Child("initializer").Child("model").Child("env"),
+		)...)
 	}
 
 	allErrs = append(allErrs, j.checkRuntimePatchesImmutability(ctx, oldObj, newObj)...)
