@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
@@ -261,6 +262,10 @@ func TestNewInfo(t *testing.T) {
 								),
 						),
 				),
+				WithDeclaredPodSet(constants.Node, corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "warmup"}},
+					Containers:     []corev1.Container{{Name: constants.Node}},
+				}),
 			},
 			wantInfo: &Info{
 				Labels: map[string]string{
@@ -271,6 +276,12 @@ func TestNewInfo(t *testing.T) {
 				},
 				Scheduler: &Scheduler{PodLabels: make(map[string]string)},
 				TemplateSpec: TemplateSpec{
+					DeclaredPodSets: map[string]DeclaredPodSet{
+						constants.Node: {
+							InitContainers: sets.New("warmup"),
+							Containers:     sets.New(constants.Node),
+						},
+					},
 					PodSets: []PodSet{
 						{
 							Name:     constants.DatasetInitializer,
