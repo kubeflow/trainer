@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,11 +33,17 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
@@ -46,6 +53,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
@@ -69,6 +77,8 @@ const Name = "Volcano"
 
 // +kubebuilder:rbac:groups=scheduling.volcano.sh,resources=podgroups,verbs=create;get;list;watch;update;patch;delete
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=priorityclasses,verbs=get;list;watch
+// +kubebuilder:rbac:groups=node.k8s.io,resources=runtimeclasses,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=limitranges,verbs=get;list;watch
 
 func New(_ context.Context, client client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
 	v := &Volcano{
@@ -247,6 +257,130 @@ func shouldDeletePodGroup(trainJob *trainer.TrainJob) bool {
 	return trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false)
 }
 
+type PodGroupRuntimeClassHandler struct {
+	client client.Client
+}
+
+var _ handler.TypedEventHandler[*nodev1.RuntimeClass, reconcile.Request] = (*PodGroupRuntimeClassHandler)(nil)
+
+func (h *PodGroupRuntimeClassHandler) Create(ctx context.Context, e event.TypedCreateEvent[*nodev1.RuntimeClass], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	containerRuntimeClass := e.Object
+	log := ctrl.LoggerFrom(ctx).WithValues("runtimeClass", klog.KObj(containerRuntimeClass))
+	if err := h.queueSuspendedTrainJobs(ctx, containerRuntimeClass, q); err != nil {
+		log.Error(err, "could not queue suspended TrainJob to reconcile queue")
+	}
+}
+
+func (h *PodGroupRuntimeClassHandler) Update(ctx context.Context, e event.TypedUpdateEvent[*nodev1.RuntimeClass], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	newContainerRuntimeClass := e.ObjectNew
+	log := ctrl.LoggerFrom(ctx).WithValues("runtimeClass", klog.KObj(newContainerRuntimeClass))
+	if err := h.queueSuspendedTrainJobs(ctx, newContainerRuntimeClass, q); err != nil {
+		log.Error(err, "could not queue suspended TrainJob to reconcile queue")
+	}
+}
+
+func (h *PodGroupRuntimeClassHandler) Delete(ctx context.Context, e event.TypedDeleteEvent[*nodev1.RuntimeClass], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	containerRuntimeClass := e.Object
+	log := ctrl.LoggerFrom(ctx).WithValues("runtimeClass", klog.KObj(containerRuntimeClass))
+	if err := h.queueSuspendedTrainJobs(ctx, containerRuntimeClass, q); err != nil {
+		log.Error(err, "could not queue suspended TrainJob to reconcile queue")
+	}
+}
+
+func (h *PodGroupRuntimeClassHandler) Generic(context.Context, event.TypedGenericEvent[*nodev1.RuntimeClass], workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+}
+
+func (h *PodGroupRuntimeClassHandler) queueSuspendedTrainJobs(ctx context.Context, runtimeClass *nodev1.RuntimeClass, q workqueue.TypedRateLimitingInterface[reconcile.Request]) error {
+	var trainingRuntimes trainer.TrainingRuntimeList
+	if err := h.client.List(ctx, &trainingRuntimes, client.MatchingFields{indexer.TrainingRuntimeContainerRuntimeClassKey: runtimeClass.Name}); err != nil {
+		return err
+	}
+	var clusterTrainingRuntimes trainer.ClusterTrainingRuntimeList
+	if err := h.client.List(ctx, &clusterTrainingRuntimes, client.MatchingFields{indexer.ClusterTrainingRuntimeContainerRuntimeClassKey: runtimeClass.Name}); err != nil {
+		return err
+	}
+
+	var trainJobs []trainer.TrainJob
+	for _, trainingRuntime := range trainingRuntimes.Items {
+		var trainJobsWithTrainingRuntime trainer.TrainJobList
+		err := h.client.List(ctx, &trainJobsWithTrainingRuntime,
+			client.InNamespace(trainingRuntime.Namespace),
+			client.MatchingFields{indexer.TrainJobRuntimeRefKey: trainingRuntime.Name},
+		)
+		if err != nil {
+			return err
+		}
+		trainJobs = append(trainJobs, trainJobsWithTrainingRuntime.Items...)
+	}
+	for _, clusterTrainingRuntime := range clusterTrainingRuntimes.Items {
+		var trainJobsWithClTrainingRuntime trainer.TrainJobList
+		err := h.client.List(ctx, &trainJobsWithClTrainingRuntime, client.MatchingFields{indexer.TrainJobClusterRuntimeRefKey: clusterTrainingRuntime.Name})
+		if err != nil {
+			return err
+		}
+		trainJobs = append(trainJobs, trainJobsWithClTrainingRuntime.Items...)
+	}
+	queuedTrainJobs := make(map[client.ObjectKey]struct{}, len(trainJobs))
+	for _, trainJob := range trainJobs {
+		if !ptr.Deref(trainJob.Spec.Suspend, false) {
+			continue
+		}
+		key := client.ObjectKeyFromObject(&trainJob)
+		if _, queued := queuedTrainJobs[key]; queued {
+			continue
+		}
+		q.Add(reconcile.Request{NamespacedName: key})
+		queuedTrainJobs[key] = struct{}{}
+	}
+	return nil
+}
+
+type PodGroupLimitRangeHandler struct {
+	client client.Client
+}
+
+var _ handler.TypedEventHandler[*corev1.LimitRange, reconcile.Request] = (*PodGroupLimitRangeHandler)(nil)
+
+func (h *PodGroupLimitRangeHandler) Create(ctx context.Context, e event.TypedCreateEvent[*corev1.LimitRange], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	limitRange := e.Object
+	log := ctrl.LoggerFrom(ctx).WithValues("limitRange", klog.KObj(limitRange))
+	if err := h.queueSuspendedTrainJob(ctx, limitRange.Namespace, q); err != nil {
+		log.Error(err, "could not queue suspended TrainJob to reconcile queue")
+	}
+}
+
+func (h *PodGroupLimitRangeHandler) Update(ctx context.Context, e event.TypedUpdateEvent[*corev1.LimitRange], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	newLimitRange := e.ObjectNew
+	log := ctrl.LoggerFrom(ctx).WithValues("limitRange", klog.KObj(newLimitRange))
+	if err := h.queueSuspendedTrainJob(ctx, newLimitRange.Namespace, q); err != nil {
+		log.Error(err, "could not queue suspended TrainJob to reconcile queue")
+	}
+}
+
+func (h *PodGroupLimitRangeHandler) Delete(ctx context.Context, e event.TypedDeleteEvent[*corev1.LimitRange], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	limitRange := e.Object
+	log := ctrl.LoggerFrom(ctx).WithValues("limitRange", klog.KObj(limitRange))
+	if err := h.queueSuspendedTrainJob(ctx, limitRange.Namespace, q); err != nil {
+		log.Error(err, "could not queue suspended TrainJob to reconcile queue")
+	}
+}
+
+func (h *PodGroupLimitRangeHandler) Generic(context.Context, event.TypedGenericEvent[*corev1.LimitRange], workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+}
+
+func (h *PodGroupLimitRangeHandler) queueSuspendedTrainJob(ctx context.Context, ns string, q workqueue.TypedRateLimitingInterface[reconcile.Request]) error {
+	var trainJobs trainer.TrainJobList
+	if err := h.client.List(ctx, &trainJobs, client.InNamespace(ns)); err != nil {
+		return err
+	}
+	for _, trainJob := range trainJobs.Items {
+		if ptr.Deref(trainJob.Spec.Suspend, false) {
+			q.Add(reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&trainJob)})
+		}
+	}
+	return nil
+}
+
 // ReconcilerBuilders registers a watch on PodGroup so the TrainJob is requeued whenever
 // its owned PodGroup changes.
 func (v *Volcano) ReconcilerBuilders() []runtime.ReconcilerBuilder {
@@ -265,6 +399,16 @@ func (v *Volcano) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 					v.client.Scheme(), v.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner(),
 				),
 			)
+		},
+		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
+			return b.WatchesRawSource(source.TypedKind[*corev1.LimitRange, reconcile.Request](cache, &corev1.LimitRange{}, &PodGroupLimitRangeHandler{
+				client: cl,
+			}))
+		},
+		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
+			return b.WatchesRawSource(source.TypedKind[*nodev1.RuntimeClass, reconcile.Request](cache, &nodev1.RuntimeClass{}, &PodGroupRuntimeClassHandler{
+				client: cl,
+			}))
 		},
 	}
 }
