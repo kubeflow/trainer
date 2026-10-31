@@ -110,6 +110,70 @@ manager:
     traffic.sidecar.istio.io/excludeInboundPorts: "9443"
 ```
 
+### High availability
+
+Running more than one manager replica keeps `TrainJob`/`TrainingRuntime` admission available
+through routine disruptions such as node drains, autoscaler scale-down, or preemption. Since
+the webhooks default to `failurePolicy: Fail`, any moment with no Ready manager pod rejects all
+TrainJob and TrainingRuntime creates and updates, so the following settings matter once you run
+more than one replica:
+
+- `manager.affinity` is empty by default. To spread replicas across nodes, set a soft
+  (preferred) pod anti-affinity. It is a scheduling preference only, so it never blocks a pod
+  from being scheduled, including on a single-node cluster:
+
+```yaml
+  manager:
+    replicas: 2
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: kubeflow-trainer
+                  app.kubernetes.io/instance: <release-name>
+                  app.kubernetes.io/component: manager
+```
+
+  Replace `<release-name>` with your Helm release name, so the rule only matches this
+  release's manager pods.
+
+- `manager.topologySpreadConstraints` is empty by default. Use it for stricter control over how
+  replicas spread across nodes or zones, for example:
+
+  ```yaml
+  manager:
+    replicas: 2
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: kubeflow-trainer
+            app.kubernetes.io/instance: <release-name>
+            app.kubernetes.io/component: manager
+  ```
+
+- `manager.podDisruptionBudget` is disabled by default. Use it with `manager.replicas` of 2 or
+  more, since a PodDisruptionBudget on a single replica blocks voluntary node drains:
+
+  ```yaml
+  manager:
+    replicas: 2
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+  ```
+
+- `manager.priorityClassName` is empty by default. Set it to an existing `PriorityClass` to
+  protect the manager from preemption, for example on clusters where it would otherwise run
+  at default priority alongside higher-priority GPU training workloads. The chart does not
+  create the `PriorityClass` itself.
+
 ## Values
 
 | Key | Type | Default | Description |
@@ -132,8 +196,10 @@ manager:
 | manager.labels | object | `{}` | Extra labels for manager resources (including the Deployment and pods). |
 | manager.volumes | list | `[]` | Volumes for manager pods. |
 | manager.nodeSelector | object | `{}` | Node selector for manager pods. |
-| manager.affinity | object | `{}` | Affinity for manager pods. |
+| manager.affinity | object | `{}` | Affinity for manager pods. See the chart README for a recommended anti-affinity when running multiple replicas. |
+| manager.topologySpreadConstraints | list | `[]` | Topology spread constraints for manager pods. Empty by default (no behavior change). See the chart README for an example. |
 | manager.tolerations | list | `[]` | List of node taints to tolerate for manager pods. |
+| manager.priorityClassName | string | `""` | Priority class name for manager pods. Empty by default: no PriorityClass is created by this chart, so the named class must already exist in the cluster. |
 | manager.env | list | `[]` | Environment variables for manager containers. |
 | manager.envFrom | list | `[]` | Environment variable sources for manager containers. |
 | manager.volumeMounts | list | `[]` | Volume mounts for manager containers. |
@@ -149,6 +215,8 @@ manager:
 | manager.config.statusServer.port | int | `10443` | Port that the TrainJob status server serves on. |
 | manager.config.statusServer.qps | int | `5` | QPS rate limit for the TrainJob Status Server api client |
 | manager.config.statusServer.burst | int | `10` | Burst rate limit for the TrainJob Status Server api client |
+| manager.podDisruptionBudget | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget for manager pods. Disabled by default (no behavior change). Use it with `manager.replicas` of 2 or more, since a PDB on a single replica blocks node drains. |
+| manager.podDisruptionBudget.minAvailable | int | `1` | Minimum number of manager pods that must remain available during a voluntary disruption. |
 | prometheus.enabled | bool | `false` | Whether to create a Prometheus Operator ServiceMonitor. |
 | prometheus.labels | object | `{}` | Additional labels for selecting this ServiceMonitor from Prometheus. |
 | prometheus.authorization | object | `{"credentials":{"key":"token","name":""}}` | Secret-based authorization for authenticated metrics scraping. Required when metrics authentication is enabled. The Secret must be available in the ServiceMonitor namespace and readable by Prometheus. |
