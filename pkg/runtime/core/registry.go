@@ -27,7 +27,7 @@ import (
 
 type Registry map[string]RuntimeRegistrar
 type RuntimeRegistrar struct {
-	factory      func(ctx context.Context, client client.Client, indexer client.FieldIndexer, cfg *configapi.Configuration) (runtime.Runtime, error)
+	factory      func(ctx context.Context, client client.Client, apiReader client.Reader, indexer client.FieldIndexer, cfg *configapi.Configuration) (runtime.Runtime, error)
 	dependencies []string
 }
 

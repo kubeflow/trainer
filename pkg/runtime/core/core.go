@@ -32,7 +32,7 @@ import (
 
 var runtimes map[string]runtime.Runtime
 
-func New(ctx context.Context, client client.Client, indexer client.FieldIndexer, cfg *configapi.Configuration) (map[string]runtime.Runtime, error) {
+func New(ctx context.Context, client client.Client, apiReader client.Reader, indexer client.FieldIndexer, cfg *configapi.Configuration) (map[string]runtime.Runtime, error) {
 	registry := NewRuntimeRegistry()
 	newRuntimes := make(map[string]runtime.Runtime, len(registry))
 	for name, registrar := range registry {
@@ -40,7 +40,7 @@ func New(ctx context.Context, client client.Client, indexer client.FieldIndexer,
 			depRegistrar, depExist := registry[dep]
 			_, depRegistered := newRuntimes[dep]
 			if depExist && !depRegistered {
-				r, err := depRegistrar.factory(ctx, client, indexer, cfg)
+				r, err := depRegistrar.factory(ctx, client, apiReader, indexer, cfg)
 				if err != nil {
 					return nil, fmt.Errorf("initializing runtime %q on which %q depends: %w", dep, name, err)
 				}
@@ -48,7 +48,7 @@ func New(ctx context.Context, client client.Client, indexer client.FieldIndexer,
 			}
 		}
 		if _, ok := newRuntimes[name]; !ok {
-			r, err := registrar.factory(ctx, client, indexer, cfg)
+			r, err := registrar.factory(ctx, client, apiReader, indexer, cfg)
 			if err != nil {
 				return nil, fmt.Errorf("initializing runtime %q: %w", name, err)
 			}
