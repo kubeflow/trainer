@@ -18,13 +18,16 @@ package controller
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	"github.com/go-logr/logr/funcr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2/ktesting"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -36,6 +39,7 @@ func TestReconcile_TrainingRuntimeReconciler(t *testing.T) {
 	cases := map[string]struct {
 		trainingRuntime     *trainer.TrainingRuntime
 		wantTrainingRuntime *trainer.TrainingRuntime
+		wantRuntimeLogValue string
 	}{
 		"remove existing finalizer during reconciliation": {
 			trainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "runtime").
@@ -45,6 +49,7 @@ func TestReconcile_TrainingRuntimeReconciler(t *testing.T) {
 				metav1.NamespaceDefault,
 				"runtime",
 			).Obj(),
+			wantRuntimeLogValue: `"trainingRuntime"={"name"="runtime" "namespace"="default"}`,
 		},
 		"no action when runtime has no finalizer": {
 			trainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(
@@ -60,13 +65,17 @@ func TestReconcile_TrainingRuntimeReconciler(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			var cancel func()
-			ctx, cancel = context.WithCancel(ctx)
-			t.Cleanup(cancel)
-			cli := utiltesting.NewClientBuilder().
-				WithObjects(tc.trainingRuntime).
-				Build()
+			var logBuffer strings.Builder
+			logger := funcr.New(func(_, args string) { logBuffer.WriteString(args) }, funcr.Options{})
+			ctx := ctrl.LoggerInto(context.Background(), logger)
+			clientBuilder := utiltesting.NewClientBuilder().WithObjects(tc.trainingRuntime)
+			clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+				Patch: func(ctx context.Context, cli client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+					ctrl.LoggerFrom(ctx).Info("Patching TrainingRuntime")
+					return cli.Patch(ctx, obj, patch, opts...)
+				},
+			})
+			cli := clientBuilder.Build()
 			r := NewTrainingRuntimeReconciler(cli, nil)
 			runtimeKey := client.ObjectKeyFromObject(tc.trainingRuntime)
 			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: runtimeKey})
@@ -82,6 +91,9 @@ func TestReconcile_TrainingRuntimeReconciler(t *testing.T) {
 				cmpopts.IgnoreFields(metav1.TypeMeta{}, "Kind", "APIVersion"),
 			); len(diff) != 0 {
 				t.Errorf("Unexpected TrainingRuntime: (-want, +got): \n%s", diff)
+			}
+			if tc.wantRuntimeLogValue != "" && !strings.Contains(logBuffer.String(), tc.wantRuntimeLogValue) {
+				t.Errorf("Patch context log = %q, want it to contain %q", logBuffer.String(), tc.wantRuntimeLogValue)
 			}
 		})
 	}
