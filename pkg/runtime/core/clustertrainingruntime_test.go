@@ -405,3 +405,55 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 		})
 	}
 }
+
+// TestClusterTrainingRuntimeTrainJobStatus checks that ClusterTrainingRuntime delegates to the
+// embedded TrainingRuntime; the TrainingRuntime cases are covered by TestTrainingRuntimeTrainJobStatus.
+func TestClusterTrainingRuntimeTrainJobStatus(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	statusPlugin := &fakeTrainJobStatusPlugin{
+		status: &trainer.TrainJobStatus{
+			JobsStatus: []trainer.JobStatus{{Name: "node", Succeeded: ptr.To[int32](1)}},
+		},
+	}
+	clTrainingRuntime := &ClusterTrainingRuntime{
+		TrainingRuntime: newTrainingRuntimeWithRegistry(ctx, t, fakePluginRegistry(nil, nil, statusPlugin)),
+	}
+	trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj()
+
+	gotStatus, err := clTrainingRuntime.TrainJobStatus(ctx, trainJob)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	wantStatus := &trainer.TrainJobStatus{
+		JobsStatus: []trainer.JobStatus{{Name: "node", Succeeded: ptr.To[int32](1)}},
+	}
+	if diff := cmp.Diff(wantStatus, gotStatus); len(diff) != 0 {
+		t.Errorf("Unexpected TrainJobStatus (-want,+got):\n%s", diff)
+	}
+	if statusPlugin.gotTrainJob != trainJob {
+		t.Errorf("Expected TrainJobStatus plugin to receive TrainJob %v, got %v", trainJob, statusPlugin.gotTrainJob)
+	}
+}
+
+func TestClusterTrainingRuntimeEventHandlerRegistrars(t *testing.T) {
+	cases := map[string]struct {
+		watchBuilderIDs map[string][]string
+	}{
+		"no plugins are registered": {},
+		"WatchExtension plugins on the underlying TrainingRuntime are not registered again": {
+			watchBuilderIDs: map[string][]string{"watch-a": {"a-1"}},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			clTrainingRuntime := &ClusterTrainingRuntime{
+				TrainingRuntime: newTrainingRuntimeWithRegistry(ctx, t, fakePluginRegistry(tc.watchBuilderIDs, nil, nil)),
+			}
+
+			if builders := clTrainingRuntime.EventHandlerRegistrars(); builders != nil {
+				t.Errorf("Expected nil ReconcilerBuilders, got %d", len(builders))
+			}
+		})
+	}
+}
