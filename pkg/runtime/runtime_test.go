@@ -717,6 +717,80 @@ func TestFindPodSetByName(t *testing.T) {
 	}
 }
 
+func TestExtractResourcePerNodeFromRuntime(t *testing.T) {
+	trainerLabel := map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}
+	requests := corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("4")}
+	// jobTemplate builds a Job template declaring a single named container.
+	jobTemplate := func(containerName string, withResources bool) *batchv1ac.JobTemplateSpecApplyConfiguration {
+		container := corev1ac.Container().WithName(containerName)
+		if withResources {
+			container = container.WithResources(corev1ac.ResourceRequirements().WithRequests(requests))
+		}
+		return batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().
+			WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec().WithContainers(container))))
+	}
+	jobSetInfo := func(rJobs ...*jobsetv1alpha2ac.ReplicatedJobApplyConfiguration) *Info {
+		return &Info{TemplateSpec: TemplateSpec{
+			ObjApply: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(rJobs...),
+		}}
+	}
+
+	cases := map[string]struct {
+		info          *Info
+		wantResources *corev1.ResourceRequirements
+	}{
+		"template spec is not JobSet": {
+			info: &Info{},
+		},
+		"trainer replicatedJob is identified by name": {
+			info: jobSetInfo(jobsetv1alpha2ac.ReplicatedJob().
+				WithName(constants.Node).
+				WithTemplate(jobTemplate(constants.Node, true))),
+			wantResources: &corev1.ResourceRequirements{Limits: corev1.ResourceList{}, Requests: requests},
+		},
+		"trainer replicatedJob is identified by the ancestor label": {
+			info: jobSetInfo(jobsetv1alpha2ac.ReplicatedJob().
+				WithName("custom-trainer").
+				WithTemplate(jobTemplate(constants.Node, true).WithLabels(trainerLabel))),
+			wantResources: &corev1.ResourceRequirements{Limits: corev1.ResourceList{}, Requests: requests},
+		},
+		"replicatedJob whose Job template has no metadata is skipped": {
+			info: jobSetInfo(
+				jobsetv1alpha2ac.ReplicatedJob().
+					WithName(constants.DatasetInitializer).
+					WithTemplate(jobTemplate(constants.DatasetInitializer, false)),
+				jobsetv1alpha2ac.ReplicatedJob().
+					WithName(constants.Node).
+					WithTemplate(jobTemplate(constants.Node, true)),
+			),
+			wantResources: &corev1.ResourceRequirements{Limits: corev1.ResourceList{}, Requests: requests},
+		},
+		"trainer replicatedJob has no Job spec": {
+			info: jobSetInfo(jobsetv1alpha2ac.ReplicatedJob().
+				WithName(constants.Node).
+				WithTemplate(batchv1ac.JobTemplateSpec().WithLabels(trainerLabel))),
+		},
+		"trainer replicatedJob has no Pod spec": {
+			info: jobSetInfo(jobsetv1alpha2ac.ReplicatedJob().
+				WithName(constants.Node).
+				WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().
+					WithTemplate(corev1ac.PodTemplateSpec())))),
+		},
+		"node container declares no resources": {
+			info: jobSetInfo(jobsetv1alpha2ac.ReplicatedJob().
+				WithName(constants.Node).
+				WithTemplate(jobTemplate(constants.Node, false))),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if diff := cmp.Diff(tc.wantResources, ExtractResourcePerNodeFromRuntime(tc.info)); len(diff) != 0 {
+				t.Errorf("Unexpected resources per node (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestTrainerReplicas(t *testing.T) {
 	cases := map[string]struct {
 		info         *Info
