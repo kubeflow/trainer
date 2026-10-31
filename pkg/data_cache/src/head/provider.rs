@@ -409,8 +409,9 @@ async fn partition_tasks(
             Ok(task) => {
                 tasks.push(task);
             }
-            Err(_e) => {
-                // Handle the error
+            Err(e) => {
+                // A truncated file list would misalign the row ranges assigned below.
+                return Err(Box::new(e));
             }
         }
     }
@@ -546,24 +547,24 @@ mod tests {
     async fn test_partition_tasks_with_stream_errors() -> Result<(), Box<dyn std::error::Error>> {
         use futures::stream;
 
-        // Test the error handling path in partition_tasks
+        // A failed listing has to reach the caller.
         let mixed_stream = stream::iter(vec![
+            Ok(create_test_file_scan_task_with_record_count(
+                100,
+                "/test/file1.parquet",
+            )),
             Err(iceberg::Error::new(
                 iceberg::ErrorKind::DataInvalid,
                 "Test error 1",
             )),
-            Err(iceberg::Error::new(
-                iceberg::ErrorKind::DataInvalid,
-                "Test error 2",
-            )),
         ]);
 
-        let result = partition_tasks(Box::pin(mixed_stream), 2).await?;
+        let result = partition_tasks(Box::pin(mixed_stream), 2).await;
 
-        assert_eq!(result.len(), 2);
-        assert!(result[0].tasks.is_empty());
-        assert!(result[1].tasks.is_empty());
-
+        assert!(
+            result.is_err(),
+            "a failed file listing must surface instead of yielding a truncated map"
+        );
         Ok(())
     }
     #[tokio::test]

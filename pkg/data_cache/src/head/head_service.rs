@@ -351,7 +351,7 @@ pub async fn run(
         schema.clone(),
         cache_config,
     );
-    let _ = distributor.init().await;
+    distributor.init().await?;
 
     // Create readiness probe server
     let health_state = HealthState::new(ctx.clone(), "memtable".to_string());

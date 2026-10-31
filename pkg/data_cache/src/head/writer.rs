@@ -256,7 +256,7 @@ pub async fn send_record_batch(
                     ))
                 })?;
                 let mut client = ExecutorClient::try_new(addr, config.connect_timeout).await?;
-                let _ = client.send_batch(rb.schema(), vec![Ok(rb)]).await;
+                client.send_batch(rb.schema(), vec![Ok(rb)]).await?;
             }
             Err(error) => {
                 let err = error.to_string();
@@ -391,6 +391,7 @@ mod tests {
 
     /// A non-empty batch still has to be routed, and an unknown worker id is still
     /// an error rather than something to skip over.
+
     #[tokio::test]
     async fn test_send_record_batch_rejects_unknown_worker() -> Result<()> {
         let schema = assignment_schema();
@@ -409,6 +410,62 @@ mod tests {
         .await;
 
         assert!(result.is_err());
+        Ok(())
+    }
+
+    /// The listener accepts the connection then drops it, so `try_new` succeeds
+    /// and the `do_put` RPC fails.
+    #[tokio::test]
+    async fn test_send_record_batch_reports_do_put_failure() -> Result<()> {
+        use arrow::array::StringArray;
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        let addr = listener.local_addr()?;
+        tokio::spawn(async move {
+            if let Ok((mut sock, _)) = listener.accept().await {
+                let _ = sock.write_all(b"").await;
+                let _ = sock.shutdown().await;
+                let mut buf = [0u8; 64];
+                let _ = sock.read(&mut buf).await;
+            }
+        });
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("worker_ids", DataType::UInt64, false),
+            Field::new("payload", DataType::Utf8, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(UInt64Array::from(vec![7u64])),
+                Arc::new(StringArray::from(vec!["hello"])),
+            ],
+        )?;
+        let input = MemorySourceConfig::try_new_exec(&[vec![batch]], schema, None)?;
+
+        let mut worker_map: HashMap<String, String> = HashMap::new();
+        worker_map.insert("7".to_string(), format!("http://{addr}"));
+
+        let ctx = SessionContext::new();
+        let result = send_record_batch(
+            input,
+            ctx.task_ctx(),
+            0,
+            Arc::new(worker_map),
+            test_config(),
+        )
+        .await;
+
+        let message = match result {
+            Ok(_) => panic!("a failed do_put must surface instead of being discarded"),
+            Err(e) => e.to_string(),
+        };
+        assert!(
+            message.contains("Error sending batch") || message.contains("Error calling do_put"),
+            "the failure has to come from the do_put exchange, got: {message}"
+        );
         Ok(())
     }
 }
