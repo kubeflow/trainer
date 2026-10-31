@@ -140,7 +140,7 @@ spec:
                 spec:
                   containers:
                     - name: node
-                      image: pytorch/pytorch:2.13.0-cuda13.0-cudnn9-runtime
+                      image: pytorch/pytorch:2.15.0-cuda13.4-cudnn9-runtime
 ```
 
 Create a TrainJob that references the runtime:
