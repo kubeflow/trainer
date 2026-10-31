@@ -107,7 +107,14 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
 	} else {
 		err = r.reconcileObjects(ctx, runtime, &trainJob)
-		if err != nil {
+		var validationErr *jobruntimes.ValidationError
+		if errors.As(err, &validationErr) {
+			// The TrainJob is not valid for the runtime it is being reconciled against, so retrying cannot succeed.
+			setFailedCondition(&trainJob, fmt.Sprintf(
+				"TrainJob is not valid for runtime %q, which may have changed since the TrainJob was admitted: %v",
+				trainJob.Spec.RuntimeRef.Name, validationErr), trainer.TrainJobInvalidForRuntimeReason)
+			err = nil
+		} else if err != nil {
 			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
 			//  the creation of the runtime resources failed and the TrainJob is backed off until
 			//  the next retry attempt.

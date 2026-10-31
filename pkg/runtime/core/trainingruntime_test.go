@@ -403,7 +403,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "manager-1",
+						Manager: "acme.io/manager-1",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -505,7 +505,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 					},
 					{
-						Manager: "manager-2",
+						Manager: "acme.io/manager-2",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -820,7 +820,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "manager-1",
+						Manager: "acme.io/manager-1",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -843,7 +843,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 					},
 					{
-						Manager: "manager-2",
+						Manager: "acme.io/manager-2",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -903,7 +903,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "security-manager",
+						Manager: "acme.io/security-manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -987,7 +987,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "manager-1",
+						Manager: "acme.io/manager-1",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1014,7 +1014,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 					},
 					{
-						Manager: "manager-2",
+						Manager: "acme.io/manager-2",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1073,7 +1073,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "manager-1",
+						Manager: "acme.io/manager-1",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1098,7 +1098,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 					},
 					{
-						Manager: "manager-1-dup",
+						Manager: "acme.io/manager-1-dup",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1148,7 +1148,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "manager-1",
+						Manager: "acme.io/manager-1",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1173,7 +1173,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 					},
 					{
-						Manager: "manager-2",
+						Manager: "acme.io/manager-2",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -2463,7 +2463,7 @@ test-job-node-0-1.test-job slots=8
 				).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "manager-1",
+						Manager: "acme.io/manager-1",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{

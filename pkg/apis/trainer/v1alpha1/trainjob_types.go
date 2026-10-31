@@ -81,6 +81,11 @@ const (
 	// when the TrainJob exceeds its ActiveDeadlineSeconds.
 	// Matches the Kubernetes Job behavior.
 	TrainJobDeadlineExceededReason string = "DeadlineExceeded"
+
+	// TrainJobInvalidForRuntimeReason is the "Failed" condition reason
+	// when the TrainJob is not valid for the runtime it is first reconciled against.
+	// This can happen if the runtime changed after the TrainJob was admitted.
+	TrainJobInvalidForRuntimeReason string = "InvalidForRuntime"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

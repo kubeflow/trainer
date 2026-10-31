@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	resourcehelpers "k8s.io/component-helpers/resource"
 	"k8s.io/utils/ptr"
@@ -289,6 +290,32 @@ func RuntimeRefToRuntimeRegistryKey(runtimeRef trainer.RuntimeRef) string {
 		Group: ptr.Deref(runtimeRef.APIGroup, ""),
 		Kind:  ptr.Deref(runtimeRef.Kind, ""),
 	}.String()
+}
+
+// ValidationError is returned by Runtime.NewObjects when the TrainJob is not valid for the runtime
+// it is about to be snapshotted from. It is terminal: retrying cannot succeed.
+type ValidationError struct {
+	Errs field.ErrorList
+}
+
+func (e *ValidationError) Error() string {
+	return e.Errs.ToAggregate().Error()
+}
+
+// NewValidationError converts the result of validating a TrainJob against a runtime into an error.
+// It returns nil if there are no errors. Internal errors mean validation could not be completed
+// (e.g. a transient API failure) rather than that the TrainJob is invalid, so they are returned as
+// plain errors that can be retried instead of a terminal ValidationError.
+func NewValidationError(errs field.ErrorList) error {
+	if len(errs) == 0 {
+		return nil
+	}
+	for _, err := range errs {
+		if err.Type == field.ErrorTypeInternal {
+			return errs.ToAggregate()
+		}
+	}
+	return &ValidationError{Errs: errs}
 }
 
 // ExtractResourcePerNodeFromRuntime extracts the Trainer resource per node from the Info object.
