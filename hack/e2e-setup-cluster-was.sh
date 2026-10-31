@@ -60,7 +60,7 @@ CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}
 echo "Build Kubeflow Trainer controller manager image"
 ${CONTAINER_RUNTIME} build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
 
-TORCH_DISTRIBUTED_IMAGE="pytorch/pytorch:2.13.0-cuda13.0-cudnn9-runtime"
+TORCH_DISTRIBUTED_IMAGE="pytorch/pytorch:2.15.0-cuda13.4-cudnn9-runtime"
 echo "Pull torch-distributed runtime image"
 ${CONTAINER_RUNTIME} pull ${TORCH_DISTRIBUTED_IMAGE}
 

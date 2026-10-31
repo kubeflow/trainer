@@ -43,7 +43,7 @@ import (
 
 const (
 	// runtimeImage is loaded into the Kind cluster by hack/e2e-setup-cluster-was.sh, so the tests don't pull images.
-	runtimeImage = "pytorch/pytorch:2.13.0-cuda13.0-cudnn9-runtime"
+	runtimeImage = "pytorch/pytorch:2.15.0-cuda13.4-cudnn9-runtime"
 	// gangSlotResource is a fake extended resource advertised on the node to control the cluster capacity for
 	// the TrainJob Pods.
 	gangSlotResource corev1.ResourceName = "example.com/gang-slot"
