@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/validation"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
@@ -849,6 +850,152 @@ func TestReplicatedJobReplicas(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if got := ReplicatedJobReplicas(tc.info, tc.rJobName); got != tc.wantReplicas {
 				t.Errorf("Unexpected replicatedJob replicas, want: %d, got: %d", tc.wantReplicas, got)
+			}
+		})
+	}
+}
+
+func TestMaxTrainJobNameLength(t *testing.T) {
+	cases := map[string]struct {
+		info         *Info
+		trainJob     *trainer.TrainJob
+		wantMaxLen   int
+		wantLimitJob string
+	}{
+		"nil info": {
+			info:         nil,
+			wantMaxLen:   validation.DNS1035LabelMaxLength,
+			wantLimitJob: "",
+		},
+		"empty PodSets": {
+			info:         &Info{},
+			wantMaxLen:   validation.DNS1035LabelMaxLength,
+			wantLimitJob: "",
+		},
+		"single node PodSet": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{
+						{
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithReplicas(1),
+						),
+				},
+			},
+			wantMaxLen:   48,
+			wantLimitJob: constants.Node,
+		},
+		"single node PodSet with numNodes: 11 producing 2-digit index": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{
+						{
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithReplicas(1),
+						),
+				},
+			},
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					Trainer: &trainer.Trainer{
+						NumNodes: ptr.To[int32](11),
+					},
+				},
+			},
+			wantMaxLen:   47,
+			wantLimitJob: constants.Node,
+		},
+		"multiple PodSets where dataset-initializer is limiting": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{
+						{
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+						},
+						{
+							Name:  "dataset-initializer",
+							Count: ptr.To[int32](1),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithReplicas(1),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName("dataset-initializer").
+								WithReplicas(1),
+						),
+				},
+			},
+			wantMaxLen:   33,
+			wantLimitJob: "dataset-initializer",
+		},
+		"MPI runtime with launcher and node and numNodes: 11": {
+			info: &Info{
+				RuntimePolicy: RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						MPI: &trainer.MPIMLPolicySource{},
+					},
+				},
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{
+						{
+							Name:     constants.Launcher,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+						},
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](1),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithReplicas(1),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithReplicas(1),
+						),
+				},
+			},
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					Trainer: &trainer.Trainer{
+						NumNodes: ptr.To[int32](11),
+					},
+				},
+			},
+			wantMaxLen:   44,
+			wantLimitJob: constants.Launcher,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			gotMaxLen, gotLimitJob := MaxTrainJobNameLength(tc.info, tc.trainJob)
+			if gotMaxLen != tc.wantMaxLen || gotLimitJob != tc.wantLimitJob {
+				t.Errorf("MaxTrainJobNameLength() = (%d, %q), want (%d, %q)",
+					gotMaxLen, gotLimitJob, tc.wantMaxLen, tc.wantLimitJob)
 			}
 		})
 	}

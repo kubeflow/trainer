@@ -258,6 +258,18 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 		}
 	}
 
+	// Validate TrainJob name length against JobSet pod name constraints.
+	if oldObj == nil {
+		minMaxLen, limitingRJob := runtime.MaxTrainJobNameLength(info, newObj)
+		if len(newObj.Name) > minMaxLen && limitingRJob != "" {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("metadata", "name"),
+				newObj.Name,
+				fmt.Sprintf("TrainJob name is too long, pod names generated for replicatedJob %q will exceed 63 characters (maximum length is %d)", limitingRJob, minMaxLen),
+			))
+		}
+	}
+
 	return nil, allErrs
 }
 

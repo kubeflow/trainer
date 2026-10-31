@@ -488,7 +488,7 @@ var _ = ginkgo.Describe("OptimizationJob Controller", ginkgo.Ordered, func() {
 		})
 
 		ginkgo.It("Should mark OptimizationJob as Failed when SearchAlgorithm is unsupported", func() {
-			optJob := newTestOptimizationJob(ns.Name, "test-unsupported-algo", 2, 1)
+			optJob := newTestOptimizationJob(ns.Name, "test-unsupp-algo", 2, 1)
 			optJob.Spec.SearchAlgorithm = &trainer.SearchAlgorithm{
 				Grid: &trainer.GridAlgorithm{},
 			}
@@ -528,7 +528,7 @@ var _ = ginkgo.Describe("OptimizationJob Controller", ginkgo.Ordered, func() {
 		ginkgo.It("Should retry on transient suggestion service errors without failing prematurely", func() {
 			mockClient.SetError(fmt.Errorf("simulated transient gRPC failure"))
 
-			optJob := newTestOptimizationJob(ns.Name, "test-transient-error", 1, 1)
+			optJob := newTestOptimizationJob(ns.Name, "test-transient-err", 1, 1)
 
 			ginkgo.By("Creating OptimizationJob")
 			gomega.Expect(k8sClient.Create(ctx, optJob)).Should(gomega.Succeed())

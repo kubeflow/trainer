@@ -28,6 +28,7 @@ import (
 
 	katibapi "github.com/kubeflow/katib/pkg/apis/manager/v1beta1"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/validation"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -59,20 +60,38 @@ func getAlgorithmName(optJob *trainer.OptimizationJob) string {
 	return ""
 }
 
+const (
+	// trialNameSeparator separates the OptimizationJob name prefix from the random suffix in generated trial TrainJob names.
+	trialNameSeparator = "-t-"
+	// trialRandomSuffixLength is the length of the random suffix appended to trial TrainJob names.
+	trialRandomSuffixLength = 5
+	// trialSuffixLength is the total overhead added to the OptimizationJob name prefix.
+	trialSuffixLength = len(trialNameSeparator) + trialRandomSuffixLength // 8
+)
+
 // GenerateTrialName gives each trial a random suffix, including trials with
 // identical parameter assignments.
 func GenerateTrialName(optJobName string) string {
-	return generateTrialName(optJobName, utilrand.String(8))
+	return generateTrialName(optJobName, utilrand.String(trialRandomSuffixLength))
 }
 
 func generateTrialName(optJobName, randomSuffix string) string {
-	const separator = "-trial-"
-	maxPrefix := 63 - len(separator) - len(randomSuffix)
+	maxPrefix := validation.DNS1035LabelMaxLength - trialSuffixLength
 	prefix := optJobName
 	if len(prefix) > maxPrefix {
 		prefix = strings.TrimRight(prefix[:maxPrefix], "-")
 	}
-	return prefix + separator + randomSuffix
+	return prefix + trialNameSeparator + randomSuffix
+}
+
+// MaxOptimizationJobNameLength returns the maximum allowed length of an OptimizationJob name
+// for a given maximum TrainJob name length.
+func MaxOptimizationJobNameLength(maxTrainJobLength int) int {
+	maxLen := maxTrainJobLength - trialSuffixLength
+	if maxLen < 0 {
+		return 0
+	}
+	return maxLen
 }
 
 var ErrObjectiveMetricMissing = errors.New("objective metric is missing")

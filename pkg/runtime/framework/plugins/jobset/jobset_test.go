@@ -19,6 +19,7 @@ package jobset
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -705,6 +706,371 @@ func TestValidate(t *testing.T) {
 			wantError: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "trainer", "numNodes"), int32(6),
 					"must be divisible by the trainer replicatedJob replicas: 4"),
+			},
+		},
+		"trainjob name within limit for node replicatedJob passes": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec()),
+										),
+									),
+								),
+						),
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, strings.Repeat("a", 48)).
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(1).Obj()).
+				Obj(),
+		},
+		"trainjob name exceeding limit for node replicatedJob fails": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec()),
+										),
+									),
+								),
+						),
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, strings.Repeat("a", 49)).
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(1).Obj()).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 49),
+					"TrainJob name is too long, pod names generated for replicatedJob \"node\" will exceed 63 characters (maximum length is 48)"),
+			},
+		},
+		"trainjob name within limit for dataset-initializer passes": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.DatasetInitializer,
+							Ancestor: ptr.To(constants.DatasetInitializer),
+							Count:    ptr.To[int32](1),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.DatasetInitializer).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec()),
+										),
+									),
+								),
+						),
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, strings.Repeat("a", 33)).
+				Obj(),
+		},
+		"trainjob name exceeding limit for dataset-initializer fails": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.DatasetInitializer,
+							Ancestor: ptr.To(constants.DatasetInitializer),
+							Count:    ptr.To[int32](1),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.DatasetInitializer).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec()),
+										),
+									),
+								),
+						),
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, strings.Repeat("a", 34)).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 34),
+					"TrainJob name is too long, pod names generated for replicatedJob \"dataset-initializer\" will exceed 63 characters (maximum length is 33)"),
+			},
+		},
+		"trainjob name with 11 nodes (two pod index digits) exceeding 47 chars fails": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](11),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec()),
+										),
+									),
+								),
+						),
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, strings.Repeat("a", 48)).
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(11).Obj()).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 48),
+					"TrainJob name is too long, pod names generated for replicatedJob \"node\" will exceed 63 characters (maximum length is 47)"),
+			},
+		},
+		"trainjob with long name is not rejected on update": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.DatasetInitializer,
+							Ancestor: ptr.To(constants.DatasetInitializer),
+							Count:    ptr.To[int32](1),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.DatasetInitializer).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec()),
+										),
+									),
+								),
+						),
+				},
+			},
+			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, strings.Repeat("a", 50)).Obj(),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, strings.Repeat("a", 50)).Obj(),
+		},
+		"multiple replicatedJobs where non-first is limiting": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+						},
+						{
+							Name:  constants.DatasetInitializer,
+							Count: ptr.To[int32](1),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec()),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.DatasetInitializer).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec()),
+										),
+									),
+								),
+						),
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, strings.Repeat("a", 34)).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 34),
+					"TrainJob name is too long, pod names generated for replicatedJob \"dataset-initializer\" will exceed 63 characters (maximum length is 33)"),
+			},
+		},
+		"trainer with replicas > 1 reduces allowed name length": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](11),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithReplicas(11).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec()),
+										),
+									),
+								),
+						),
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, strings.Repeat("a", 48)).
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(11).Obj()).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 48),
+					"TrainJob name is too long, pod names generated for replicatedJob \"node\" will exceed 63 characters (maximum length is 47)"),
+			},
+		},
+		"MPI runtime with launcher and node and numNodes: 11 allows 44 chars": {
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						MPI: &trainer.MPIMLPolicySource{},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.Launcher,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+						},
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](1),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec()),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec()),
+										),
+									),
+								),
+						),
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, strings.Repeat("a", 44)).
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(11).Obj()).
+				Obj(),
+		},
+		"MPI runtime with launcher and node and numNodes: 11 rejects 45 chars": {
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						MPI: &trainer.MPIMLPolicySource{},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.Launcher,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+						},
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](1),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec()),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec()),
+										),
+									),
+								),
+						),
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, strings.Repeat("a", 45)).
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(11).Obj()).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 45),
+					"TrainJob name is too long, pod names generated for replicatedJob \"launcher\" will exceed 63 characters (maximum length is 44)"),
 			},
 		},
 		"must have dataset initializer job when trainJob is configured with input datasetConfig": {

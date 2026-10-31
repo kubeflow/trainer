@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	resourcehelpers "k8s.io/component-helpers/resource"
 	"k8s.io/utils/ptr"
@@ -31,6 +32,7 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
 type Info struct {
@@ -346,6 +348,59 @@ func ReplicatedJobReplicas(info *Info, rJobName string) int32 {
 		}
 	}
 	return constants.DefaultJobReplicas
+}
+
+// MaxTrainJobNameLength returns the maximum allowed length of a TrainJob name across all
+// PodSets in the Info object for the given TrainJob, along with the limiting replicatedJob name.
+// If no PodSets are defined, it returns validation.DNS1035LabelMaxLength and "".
+func MaxTrainJobNameLength(info *Info, trainJob *trainer.TrainJob) (int, string) {
+	if info == nil {
+		return validation.DNS1035LabelMaxLength, ""
+	}
+	minMaxLen := validation.DNS1035LabelMaxLength
+	limitingRJob := ""
+
+	isMPI := info.RuntimePolicy.MLPolicySource != nil && info.RuntimePolicy.MLPolicySource.MPI != nil
+	runLauncherAsNode := isMPI && ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false)
+
+	for _, ps := range info.TemplateSpec.PodSets {
+		rJobName := ps.Name
+		if rJobName == "" {
+			continue
+		}
+		replicas := ReplicatedJobReplicas(info, rJobName)
+		if replicas < 1 {
+			replicas = 1
+		}
+		count := ptr.Deref(ps.Count, 1)
+
+		if trainJob != nil && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
+			numNodes := *trainJob.Spec.Trainer.NumNodes
+			if isMPI {
+				if rJobName == constants.Node {
+					if runLauncherAsNode {
+						count = max(numNodes-1, 1)
+					} else {
+						count = numNodes
+					}
+				}
+			} else if ptr.Deref(ps.Ancestor, "") == constants.AncestorTrainer {
+				count = numNodes
+			}
+		}
+
+		completions := count / replicas
+		if completions < 1 {
+			completions = 1
+		}
+
+		maxLen := trainjob.MaxTrainJobNameLength(rJobName, replicas, completions)
+		if maxLen < minMaxLen {
+			minMaxLen = maxLen
+			limitingRJob = rJobName
+		}
+	}
+	return minMaxLen, limitingRJob
 }
 
 // GetNumGPUPerNode returns the GPU count if found in container resources.
