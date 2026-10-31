@@ -137,7 +137,7 @@ Use `update_trainjob_status` from `kubeflow.trainer` when writing a custom train
 loop or using a framework other than HuggingFace Transformers. The SDK throttles updates
 to at most once every 5 seconds to avoid overloading the controller.
 
-For detailed API usage of `update_trainjob_status`, refer to the [Kubeflow SDK documentation](https://www.kubeflow.org/docs/components/trainer/sdk/).
+For detailed API usage of `update_trainjob_status`, refer to the [Kubeflow SDK documentation](https://sdk.kubeflow.org/en/latest/train/api.html).
 
 ```python
 from kubeflow.trainer import update_trainjob_status
@@ -238,7 +238,7 @@ conventions.
 ## Future plans
 
 The following capabilities are planned as follow-ons to this feature, as described in the
-[TrainJob progress proposal](https://github.com/kubeflow/trainer/tree/master/docs/proposals/2779-trainjob-progress):
+[TrainJob progress proposal](https://github.com/kubeflow/trainer/tree/master/proposals/2779-trainjob-progress):
 
 - Periodic, transparent checkpointing triggered automatically based on ETA.
 - Integration with `OptimizationJob` for hyperparameter tuning jobs (Katib).
