@@ -22,9 +22,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -64,6 +67,7 @@ type Status struct {
 
 var _ framework.ComponentBuilderPlugin = (*Status)(nil)
 var _ framework.EnforcePodSpecPlugin = (*Status)(nil)
+var _ framework.CustomValidationPlugin = (*Status)(nil)
 
 func New(_ context.Context, c client.Client, _ client.FieldIndexer, cfg *configapi.Configuration) (framework.Plugin, error) {
 	return &Status{client: c, cfg: cfg}, nil
@@ -71,6 +75,46 @@ func New(_ context.Context, c client.Client, _ client.FieldIndexer, cfg *configa
 
 func (p *Status) Name() string {
 	return Name
+}
+
+func (p *Status) Validate(_ context.Context, info *runtime.Info, _, _ *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	var allErrs field.ErrorList
+	if info == nil {
+		return nil, allErrs
+	}
+
+	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
+	if trainerPS == nil {
+		return nil, allErrs
+	}
+
+	for _, vol := range trainerPS.Volumes {
+		if ptr.Deref(vol.Name, "") == tokenVolumeName {
+			allErrs = append(allErrs, field.Forbidden(
+				field.NewPath("spec", "template", "spec", "volumes"),
+				fmt.Sprintf("volume name %q in podSet %q is reserved for %s", tokenVolumeName, trainerPS.Name, Name),
+			))
+		}
+	}
+
+	for cIdx, c := range trainerPS.Containers {
+		for _, vm := range c.VolumeMounts {
+			if ptr.Deref(vm.Name, "") == tokenVolumeName {
+				allErrs = append(allErrs, field.Forbidden(
+					field.NewPath("spec", "template", "spec", "containers").Index(cIdx).Child("volumeMounts"),
+					fmt.Sprintf("volume mount name %q in container %q of podSet %q is reserved for %s", tokenVolumeName, c.Name, trainerPS.Name, Name),
+				))
+			}
+			if ptr.Deref(vm.MountPath, "") == configMountPath {
+				allErrs = append(allErrs, field.Forbidden(
+					field.NewPath("spec", "template", "spec", "containers").Index(cIdx).Child("volumeMounts"),
+					fmt.Sprintf("volume mount path %q in container %q of podSet %q is reserved for %s", configMountPath, c.Name, trainerPS.Name, Name),
+				))
+			}
+		}
+	}
+
+	return nil, allErrs
 }
 
 // EnforcePodSpec injects the status server endpoint, its CA certificate, and the
