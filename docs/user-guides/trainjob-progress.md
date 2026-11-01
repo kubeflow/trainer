@@ -178,7 +178,7 @@ to the controller endpoint.
 #### Technical Details
 
 - **Environment Variables**: The controller injects `KUBEFLOW_TRAINER_SERVER_URL` (the HTTPS endpoint), `KUBEFLOW_TRAINER_SERVER_CA_CERT` (path to the CA cert file), and `KUBEFLOW_TRAINER_SERVER_TOKEN` (path to the bearer token file).
-- **Authentication**: Each request is authenticated using a projected service account token (OIDC-verified by the controller). The projected service account token is issued with a TrainJob-specific audience so the controller can verify that update requests target the correct TrainJob.
+- **Authentication**: Each request is authenticated using a projected service account token (validated by the controller with the Kubernetes TokenReview API). The projected service account token is issued with a TrainJob-specific audience so the controller can verify that update requests target the correct TrainJob.
 - **TLS Configuration**: The endpoint reuses the same webhook TLS certificates as the controller, with automatic cert rotation.
 
 #### Implementation Guidance

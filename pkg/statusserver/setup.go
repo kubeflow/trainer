@@ -50,9 +50,9 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.StatusServer, tlsOpts *configa
 		return err
 	}
 
-	// Initialize OIDC provider for token authentication
-	// The provider will be used to create verifiers with TrainJob-specific audiences
-	authorizer := NewProjectedServiceAccountTokenAuthorizer(mgr.GetConfig())
+	// Review tokens with the manager's client, so token reviews do not consume
+	// the status server client's rate limits used for status updates
+	authorizer := NewTokenReviewAuthorizer(mgr.GetClient())
 
 	server, err := NewServer(cli, cfg, tlsConfig, authorizer)
 	if err != nil {
