@@ -17,6 +17,8 @@ limitations under the License.
 package statusserver
 
 import (
+	"time"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -28,13 +30,14 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/statusserver"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 	"github.com/kubeflow/trainer/v2/test/integration/framework"
-	"github.com/kubeflow/trainer/v2/test/util"
 )
 
 var _ = ginkgo.Describe("StatusServer TokenReview authorizer", ginkgo.Ordered, func() {
 	const (
 		serviceAccountName = "trainer"
 		trainJobName       = "test-job"
+		// tokenCacheTimeout exceeds the API server's 10 second cache of successful token authentications.
+		tokenCacheTimeout = 30 * time.Second
 	)
 
 	var (
@@ -153,11 +156,13 @@ var _ = ginkgo.Describe("StatusServer TokenReview authorizer", ginkgo.Ordered, f
 		gomega.Expect(authorized).To(gomega.BeTrue())
 
 		gomega.Expect(k8sClient.Delete(ctx, pod)).To(gomega.Succeed())
+		// The API server caches successful token authentications for 10 seconds by default,
+		// so the review above can still be served from that cache right after the deletion.
 		gomega.Eventually(func(g gomega.Gomega) {
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pod), &corev1.Pod{})).To(testingutil.BeNotFoundError())
 			authorized, err := authorizer.Authorize(ctx, "Bearer "+token, ns.Name, trainJobName)
 			g.Expect(err).NotTo(gomega.HaveOccurred())
 			g.Expect(authorized).To(gomega.BeFalse())
-		}, util.Timeout, util.Interval).Should(gomega.Succeed())
+		}, tokenCacheTimeout, time.Second).Should(gomega.Succeed())
 	})
 })
