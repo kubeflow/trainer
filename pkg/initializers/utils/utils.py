@@ -14,7 +14,7 @@
 
 import os
 from abc import ABC, abstractmethod
-from dataclasses import fields
+from dataclasses import MISSING, fields
 from typing import Dict
 
 STORAGE_URI_ENV = "STORAGE_URI"
@@ -62,11 +62,17 @@ def get_config_from_env(config) -> Dict:
         env_value = os.getenv(field.name.upper())
 
         if field.name == "ignore_patterns":
-            config_from_env[field.name] = (
-                [item.strip() for item in env_value.split(",") if item.strip()]
-                if env_value
-                else None
-            )
+            if env_value is None and (
+                field.default_factory is not MISSING
+                or (field.default is not MISSING and field.default is not None)
+            ):
+                continue
+            if env_value:
+                config_from_env[field.name] = [
+                    item.strip() for item in env_value.split(",") if item.strip()
+                ]
+            else:
+                config_from_env[field.name] = None
         else:
             config_from_env[field.name] = env_value if env_value else None
 

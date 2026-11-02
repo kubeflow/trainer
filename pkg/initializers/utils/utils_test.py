@@ -12,10 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
+
 import pytest
 
 import pkg.initializers.types.types as types
 import pkg.initializers.utils.utils as utils
+
+
+@dataclass
+class IgnorePatternsWithDefault:
+    ignore_patterns: tuple[str, ...] = ("*.ckpt",)
 
 
 @pytest.mark.parametrize(
@@ -39,7 +46,6 @@ import pkg.initializers.utils.utils as utils
             {"STORAGE_URI": "hf://test"},
             {
                 "storage_uri": "hf://test",
-                "ignore_patterns": None,
                 "access_token": None,
             },
         ),
@@ -137,7 +143,6 @@ import pkg.initializers.utils.utils as utils
             {"STORAGE_URI": "s3://bucket/path"},
             {
                 "storage_uri": "s3://bucket/path",
-                "ignore_patterns": None,
                 "endpoint": None,
                 "access_key_id": None,
                 "secret_access_key": None,
@@ -151,3 +156,20 @@ def test_get_config_from_env(mock_env_vars, config_class, env_vars, expected):
     mock_env_vars(**env_vars)
     result = utils.get_config_from_env(config_class)
     assert result == expected
+
+
+def test_get_config_from_env_preserves_default_value(mock_env_vars):
+    mock_env_vars(IGNORE_PATTERNS=None)
+
+    result = utils.get_config_from_env(IgnorePatternsWithDefault)
+
+    assert result == {}
+    assert IgnorePatternsWithDefault(**result).ignore_patterns == ("*.ckpt",)
+
+
+def test_get_config_from_env_empty_ignore_patterns_clears_default(mock_env_vars):
+    mock_env_vars(STORAGE_URI="s3://bucket/path", IGNORE_PATTERNS="")
+
+    result = utils.get_config_from_env(types.S3ModelInitializer)
+
+    assert result["ignore_patterns"] is None
