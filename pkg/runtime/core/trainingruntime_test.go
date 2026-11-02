@@ -3307,7 +3307,7 @@ func TestNewRuntimeInfo(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, err := (&TrainingRuntime{}).newRuntimeInfo(tc.trainJob, tc.jobSetTemplate, tc.mlPolicy, tc.podGroupPolicy)
+			got, err := (&TrainingRuntime{}).newRuntimeInfo(tc.trainJob, tc.jobSetTemplate, tc.mlPolicy, tc.podGroupPolicy, nil)
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}
