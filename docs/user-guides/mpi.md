@@ -95,20 +95,16 @@ my-mpi-job-launcher-0-0.my-mpi-job slots=4
 The `spec.trainer` fields of the TrainJob are set on the `node` container of the launcher and of
 the nodes as follows:
 
-| Field              | Launcher | Nodes                                                      |
-| ------------------ | -------- | ---------------------------------------------------------- |
-| `image`            | Yes      | Yes                                                        |
-| `command`, `args`  | Yes      | No, the nodes keep the command of the runtime to start SSH |
-| `env`              | Yes      | Only with `runLauncherAsNode: true`                        |
-| `resourcesPerNode` | Yes      | Only with `runLauncherAsNode: true`                        |
+| Field              | Launcher                            | Nodes                                                      |
+| ------------------ | ----------------------------------- | ---------------------------------------------------------- |
+| `image`            | Yes                                 | Yes                                                        |
+| `command`, `args`  | Yes                                 | No, the nodes keep the command of the runtime to start SSH |
+| `env`              | Yes                                 | Only with `runLauncherAsNode: true`                        |
+| `resourcesPerNode` | Only with `runLauncherAsNode: true` | Yes                                                        |
 
 The `env` of the nodes is set on the SSH server container, and the processes that `mpirun` starts
 over SSH do not inherit it. Use `mpirun -x <NAME>` to forward an environment variable from the
 launcher to all MPI processes.
-
-With `runLauncherAsNode: false`, the nodes keep the resources of the runtime. You can set them with
-[runtime patches](../operator-guides/runtime-patches) on the `node` container of the `node`
-replicatedJob.
 
 ## Use a Custom Image
 

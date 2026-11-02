@@ -3062,29 +3062,6 @@ func TestToApplyConfig(t *testing.T) {
 func TestNewRuntimeInfo(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobDynamicResourceAllocation, true)
 
-	gpuRequests := corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}
-	gpuClaim := trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "gpu-claim-template"}
-	mpiJobSet := func() *testingutil.JobSetWrapper {
-		return testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
-			LauncherReplica().
-			ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher)
-	}
-	mpiPolicy := func(runLauncherAsNode *bool) *trainer.MLPolicy {
-		return testingutil.MakeMLPolicyWrapper().
-			WithNumNodes(1).
-			WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-				MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), runLauncherAsNode).
-				Obj(),
-			).
-			Obj()
-	}
-	torchPolicy := testingutil.MakeMLPolicyWrapper().
-		WithNumNodes(1).
-		WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj()).
-		Obj()
-	trainJob := func(trainerSpec *trainer.Trainer) *trainer.TrainJob {
-		return testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Trainer(trainerSpec).Obj()
-	}
 	// newInfo builds the expected Info from the expected JobSet spec. Every case runs one node
 	// and one Pod per replicatedJob, so every PodSet has a count of 1.
 	newInfo := func(mlPolicy *trainer.MLPolicy, jobSetSpec jobsetv1alpha2.JobSetSpec) *jobruntimes.Info {
@@ -3122,59 +3099,210 @@ func TestNewRuntimeInfo(t *testing.T) {
 		wantError      error
 	}{
 		"MPI resourcesPerNode is set on the node and not on the launcher when runLauncherAsNode is false": {
-			trainJob:       trainJob(testingutil.MakeTrainJobTrainerWrapper().Container("", nil, nil, gpuRequests).Obj()),
-			jobSetTemplate: trainer.JobSetTemplateSpec{Spec: mpiJobSet().Obj().Spec},
-			mlPolicy:       mpiPolicy(ptr.To(false)),
-			wantInfo: newInfo(mpiPolicy(ptr.To(false)), mpiJobSet().
-				Container(constants.Node, constants.Node, "", nil, nil, gpuRequests).
-				Obj().Spec),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(testingutil.MakeTrainJobTrainerWrapper().
+					Container("", nil, nil, corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}).
+					Obj(),
+				).
+				Obj(),
+			jobSetTemplate: trainer.JobSetTemplateSpec{
+				Spec: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					LauncherReplica().
+					ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+					Obj().Spec,
+			},
+			mlPolicy: testingutil.MakeMLPolicyWrapper().
+				WithNumNodes(1).
+				WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+					MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(false)).
+					Obj(),
+				).
+				Obj(),
+			wantInfo: newInfo(
+				testingutil.MakeMLPolicyWrapper().
+					WithNumNodes(1).
+					WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(false)).
+						Obj(),
+					).
+					Obj(),
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					LauncherReplica().
+					ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+					Container(constants.Node, constants.Node, "", nil, nil, corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}).
+					Obj().Spec,
+			),
 		},
 		"MPI resourcesPerNode is set on the node and not on the launcher when runLauncherAsNode is unset": {
-			trainJob:       trainJob(testingutil.MakeTrainJobTrainerWrapper().Container("", nil, nil, gpuRequests).Obj()),
-			jobSetTemplate: trainer.JobSetTemplateSpec{Spec: mpiJobSet().Obj().Spec},
-			mlPolicy:       mpiPolicy(nil),
-			wantInfo: newInfo(mpiPolicy(nil), mpiJobSet().
-				Container(constants.Node, constants.Node, "", nil, nil, gpuRequests).
-				Obj().Spec),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(testingutil.MakeTrainJobTrainerWrapper().
+					Container("", nil, nil, corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}).
+					Obj(),
+				).
+				Obj(),
+			jobSetTemplate: trainer.JobSetTemplateSpec{
+				Spec: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					LauncherReplica().
+					ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+					Obj().Spec,
+			},
+			mlPolicy: testingutil.MakeMLPolicyWrapper().
+				WithNumNodes(1).
+				WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+					MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), nil).
+					Obj(),
+				).
+				Obj(),
+			wantInfo: newInfo(
+				testingutil.MakeMLPolicyWrapper().
+					WithNumNodes(1).
+					WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), nil).
+						Obj(),
+					).
+					Obj(),
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					LauncherReplica().
+					ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+					Container(constants.Node, constants.Node, "", nil, nil, corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}).
+					Obj().Spec,
+			),
 		},
 		"MPI resourcesPerNode is set on the node and on the launcher when runLauncherAsNode is true": {
-			trainJob:       trainJob(testingutil.MakeTrainJobTrainerWrapper().Container("", nil, nil, gpuRequests).Obj()),
-			jobSetTemplate: trainer.JobSetTemplateSpec{Spec: mpiJobSet().Obj().Spec},
-			mlPolicy:       mpiPolicy(ptr.To(true)),
-			wantInfo: newInfo(mpiPolicy(ptr.To(true)), mpiJobSet().
-				Container(constants.Node, constants.Node, "", nil, nil, gpuRequests).
-				Container(constants.Launcher, constants.Node, "", []string{"mpirun"}, []string{"echo.sh"}, gpuRequests).
-				Obj().Spec),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(testingutil.MakeTrainJobTrainerWrapper().
+					Container("", nil, nil, corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}).
+					Obj(),
+				).
+				Obj(),
+			jobSetTemplate: trainer.JobSetTemplateSpec{
+				Spec: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					LauncherReplica().
+					ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+					Obj().Spec,
+			},
+			mlPolicy: testingutil.MakeMLPolicyWrapper().
+				WithNumNodes(1).
+				WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+					MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(true)).
+					Obj(),
+				).
+				Obj(),
+			wantInfo: newInfo(
+				testingutil.MakeMLPolicyWrapper().
+					WithNumNodes(1).
+					WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(true)).
+						Obj(),
+					).
+					Obj(),
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					LauncherReplica().
+					ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+					Container(constants.Node, constants.Node, "", nil, nil, corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}).
+					Container(constants.Launcher, constants.Node, "", []string{"mpirun"}, []string{"echo.sh"}, corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}).
+					Obj().Spec,
+			),
 		},
 		"MPI resourceClaimsPerNode is set on the node and not on the launcher when runLauncherAsNode is false": {
-			trainJob:       trainJob(testingutil.MakeTrainJobTrainerWrapper().ResourceClaimsPerNode(gpuClaim).Obj()),
-			jobSetTemplate: trainer.JobSetTemplateSpec{Spec: mpiJobSet().Obj().Spec},
-			mlPolicy:       mpiPolicy(ptr.To(false)),
-			wantInfo: newInfo(mpiPolicy(ptr.To(false)), mpiJobSet().
-				PodResourceClaims(constants.Node, corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To("gpu-claim-template")}).
-				ContainerResourceClaims(constants.Node, constants.Node, corev1.ResourceClaim{Name: "gpu"}).
-				Obj().Spec),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(testingutil.MakeTrainJobTrainerWrapper().
+					ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "gpu-claim-template"}).
+					Obj(),
+				).
+				Obj(),
+			jobSetTemplate: trainer.JobSetTemplateSpec{
+				Spec: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					LauncherReplica().
+					ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+					Obj().Spec,
+			},
+			mlPolicy: testingutil.MakeMLPolicyWrapper().
+				WithNumNodes(1).
+				WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+					MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(false)).
+					Obj(),
+				).
+				Obj(),
+			wantInfo: newInfo(
+				testingutil.MakeMLPolicyWrapper().
+					WithNumNodes(1).
+					WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(false)).
+						Obj(),
+					).
+					Obj(),
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					LauncherReplica().
+					ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+					PodResourceClaims(constants.Node, corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To("gpu-claim-template")}).
+					ContainerResourceClaims(constants.Node, constants.Node, corev1.ResourceClaim{Name: "gpu"}).
+					Obj().Spec,
+			),
 		},
 		"MPI resourcesPerNode is merged with the resources of the runtime": {
-			trainJob: trainJob(testingutil.MakeTrainJobTrainerWrapper().Container("", nil, nil, gpuRequests).Obj()),
-			jobSetTemplate: trainer.JobSetTemplateSpec{Spec: mpiJobSet().
-				Container(constants.Node, constants.Node, "", nil, nil, corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}).
-				Obj().Spec},
-			mlPolicy: mpiPolicy(ptr.To(false)),
-			wantInfo: newInfo(mpiPolicy(ptr.To(false)), mpiJobSet().
-				Container(constants.Node, constants.Node, "", nil, nil, corev1.ResourceList{
-					corev1.ResourceCPU: resource.MustParse("1"),
-					"nvidia.com/gpu":   resource.MustParse("4"),
-				}).
-				Obj().Spec),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(testingutil.MakeTrainJobTrainerWrapper().
+					Container("", nil, nil, corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}).
+					Obj(),
+				).
+				Obj(),
+			jobSetTemplate: trainer.JobSetTemplateSpec{
+				Spec: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					LauncherReplica().
+					ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+					Container(constants.Node, constants.Node, "", nil, nil, corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}).
+					Obj().Spec,
+			},
+			mlPolicy: testingutil.MakeMLPolicyWrapper().
+				WithNumNodes(1).
+				WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+					MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(false)).
+					Obj(),
+				).
+				Obj(),
+			wantInfo: newInfo(
+				testingutil.MakeMLPolicyWrapper().
+					WithNumNodes(1).
+					WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(false)).
+						Obj(),
+					).
+					Obj(),
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					LauncherReplica().
+					ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+					Container(constants.Node, constants.Node, "", nil, nil, corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("1"),
+						"nvidia.com/gpu":   resource.MustParse("4"),
+					}).
+					Obj().Spec,
+			),
 		},
 		"Torch resourcesPerNode is set on the trainer node": {
-			trainJob:       trainJob(testingutil.MakeTrainJobTrainerWrapper().Container("", nil, nil, gpuRequests).Obj()),
-			jobSetTemplate: trainer.JobSetTemplateSpec{Spec: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").Obj().Spec},
-			mlPolicy:       torchPolicy,
-			wantInfo: newInfo(torchPolicy, testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
-				Container(constants.Node, constants.Node, "", nil, nil, gpuRequests).
-				Obj().Spec),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(testingutil.MakeTrainJobTrainerWrapper().
+					Container("", nil, nil, corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}).
+					Obj(),
+				).
+				Obj(),
+			jobSetTemplate: trainer.JobSetTemplateSpec{
+				Spec: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					Obj().Spec,
+			},
+			mlPolicy: testingutil.MakeMLPolicyWrapper().
+				WithNumNodes(1).
+				WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj()).
+				Obj(),
+			wantInfo: newInfo(
+				testingutil.MakeMLPolicyWrapper().
+					WithNumNodes(1).
+					WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj()).
+					Obj(),
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					Container(constants.Node, constants.Node, "", nil, nil, corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}).
+					Obj().Spec,
+			),
 		},
 	}
 	for name, tc := range cases {
