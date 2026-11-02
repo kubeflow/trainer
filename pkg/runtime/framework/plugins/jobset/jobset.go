@@ -185,7 +185,8 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 			continue
 		}
 		for _, rJobPatch := range runtimePatch.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs {
-			containers, ok := rJobContainerNames[rJobPatch.Name]
+			// ObjApply has the runtimePatches merged in already, so it holds every target they name.
+			declared, ok := info.TemplateSpec.DeclaredPodSets[rJobPatch.Name]
 			if !ok {
 				allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 					"must not have replicated job that doesn't exist in the runtime job template"))
@@ -198,13 +199,13 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 			podSpecPatch := rJobPatch.Template.Spec.Template.Spec
 
 			for _, c := range podSpecPatch.InitContainers {
-				if !containers.Has(c.Name) {
+				if !declared.InitContainers.Has(c.Name) {
 					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 						fmt.Sprintf("must not have initContainer that doesn't exist in the runtime job %s", rJobPatch.Name)))
 				}
 			}
 			for _, c := range podSpecPatch.Containers {
-				if !containers.Has(c.Name) {
+				if !declared.Containers.Has(c.Name) {
 					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 						fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", rJobPatch.Name)))
 				} else if len(c.Env) > 0 && (c.Name == constants.DatasetInitializer || c.Name == constants.ModelInitializer || c.Name == constants.Node) {

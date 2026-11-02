@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	resourcehelpers "k8s.io/component-helpers/resource"
 	"k8s.io/utils/ptr"
@@ -58,6 +59,15 @@ type TemplateSpec struct {
 	// PodSets is a set of Pod extracted from ObjApply.
 	// This is abstract concept to represent multiple PodSpec as a unit.
 	PodSets PodSets
+	// DeclaredPodSets maps each PodSet name to the containers the runtime template declares for it.
+	// Unlike ObjApply and PodSets, it excludes what the TrainJob's runtimePatches add.
+	DeclaredPodSets map[string]DeclaredPodSet
+}
+
+// DeclaredPodSet holds the initContainer and container names a runtime template declares for a PodSet.
+type DeclaredPodSet struct {
+	InitContainers sets.Set[string]
+	Containers     sets.Set[string]
 }
 
 // PodSets is the collection of PodSet extracted from the runtime template.
@@ -144,6 +154,26 @@ func WithScheduling(scheduling *trainer.TrainingRuntimeScheduling) InfoOption {
 func WithTemplateSpecObjApply(objApply any) InfoOption {
 	return func(o *InfoOptions) {
 		o.templateSpec.ObjApply = objApply
+	}
+}
+
+// WithDeclaredPodSet records the initContainer and container names the runtime template declares for a PodSet.
+func WithDeclaredPodSet(psName string, podSpec corev1.PodSpec) InfoOption {
+	return func(o *InfoOptions) {
+		ps := DeclaredPodSet{
+			InitContainers: sets.New[string](),
+			Containers:     sets.New[string](),
+		}
+		for _, c := range podSpec.InitContainers {
+			ps.InitContainers.Insert(c.Name)
+		}
+		for _, c := range podSpec.Containers {
+			ps.Containers.Insert(c.Name)
+		}
+		if o.templateSpec.DeclaredPodSets == nil {
+			o.templateSpec.DeclaredPodSets = make(map[string]DeclaredPodSet)
+		}
+		o.templateSpec.DeclaredPodSets[psName] = ps
 	}
 }
 
