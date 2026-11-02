@@ -27,8 +27,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	"sigs.k8s.io/yaml"
 
@@ -654,6 +656,80 @@ func TestRuntimeSnapshotRoundTrip(t *testing.T) {
 			// Verify metadata and spec are preserved
 			if diff := cmp.Diff(tc.inputRuntimeObj, tc.retrievedRuntime); diff != "" {
 				t.Errorf("Runtime mismatch after round-trip (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateObjectsWithSnapshotOfDeletedTrainJob(t *testing.T) {
+	staleSnapshot := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job-runtime-snapshot",
+			Namespace: metav1.NamespaceDefault,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					UID:        "uid-deleted-test-job",
+					Controller: ptr.To(true),
+				},
+			},
+		},
+	}
+	trainingRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj()
+	clusterTrainingRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj()
+
+	cases := map[string]struct {
+		kind       string
+		isUpdate   bool
+		wantErrors int
+	}{
+		"TrainingRuntime: create ignores the snapshot": {
+			kind: trainer.TrainingRuntimeKind,
+		},
+		"ClusterTrainingRuntime: create ignores the snapshot": {
+			kind: trainer.ClusterTrainingRuntimeKind,
+		},
+		"TrainingRuntime: update rejects the snapshot": {
+			kind:       trainer.TrainingRuntimeKind,
+			isUpdate:   true,
+			wantErrors: 1,
+		},
+		"ClusterTrainingRuntime: update rejects the snapshot": {
+			kind:       trainer.ClusterTrainingRuntimeKind,
+			isUpdate:   true,
+			wantErrors: 1,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			clientBuilder := testingutil.NewClientBuilder().WithObjects(staleSnapshot, trainingRuntime, clusterTrainingRuntime)
+			c := clientBuilder.Build()
+			rt, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			clRt, err := NewClusterTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			runtimes := map[string]interface {
+				ValidateObjects(context.Context, *trainer.TrainJob, *trainer.TrainJob) (admission.Warnings, field.ErrorList)
+			}{
+				trainer.TrainingRuntimeKind:        rt,
+				trainer.ClusterTrainingRuntimeKind: clRt,
+			}
+			trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid-test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(tc.kind), "test-runtime").
+				Obj()
+			var old *trainer.TrainJob
+			if tc.isUpdate {
+				old = trainJob
+			}
+
+			_, errs := runtimes[tc.kind].ValidateObjects(ctx, old, trainJob)
+			if len(errs) != tc.wantErrors {
+				t.Errorf("Unexpected field errors, want %d: %v", tc.wantErrors, errs)
 			}
 		})
 	}

@@ -313,15 +313,22 @@ func (r *TrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {
 
 func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	// Validate against the snapshot the TrainJob was built from, falling back to the live
-	// runtime when no snapshot exists yet, as NewObjects does.
+	// runtime when no snapshot exists yet, as NewObjects does. On create there is no snapshot
+	// to read: one under this name still belongs to a deleted TrainJob of the same name.
 	trainingRuntime := &trainer.TrainingRuntime{}
-	if err := getRuntimeSnapshot(ctx, r.client, new, trainingRuntime); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, field.ErrorList{
-				field.InternalError(field.NewPath("spec", "runtimeRef"), fmt.Errorf("unable to get runtime snapshot: %w", err)),
+	useLiveRuntime := old == nil
+	if !useLiveRuntime {
+		if err := getRuntimeSnapshot(ctx, r.client, new, trainingRuntime); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, field.ErrorList{
+					field.InternalError(field.NewPath("spec", "runtimeRef"), fmt.Errorf("unable to get runtime snapshot: %w", err)),
+				}
 			}
+			trainingRuntime = &trainer.TrainingRuntime{}
+			useLiveRuntime = true
 		}
-		trainingRuntime = &trainer.TrainingRuntime{}
+	}
+	if useLiveRuntime {
 		if err := r.client.Get(ctx, client.ObjectKey{
 			Namespace: new.Namespace,
 			Name:      new.Spec.RuntimeRef.Name,
