@@ -33,6 +33,19 @@ to understand the basics of Kubeflow Trainer.
 
 - For SDK-based progress reporting: Kubeflow SDK `>= 0.5.0`.
 
+### Status server rate limits
+
+Each status update makes two Kubernetes API requests from the status server: a TokenReview to
+validate the trainer's token, and the TrainJob status update. Both share the status server's
+client rate limits (5 QPS and a burst of 10 by default). If many TrainJobs report progress at the
+same time, raise these limits with Helm:
+
+```bash
+--set manager.config.statusServer.qps=20 --set manager.config.statusServer.burst=40
+```
+
+Or set `statusServer.qps` and `statusServer.burst` in the controller config file.
+
 ## View TrainJob progress and metrics
 
 Once progress reporting is active, inspect `status.trainerStatus` using standard tooling.
@@ -178,7 +191,7 @@ to the controller endpoint.
 #### Technical Details
 
 - **Environment Variables**: The controller injects `KUBEFLOW_TRAINER_SERVER_URL` (the HTTPS endpoint), `KUBEFLOW_TRAINER_SERVER_CA_CERT` (path to the CA cert file), and `KUBEFLOW_TRAINER_SERVER_TOKEN` (path to the bearer token file).
-- **Authentication**: Each request is authenticated using a projected service account token (OIDC-verified by the controller). The projected service account token is issued with a TrainJob-specific audience so the controller can verify that update requests target the correct TrainJob.
+- **Authentication**: Each request is authenticated using a projected service account token (validated by the controller with the Kubernetes TokenReview API). The projected service account token is issued with a TrainJob-specific audience so the controller can verify that update requests target the correct TrainJob.
 - **TLS Configuration**: The endpoint reuses the same webhook TLS certificates as the controller, with automatic cert rotation.
 
 #### Implementation Guidance
