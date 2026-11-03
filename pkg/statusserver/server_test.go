@@ -21,6 +21,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -42,6 +43,7 @@ import (
 
 type fakeAuthorizer struct {
 	authorized bool
+	err        error
 }
 
 func (f fakeAuthorizer) Init(_ context.Context) error {
@@ -49,7 +51,7 @@ func (f fakeAuthorizer) Init(_ context.Context) error {
 }
 
 func (f fakeAuthorizer) Authorize(_ context.Context, _, _, _ string) (bool, error) {
-	return f.authorized, nil
+	return f.authorized, f.err
 }
 
 func newTestServer(t *testing.T, cfg *configapi.StatusServer, authorizer TokenAuthorizer, objs ...client.Object) *httptest.Server {
@@ -142,8 +144,19 @@ func TestServerErrorResponses(t *testing.T) {
 		body         string
 		chunked      bool
 		authorized   bool
+		authorizeErr error
 		wantResponse *metav1.Status
 	}{
+		"authorization failure fails with 500 internal error": {
+			url:          "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			authorizeErr: errors.New("failed to review token: connection refused"),
+			wantResponse: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: "Internal error",
+				Reason:  metav1.StatusReasonInternalError,
+				Code:    http.StatusInternalServerError,
+			},
+		},
 		"unauthorized fails with 403 unauthorized": {
 			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			authorized: false,
@@ -236,7 +249,7 @@ func TestServerErrorResponses(t *testing.T) {
 			ts := newTestServer(
 				t,
 				&configapi.StatusServer{Port: ptr.To[int32](8080)},
-				fakeAuthorizer{authorized: tc.authorized},
+				fakeAuthorizer{authorized: tc.authorized, err: tc.authorizeErr},
 				existingTrainJob,
 			)
 			defer ts.Close()
