@@ -3011,6 +3011,63 @@ func TestMergeTrainerNodeResources(t *testing.T) {
 				Claims:   []corev1.ResourceClaim{{Name: "gpu"}, {Name: "nic"}},
 			},
 		},
+		"limits-only resourcesPerNode sets the runtime requests above the new limits to the limits": {
+			runtimeNode: corev1ac.Container().WithName(constants.Node).WithResources(
+				corev1ac.ResourceRequirements().
+					WithRequests(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("4"), corev1.ResourceMemory: resource.MustParse("8Gi")}).
+					WithLimits(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("4"), corev1.ResourceMemory: resource.MustParse("8Gi")}),
+			),
+			resourcesPerNode: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2"), corev1.ResourceMemory: resource.MustParse("4Gi")},
+			},
+			want: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2"), corev1.ResourceMemory: resource.MustParse("4Gi")},
+				Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2"), corev1.ResourceMemory: resource.MustParse("4Gi")},
+			},
+		},
+		"limits-only resourcesPerNode sets the runtime extended resource request that differs from the new limit to the limit": {
+			runtimeNode: corev1ac.Container().WithName(constants.Node).WithResources(
+				corev1ac.ResourceRequirements().
+					WithRequests(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1"), "nvidia.com/gpu": resource.MustParse("1")}).
+					WithLimits(corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("1")}),
+			),
+			resourcesPerNode: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")},
+			},
+			want: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1"), "nvidia.com/gpu": resource.MustParse("4")},
+				Limits:   corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")},
+			},
+		},
+		"limits-only resourcesPerNode keeps the runtime requests within the new limits": {
+			runtimeNode: corev1ac.Container().WithName(constants.Node).WithResources(
+				corev1ac.ResourceRequirements().
+					WithRequests(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1"), corev1.ResourceMemory: resource.MustParse("1Gi")}).
+					WithLimits(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2"), corev1.ResourceMemory: resource.MustParse("2Gi")}),
+			),
+			resourcesPerNode: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("4"), corev1.ResourceMemory: resource.MustParse("1Gi")},
+			},
+			want: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1"), corev1.ResourceMemory: resource.MustParse("1Gi")},
+				Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("4"), corev1.ResourceMemory: resource.MustParse("1Gi")},
+			},
+		},
+		"resourcesPerNode request is kept together with its limit": {
+			runtimeNode: corev1ac.Container().WithName(constants.Node).WithResources(
+				corev1ac.ResourceRequirements().
+					WithRequests(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("4")}).
+					WithLimits(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("4")}),
+			),
+			resourcesPerNode: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+				Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+			},
+			want: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+				Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -3022,6 +3079,54 @@ func TestMergeTrainerNodeResources(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.want, got); len(diff) != 0 {
 				t.Errorf("Unexpected merged resources (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRequestFitsLimit(t *testing.T) {
+	cases := map[string]struct {
+		name    corev1.ResourceName
+		request string
+		limit   string
+		want    bool
+	}{
+		"cpu request below the limit": {
+			name: corev1.ResourceCPU, request: "1", limit: "2", want: true,
+		},
+		"cpu request equal to the limit": {
+			name: corev1.ResourceCPU, request: "2", limit: "2", want: true,
+		},
+		"cpu request above the limit": {
+			name: corev1.ResourceCPU, request: "4", limit: "2",
+		},
+		"memory request above the limit": {
+			name: corev1.ResourceMemory, request: "8Gi", limit: "4Gi",
+		},
+		"extended resource request equal to the limit": {
+			name: "nvidia.com/gpu", request: "4", limit: "4", want: true,
+		},
+		"extended resource request below the limit": {
+			name: "nvidia.com/gpu", request: "1", limit: "4",
+		},
+		"hugepages request below the limit": {
+			name: "hugepages-2Mi", request: "2Mi", limit: "4Mi",
+		},
+		"kubernetes.io prefixed resource request below the limit": {
+			name: "kubernetes.io/custom", request: "1", limit: "2", want: true,
+		},
+		"kubernetes.io subdomain resource request below the limit": {
+			name: "foo.kubernetes.io/custom", request: "1", limit: "2", want: true,
+		},
+		"extended resource request above the limit": {
+			name: "nvidia.com/gpu", request: "4", limit: "1",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := requestFitsLimit(tc.name, resource.MustParse(tc.request), resource.MustParse(tc.limit))
+			if got != tc.want {
+				t.Errorf("Unexpected result: want %v, got %v", tc.want, got)
 			}
 		})
 	}
@@ -3088,6 +3193,21 @@ func TestNewRuntimeInfo(t *testing.T) {
 				rJob.Template.Spec.Template.Spec, jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec))
 		}
 		return jobruntimes.NewInfo(opts...)
+	}
+
+	// withNodeResources sets the resources of the node container in the node replicatedJob.
+	withNodeResources := func(spec jobsetv1alpha2.JobSetSpec, res corev1.ResourceRequirements) jobsetv1alpha2.JobSetSpec {
+		for i := range spec.ReplicatedJobs {
+			if spec.ReplicatedJobs[i].Name != constants.Node {
+				continue
+			}
+			for k := range spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers {
+				if spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Name == constants.Node {
+					spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Resources = res
+				}
+			}
+		}
+		return spec
 	}
 
 	cases := map[string]struct {
@@ -3302,6 +3422,38 @@ func TestNewRuntimeInfo(t *testing.T) {
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					Container(constants.Node, constants.Node, "", nil, nil, corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}).
 					Obj().Spec,
+			),
+		},
+		"Torch limits-only resourcesPerNode sets the runtime requests above the new limits to the limits": {
+			trainJob: func() *trainer.TrainJob {
+				trainerSpec := testingutil.MakeTrainJobTrainerWrapper().Obj()
+				trainerSpec.ResourcesPerNode = &corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2"), corev1.ResourceMemory: resource.MustParse("4Gi")},
+				}
+				return testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Trainer(trainerSpec).Obj()
+			}(),
+			jobSetTemplate: trainer.JobSetTemplateSpec{
+				Spec: withNodeResources(testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").Obj().Spec,
+					corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("4"), corev1.ResourceMemory: resource.MustParse("8Gi")},
+						Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("4"), corev1.ResourceMemory: resource.MustParse("8Gi")},
+					}),
+			},
+			mlPolicy: testingutil.MakeMLPolicyWrapper().
+				WithNumNodes(1).
+				WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj()).
+				Obj(),
+			// The PodSet requests used by the gang schedulers match the Pod requests.
+			wantInfo: newInfo(
+				testingutil.MakeMLPolicyWrapper().
+					WithNumNodes(1).
+					WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj()).
+					Obj(),
+				withNodeResources(testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").Obj().Spec,
+					corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2"), corev1.ResourceMemory: resource.MustParse("4Gi")},
+						Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2"), corev1.ResourceMemory: resource.MustParse("4Gi")},
+					}),
 			),
 		},
 	}

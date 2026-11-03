@@ -24,9 +24,11 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -401,7 +403,7 @@ func mergeTrainerNodeResources(
 			runtimeRes.Limits = *runtimeNode.Resources.Limits
 		}
 		if runtimeNode.Resources.Requests != nil {
-			runtimeRes.Requests = *runtimeNode.Resources.Requests
+			runtimeRes.Requests = maps.Clone(*runtimeNode.Resources.Requests)
 		}
 		for _, claim := range runtimeNode.Resources.Claims {
 			name := ptr.Deref(claim.Name, "")
@@ -417,7 +419,35 @@ func mergeTrainerNodeResources(
 		}
 	}
 
+	// A limit set without a request in resourcesPerNode must not be merged with a runtime request
+	// that the API server rejects for that limit. Such a request is set to the limit, as Kubernetes
+	// defaults it on the Pod, so that the PodSet requests used by the gang schedulers stay accurate.
+	for name, limit := range nodeRes.Limits {
+		if _, ok := nodeRes.Requests[name]; ok {
+			continue
+		}
+		if request, ok := runtimeRes.Requests[name]; ok && !requestFitsLimit(name, request, limit) {
+			runtimeRes.Requests[name] = limit.DeepCopy()
+		}
+	}
+
 	return trainingruntimeutil.MergeResourceRequirements(runtimeRes, nodeRes)
+}
+
+// requestFitsLimit reports whether the API server accepts the request together with the limit.
+// The request must not exceed the limit, and must equal it for the resources that can't be
+// overcommitted: the extended resources (e.g. nvidia.com/gpu) and hugepages.
+// It mirrors IsOvercommitAllowed in k8s.io/kubernetes/pkg/apis/core/helper.
+func requestFitsLimit(name corev1.ResourceName, request, limit resource.Quantity) bool {
+	if request.Cmp(limit) > 0 {
+		return false
+	}
+	isNative := !strings.Contains(string(name), "/") || strings.Contains(string(name), corev1.ResourceDefaultNamespacePrefix)
+	isHugePages := strings.HasPrefix(string(name), corev1.ResourceHugePagesPrefix)
+	if !isNative || isHugePages {
+		return request.Cmp(limit) == 0
+	}
+	return true
 }
 
 // toApplyConfig converts typed ResourceRequirements to the apply configuration used in the JobSet template.
