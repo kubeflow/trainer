@@ -48,7 +48,9 @@ func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 		(info.RuntimePolicy.MLPolicySource != nil &&
 			(info.RuntimePolicy.MLPolicySource.Torch != nil ||
 				info.RuntimePolicy.MLPolicySource.MPI != nil ||
-				info.RuntimePolicy.MLPolicySource.JAX != nil)) {
+				info.RuntimePolicy.MLPolicySource.Flux != nil ||
+				info.RuntimePolicy.MLPolicySource.JAX != nil ||
+				info.RuntimePolicy.MLPolicySource.XGBoost != nil)) {
 		return nil
 	}
 
