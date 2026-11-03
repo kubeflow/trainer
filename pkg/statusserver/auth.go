@@ -24,6 +24,7 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -56,8 +57,11 @@ func (t *tokenReviewAuthorizer) Init(_ context.Context) error {
 }
 
 func (t *tokenReviewAuthorizer) Authorize(ctx context.Context, authHeader, namespace, trainJobName string) (bool, error) {
+	log := ctrl.LoggerFrom(ctx).WithValues("namespace", namespace, "trainJobName", trainJobName)
+
 	rawToken := extractRawToken(authHeader)
 	if rawToken == "" {
+		log.V(5).Info("Missing or malformed bearer token")
 		return false, nil
 	}
 
@@ -73,12 +77,16 @@ func (t *tokenReviewAuthorizer) Authorize(ctx context.Context, authHeader, names
 		return false, fmt.Errorf("failed to review token: %w", err)
 	}
 	if !review.Status.Authenticated || !slices.Contains(review.Status.Audiences, expectedAudience) {
+		log.V(5).Info("Token review rejected", "authenticated", review.Status.Authenticated,
+			"audiences", review.Status.Audiences, "error", review.Status.Error)
 		return false, nil
 	}
 
 	// Check token is issued to a service account in the same namespace as the train job
 	tokenNamespace, _, err := serviceaccount.SplitUsername(review.Status.User.Username)
 	if err != nil || tokenNamespace != namespace {
+		log.V(5).Info("Token is not issued to a service account in the train job namespace",
+			"username", review.Status.User.Username)
 		return false, nil
 	}
 

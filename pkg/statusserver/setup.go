@@ -50,9 +50,9 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.StatusServer, tlsOpts *configa
 		return err
 	}
 
-	// Review tokens with the manager's client, so token reviews do not consume
-	// the status server client's rate limits used for status updates
-	authorizer := NewTokenReviewAuthorizer(mgr.GetClient())
+	// Review tokens with the status server client, so unauthenticated requests
+	// cannot consume the main reconciler's rate limits
+	authorizer := NewTokenReviewAuthorizer(cli)
 
 	server, err := NewServer(cli, cfg, tlsConfig, authorizer)
 	if err != nil {

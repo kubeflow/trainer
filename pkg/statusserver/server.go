@@ -152,7 +152,7 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 	namespace := r.PathValue("namespace")
 	trainJobName := r.PathValue("name")
 
-	authorized, err := s.authorizer.Authorize(r.Context(), r.Header.Get("Authorization"), namespace, trainJobName)
+	authorized, err := s.authorizer.Authorize(ctrl.LoggerInto(r.Context(), s.log), r.Header.Get("Authorization"), namespace, trainJobName)
 	if err != nil {
 		s.log.Error(err, "Failed to authorize TrainJob status update", "namespace", namespace, "name", trainJobName)
 		badRequest(w, s.log, "Internal error", metav1.StatusReasonInternalError, http.StatusInternalServerError)
