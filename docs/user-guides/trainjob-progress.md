@@ -33,6 +33,19 @@ to understand the basics of Kubeflow Trainer.
 
 - For SDK-based progress reporting: Kubeflow SDK `>= 0.5.0`.
 
+### Status server rate limits
+
+Each status update makes two Kubernetes API requests from the status server: a TokenReview to
+validate the trainer's token, and the TrainJob status update. Both share the status server's
+client rate limits (5 QPS and a burst of 10 by default). If many TrainJobs report progress at the
+same time, raise these limits with Helm:
+
+```bash
+--set manager.config.statusServer.qps=20 --set manager.config.statusServer.burst=40
+```
+
+Or set `statusServer.qps` and `statusServer.burst` in the controller config file.
+
 ## View TrainJob progress and metrics
 
 Once progress reporting is active, inspect `status.trainerStatus` using standard tooling.
