@@ -82,11 +82,19 @@ manager:
   # -- Node selector for manager pods.
   nodeSelector: {}
 
-  # -- Affinity for manager pods.
+  # -- Affinity for manager pods. See the chart README for a recommended anti-affinity when running multiple replicas.
   affinity: {}
+
+  # -- Topology spread constraints for manager pods. Empty by default (no behavior change).
+  # See the chart README for an example.
+  topologySpreadConstraints: []
 
   # -- List of node taints to tolerate for manager pods.
   tolerations: []
+
+  # -- Priority class name for manager pods. Empty by default: no PriorityClass is created by
+  # this chart, so the named class must already exist in the cluster.
+  priorityClassName: ""
 
   # -- Environment variables for manager containers.
   env: []
@@ -164,6 +172,13 @@ manager:
       # -- Burst rate limit for the TrainJob Status Server api client
       burst: 10
     featureGates: {}
+
+  # -- PodDisruptionBudget for manager pods. Disabled by default (no behavior change).
+  # Use it with `manager.replicas` of 2 or more, since a PDB on a single replica blocks node drains.
+  podDisruptionBudget:
+    enabled: false
+    # -- Minimum number of manager pods that must remain available during a voluntary disruption.
+    minAvailable: 1
 
 prometheus:
   # -- Whether to create a Prometheus Operator ServiceMonitor.
