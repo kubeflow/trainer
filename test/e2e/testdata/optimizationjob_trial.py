@@ -48,7 +48,7 @@ train_x = [-1.0, -0.5, 0.0, 0.5, 1.0]
 weight, bias = 0.0, 0.0
 for _ in range(epochs):
     errors = [weight * x + bias - (2 * x + 1) for x in train_x]
-    weight_grad = sum(error * x for error, x in zip(errors, train_x))
+    weight_grad = sum(residual * x for residual, x in zip(errors, train_x))
     weight -= learning_rate * 2 * weight_grad / len(train_x)
     bias -= learning_rate * 2 * sum(errors) / len(train_x)
 
@@ -77,7 +77,7 @@ req = request.Request(
 )
 
 try:
-    resp = request.urlopen(req, context=ssl_context)
+    resp = request.urlopen(req, context=ssl_context, timeout=30)
 except error.HTTPError as ex:
     body = ex.read().decode("utf-8", errors="replace")
     print(f"Failed to report validation_loss to TrainJob status server. {ex} {body}")

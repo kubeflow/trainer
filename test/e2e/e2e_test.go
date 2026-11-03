@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -1039,17 +1040,25 @@ var _ = ginkgo.Describe("OptimizationJob e2e", func() {
 
 			ginkgo.By("Verifying OptimizationJob reaches Complete status", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
+					// List the trials so a timeout shows which trial got stuck.
+					var trainJobs trainer.TrainJobList
+					g.Expect(k8sClient.List(ctx, &trainJobs, client.InNamespace(ns.Name), client.MatchingLabels{
+						constants.OptimizationJobNameLabel: optJob.Name,
+					})).Should(gomega.Succeed())
+					trialStatus := trialConditions(trainJobs.Items)
+
 					gotOptJob := &trainer.OptimizationJob{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(optJob), gotOptJob)).Should(gomega.Succeed())
-					g.Expect(gotOptJob.Status).ShouldNot(gomega.BeNil())
+					g.Expect(gotOptJob.Status).ShouldNot(gomega.BeNil(), "trials: %v", trialStatus)
 					if cond := meta.FindStatusCondition(gotOptJob.Status.Conditions, constants.OptimizationJobFailed); cond != nil && cond.Status == metav1.ConditionTrue {
-						gomega.StopTrying("OptimizationJob failed").Attach("condition", cond).Now()
+						gomega.StopTrying("OptimizationJob failed").Attach("condition", cond).Attach("trials", trialStatus).Now()
 					}
-					g.Expect(meta.IsStatusConditionTrue(gotOptJob.Status.Conditions, constants.OptimizationJobCreated)).Should(gomega.BeTrue())
+					g.Expect(meta.IsStatusConditionTrue(gotOptJob.Status.Conditions, constants.OptimizationJobCreated)).Should(gomega.BeTrue(),
+						"trials: %v", trialStatus)
 					cond := meta.FindStatusCondition(gotOptJob.Status.Conditions, constants.OptimizationJobComplete)
-					g.Expect(cond).ShouldNot(gomega.BeNil())
-					g.Expect(cond.Status).Should(gomega.Equal(metav1.ConditionTrue))
-					g.Expect(cond.Reason).Should(gomega.Equal("OptimizationJobCompleted"))
+					g.Expect(cond).ShouldNot(gomega.BeNil(), "trials: %v", trialStatus)
+					g.Expect(cond.Status).Should(gomega.Equal(metav1.ConditionTrue), "trials: %v", trialStatus)
+					g.Expect(cond.Reason).Should(gomega.Equal("OptimizationJobCompleted"), "trials: %v", trialStatus)
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 
@@ -1089,7 +1098,8 @@ var _ = ginkgo.Describe("OptimizationJob e2e", func() {
 						gomega.ContainElement(gomega.HaveField("Name", objectiveMetric), &metric), "trial %s", tj.Name)
 					loss, err := strconv.ParseFloat(metric.Value, 64)
 					gomega.Expect(err).ShouldNot(gomega.HaveOccurred(), "trial %s", tj.Name)
-					gomega.Expect(loss).Should(gomega.BeNumerically("~", linearRegressionValidationLoss(learningRate, epochs), 1e-9),
+					want := linearRegressionValidationLoss(learningRate, epochs)
+					gomega.Expect(loss).Should(gomega.BeNumerically("~", want, 1e-9*want),
 						"trial %s with learning_rate=%s epochs=%s", tj.Name, params["learning_rate"], params["epochs"])
 					losses[tj.Name] = loss
 				}
@@ -1188,6 +1198,18 @@ func trialParameters(trainJob *trainer.TrainJob) map[string]string {
 	return params
 }
 
+// trialConditions returns the condition types, statuses and reasons of every trial by name.
+func trialConditions(trainJobs []trainer.TrainJob) map[string][]string {
+	conditions := make(map[string][]string, len(trainJobs))
+	for _, tj := range trainJobs {
+		conditions[tj.Name] = []string{}
+		for _, cond := range tj.Status.Conditions {
+			conditions[tj.Name] = append(conditions[tj.Name], fmt.Sprintf("%s=%s (%s)", cond.Type, cond.Status, cond.Reason))
+		}
+	}
+	return conditions
+}
+
 // linearRegressionValidationLoss recomputes the validation_loss reported by testdata/optimizationjob_trial.py.
 // It fits y = 2x + 1 with gradient descent and returns the mean squared error on the validation data.
 func linearRegressionValidationLoss(learningRate float64, epochs int) float64 {
@@ -1196,9 +1218,9 @@ func linearRegressionValidationLoss(learningRate float64, epochs int) float64 {
 	for range epochs {
 		var weightGrad, biasGrad float64
 		for _, x := range trainX {
-			err := weight*x + bias - (2*x + 1)
-			weightGrad += err * x
-			biasGrad += err
+			residual := weight*x + bias - (2*x + 1)
+			weightGrad += residual * x
+			biasGrad += residual
 		}
 		weight -= learningRate * 2 * weightGrad / float64(len(trainX))
 		bias -= learningRate * 2 * biasGrad / float64(len(trainX))
@@ -1207,8 +1229,8 @@ func linearRegressionValidationLoss(learningRate float64, epochs int) float64 {
 	validationX := []float64{-0.75, -0.25, 0.25, 0.75}
 	var loss float64
 	for _, x := range validationX {
-		err := weight*x + bias - (2*x + 1)
-		loss += err * err
+		residual := weight*x + bias - (2*x + 1)
+		loss += residual * residual
 	}
 	return loss / float64(len(validationX))
 }
