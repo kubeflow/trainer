@@ -531,7 +531,7 @@ func TestOptionalTrainerFields(t *testing.T) {
 		// wantCommand is only asserted when set.
 		wantCommand []string
 		wantFlags   string
-		// wantNoGPUArg asserts the entrypoint has no -g flag.
+		// wantNoGPUArg asserts the entrypoint has neither a -g flag nor a gpu-affinity option.
 		wantNoGPUArg bool
 		// wantViewImage defaults to constants.FluxInstallerImage when empty.
 		wantViewImage string
@@ -571,7 +571,7 @@ func TestOptionalTrainerFields(t *testing.T) {
 				NumProcPerNode(4).
 				Container("image", nil, nil, corev1.ResourceList{"example.com/gpu": resource.MustParse("4")}).
 				Obj(),
-			wantFlags:    "-N 1 -n 4 -g 1",
+			wantFlags:    "-N 1 -n 4 -g 1 -o gpu-affinity=per-task",
 			wantHostlist: "test-job-node-0-[0]",
 		},
 		"more tasks than GPUs omits the -g flag": {
@@ -590,7 +590,7 @@ func TestOptionalTrainerFields(t *testing.T) {
 				NumProcPerNode(3).
 				Container("image", nil, nil, corev1.ResourceList{"example.com/gpu": resource.MustParse("4")}).
 				Obj(),
-			wantFlags:    "-N 1 -n 3 -g 1",
+			wantFlags:    "-N 1 -n 3 -g 1 -o gpu-affinity=per-task",
 			wantHostlist: "test-job-node-0-[0]",
 		},
 	}
@@ -689,6 +689,9 @@ func TestOptionalTrainerFields(t *testing.T) {
 			}
 			if tc.wantNoGPUArg && strings.Contains(configMap.Data["entrypoint.sh"], " -g ") {
 				t.Errorf("entrypoint.sh unexpectedly contains a -g flag")
+			}
+			if tc.wantNoGPUArg && strings.Contains(configMap.Data["entrypoint.sh"], "gpu-affinity") {
+				t.Errorf("entrypoint.sh unexpectedly contains a gpu-affinity option")
 			}
 			if !strings.Contains(configMap.Data["init.sh"], tc.wantHostlist) {
 				t.Errorf("init.sh does not contain the hostlist %q", tc.wantHostlist)
