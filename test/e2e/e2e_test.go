@@ -17,6 +17,8 @@ limitations under the License.
 package e2e
 
 import (
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -52,6 +54,9 @@ const (
 
 //go:embed testdata/status_update.py
 var statusUpdateScript string
+
+//go:embed testdata/optimizationjob_trial.py
+var optimizationJobTrialScript string
 
 var _ = ginkgo.Describe("TrainJob e2e", func() {
 	// Each test runs in a separate namespace.
@@ -956,25 +961,43 @@ var _ = ginkgo.Describe("OptimizationJob e2e", func() {
 	})
 
 	ginkgo.When("Creating OptimizationJob with random search algorithm", func() {
-		ginkgo.It("should provision algorithm service, run trials to completion, record best result, and perform cleanup", func() {
-			optJob := testingutil.MakeOptimizationJobWrapper(ns.Name, "e2e-random-optjob").
-				NumTrials(1).
-				ParallelTrials(1).
-				SearchAlgorithm(&trainer.SearchAlgorithm{Random: &trainer.RandomAlgorithm{}}).
+		// This test runs the linear regression search from examples/optimizationjob without mocks:
+		// the Optuna search algorithm suggests parameters, every trial trains with them and reports
+		// validation_loss to the status server, and the controller selects the best trial.
+		ginkgo.It("should run a linear regression search and select the trial with the lowest validation loss", func() {
+			const (
+				numTrials       = 4
+				parallelTrials  = 2
+				objectiveMetric = "validation_loss"
+			)
+			epochChoices := []string{"10", "20", "40"}
+
+			optJob := testingutil.MakeOptimizationJobWrapper(ns.Name, "e2e-linear-regression-optjob").
+				NumTrials(numTrials).
+				ParallelTrials(parallelTrials).
+				SearchAlgorithm(&trainer.SearchAlgorithm{Random: &trainer.RandomAlgorithm{Seed: ptr.To[int64](42)}}).
 				Objectives(trainer.Objective{
-					Metric:    "accuracy",
-					Direction: trainer.ObjectiveDirectionMaximize,
+					Metric:    objectiveMetric,
+					Direction: trainer.ObjectiveDirectionMinimize,
 				}).
-				Parameters(trainer.Parameter{
-					Name: "learning_rate",
-					SearchSpace: &trainer.SearchSpace{
-						Uniform: trainer.UniformSpace{
-							Min:  "0.001",
-							Max:  "0.1",
-							Type: trainer.ParameterTypeFloat,
+				Parameters(
+					trainer.Parameter{
+						Name: "learning_rate",
+						SearchSpace: &trainer.SearchSpace{
+							LogUniform: trainer.LogUniformSpace{
+								Min:  "0.01",
+								Max:  "0.2",
+								Type: trainer.ParameterTypeFloat,
+							},
 						},
 					},
-				}).
+					trainer.Parameter{
+						Name: "epochs",
+						SearchSpace: &trainer.SearchSpace{
+							Categorical: trainer.CategoricalSpace{Choices: epochChoices},
+						},
+					},
+				).
 				TrainJobTemplate(trainer.TrainJobTemplateSpec{
 					Spec: trainer.TrainJobSpec{
 						RuntimeRef: trainer.RuntimeRef{
@@ -984,7 +1007,7 @@ var _ = ginkgo.Describe("OptimizationJob e2e", func() {
 						},
 						Trainer: &trainer.Trainer{
 							Command: []string{"python3", "-c"},
-							Args:    []string{statusUpdateScript},
+							Args:    []string{optimizationJobTrialScript},
 						},
 					},
 				}).
@@ -999,37 +1022,18 @@ var _ = ginkgo.Describe("OptimizationJob e2e", func() {
 				Name:      optutil.GetAlgorithmServiceName(optJob),
 			}
 
-			ginkgo.By("Verifying search algorithm Deployment and Service are created and gRPC ready", func() {
+			ginkgo.By("Verifying search algorithm Deployment becomes available", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					deploy := &appsv1.Deployment{}
-					svc := &corev1.Service{}
 					g.Expect(k8sClient.Get(ctx, deployKey, deploy)).Should(gomega.Succeed())
-					g.Expect(k8sClient.Get(ctx, deployKey, svc)).Should(gomega.Succeed())
-					g.Expect(svc.Spec.Selector[constants.OptimizationJobComponentLabel]).Should(gomega.Equal(constants.SearchAlgorithmComponent))
-					g.Expect(deploy.Spec.Template.Spec.Containers).Should(gomega.HaveLen(1))
-					g.Expect(deploy.Spec.Template.Labels[constants.OptimizationJobComponentLabel]).Should(gomega.Equal(constants.SearchAlgorithmComponent))
-					probe := deploy.Spec.Template.Spec.Containers[0].ReadinessProbe
-					g.Expect(probe).ShouldNot(gomega.BeNil())
-					g.Expect(probe.GRPC).ShouldNot(gomega.BeNil())
-					g.Expect(probe.GRPC.Port).Should(gomega.Equal(constants.SearchAlgorithmServicePort))
-					g.Expect(probe.GRPC.Service).Should(gomega.Equal(ptr.To(constants.SearchAlgorithmServiceName)))
-					g.Expect(probe.TCPSocket).Should(gomega.BeNil())
+					g.Expect(k8sClient.Get(ctx, deployKey, &corev1.Service{})).Should(gomega.Succeed())
 					var pods corev1.PodList
 					g.Expect(k8sClient.List(ctx, &pods, client.InNamespace(ns.Name), client.MatchingLabels{
-						constants.OptimizationJobNameLabel: optJob.Name,
+						constants.OptimizationJobNameLabel:      optJob.Name,
+						constants.OptimizationJobComponentLabel: constants.SearchAlgorithmComponent,
 					})).Should(gomega.Succeed())
 					g.Expect(deploy.Status.AvailableReplicas).Should(gomega.BeNumerically(">=", 1),
 						"deployment status: %+v; pod statuses: %+v", deploy.Status, pods.Items)
-				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
-			})
-
-			ginkgo.By("Verifying trial TrainJob is created", func() {
-				gomega.Eventually(func(g gomega.Gomega) {
-					var trainJobs trainer.TrainJobList
-					g.Expect(k8sClient.List(ctx, &trainJobs, client.InNamespace(ns.Name), client.MatchingLabels{
-						constants.OptimizationJobNameLabel: optJob.Name,
-					})).Should(gomega.Succeed())
-					g.Expect(trainJobs.Items).Should(gomega.HaveLen(1))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 
@@ -1038,6 +1042,10 @@ var _ = ginkgo.Describe("OptimizationJob e2e", func() {
 					gotOptJob := &trainer.OptimizationJob{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(optJob), gotOptJob)).Should(gomega.Succeed())
 					g.Expect(gotOptJob.Status).ShouldNot(gomega.BeNil())
+					if cond := meta.FindStatusCondition(gotOptJob.Status.Conditions, constants.OptimizationJobFailed); cond != nil && cond.Status == metav1.ConditionTrue {
+						gomega.StopTrying("OptimizationJob failed").Attach("condition", cond).Now()
+					}
+					g.Expect(meta.IsStatusConditionTrue(gotOptJob.Status.Conditions, constants.OptimizationJobCreated)).Should(gomega.BeTrue())
 					cond := meta.FindStatusCondition(gotOptJob.Status.Conditions, constants.OptimizationJobComplete)
 					g.Expect(cond).ShouldNot(gomega.BeNil())
 					g.Expect(cond.Status).Should(gomega.Equal(metav1.ConditionTrue))
@@ -1045,14 +1053,72 @@ var _ = ginkgo.Describe("OptimizationJob e2e", func() {
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 
-			ginkgo.By("Verifying best result is populated in OptimizationJob status", func() {
+			var trials []trainer.TrainJob
+			losses := make(map[string]float64, numTrials)
+			ginkgo.By("Verifying every trial trained with suggested parameters and reported its own validation loss", func() {
+				var trainJobs trainer.TrainJobList
+				gomega.Expect(k8sClient.List(ctx, &trainJobs, client.InNamespace(ns.Name), client.MatchingLabels{
+					constants.OptimizationJobNameLabel: optJob.Name,
+				})).Should(gomega.Succeed())
+				gomega.Expect(trainJobs.Items).Should(gomega.HaveLen(numTrials))
+				trials = trainJobs.Items
+
+				for i := range trials {
+					tj := &trials[i]
+					gomega.Expect(metav1.IsControlledBy(tj, optJob)).Should(gomega.BeTrue(), "trial %s", tj.Name)
+					gomega.Expect(meta.IsStatusConditionTrue(tj.Status.Conditions, trainer.TrainJobComplete)).Should(gomega.BeTrue(),
+						"trial %s conditions: %+v", tj.Name, tj.Status.Conditions)
+
+					params := trialParameters(tj)
+					gomega.Expect(params).Should(gomega.HaveLen(2), "trial %s", tj.Name)
+					learningRate, err := strconv.ParseFloat(params["learning_rate"], 64)
+					gomega.Expect(err).ShouldNot(gomega.HaveOccurred(), "trial %s", tj.Name)
+					gomega.Expect(learningRate).Should(gomega.And(
+						gomega.BeNumerically(">=", 0.01),
+						gomega.BeNumerically("<=", 0.2),
+					), "trial %s", tj.Name)
+					gomega.Expect(epochChoices).Should(gomega.ContainElement(params["epochs"]), "trial %s", tj.Name)
+					epochs, err := strconv.Atoi(params["epochs"])
+					gomega.Expect(err).ShouldNot(gomega.HaveOccurred(), "trial %s", tj.Name)
+
+					// The reported metric must match a recomputation from the injected parameters,
+					// which proves that the trial trained with them rather than reporting a fixed value.
+					gomega.Expect(tj.Status.TrainerStatus).ShouldNot(gomega.BeNil(), "trial %s", tj.Name)
+					var metric trainer.Metric
+					gomega.Expect(tj.Status.TrainerStatus.Metrics).Should(
+						gomega.ContainElement(gomega.HaveField("Name", objectiveMetric), &metric), "trial %s", tj.Name)
+					loss, err := strconv.ParseFloat(metric.Value, 64)
+					gomega.Expect(err).ShouldNot(gomega.HaveOccurred(), "trial %s", tj.Name)
+					gomega.Expect(loss).Should(gomega.BeNumerically("~", linearRegressionValidationLoss(learningRate, epochs), 1e-9),
+						"trial %s with learning_rate=%s epochs=%s", tj.Name, params["learning_rate"], params["epochs"])
+					losses[tj.Name] = loss
+				}
+			})
+
+			ginkgo.By("Verifying best result is the trial with the lowest validation loss", func() {
+				// Equal losses are resolved by the older creation timestamp, then by the smaller name.
+				var best *trainer.TrainJob
+				for i := range trials {
+					tj := &trials[i]
+					if best == nil || losses[tj.Name] < losses[best.Name] {
+						best = tj
+					} else if losses[tj.Name] == losses[best.Name] {
+						if tj.CreationTimestamp.Before(&best.CreationTimestamp) ||
+							(tj.CreationTimestamp.Equal(&best.CreationTimestamp) && tj.Name < best.Name) {
+							best = tj
+						}
+					}
+				}
+				bestParams := trialParameters(best)
+
 				gotOptJob := &trainer.OptimizationJob{}
 				gomega.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(optJob), gotOptJob)).Should(gomega.Succeed())
 				gomega.Expect(gotOptJob.Status).ShouldNot(gomega.BeNil())
-				gomega.Expect(gotOptJob.Status.Result.TrainJobName).ShouldNot(gomega.BeEmpty())
-				gomega.Expect(gotOptJob.Status.Result.Parameters).Should(gomega.ContainElement(
-					gomega.HaveField("Name", "learning_rate"),
-				))
+				gomega.Expect(gotOptJob.Status.Result.TrainJobName).Should(gomega.Equal(best.Name), "trial losses: %v", losses)
+				gomega.Expect(gotOptJob.Status.Result.Parameters).Should(gomega.Equal([]trainer.ParameterAssignment{
+					{Name: "epochs", Value: bestParams["epochs"]},
+					{Name: "learning_rate", Value: bestParams["learning_rate"]},
+				}))
 			})
 
 			ginkgo.By("Verifying automated cleanup deletes algorithm Deployment and Service", func() {
@@ -1107,3 +1173,42 @@ var _ = ginkgo.Describe("OptimizationJob e2e", func() {
 		})
 	})
 })
+
+// trialParameters returns the search parameters that the OptimizationJob controller injected into the trial.
+func trialParameters(trainJob *trainer.TrainJob) map[string]string {
+	params := make(map[string]string)
+	if trainJob.Spec.Trainer == nil {
+		return params
+	}
+	for _, env := range trainJob.Spec.Trainer.Env {
+		if name, ok := strings.CutPrefix(env.Name, constants.EnvVarPrefix); ok {
+			params[name] = env.Value
+		}
+	}
+	return params
+}
+
+// linearRegressionValidationLoss recomputes the validation_loss reported by testdata/optimizationjob_trial.py.
+// It fits y = 2x + 1 with gradient descent and returns the mean squared error on the validation data.
+func linearRegressionValidationLoss(learningRate float64, epochs int) float64 {
+	trainX := []float64{-1.0, -0.5, 0.0, 0.5, 1.0}
+	var weight, bias float64
+	for range epochs {
+		var weightGrad, biasGrad float64
+		for _, x := range trainX {
+			err := weight*x + bias - (2*x + 1)
+			weightGrad += err * x
+			biasGrad += err
+		}
+		weight -= learningRate * 2 * weightGrad / float64(len(trainX))
+		bias -= learningRate * 2 * biasGrad / float64(len(trainX))
+	}
+
+	validationX := []float64{-0.75, -0.25, 0.25, 0.75}
+	var loss float64
+	for _, x := range validationX {
+		err := weight*x + bias - (2*x + 1)
+		loss += err * err
+	}
+	return loss / float64(len(validationX))
+}
