@@ -42,7 +42,7 @@ By now, Kubeflow Training Operator V1 has implemented a [Trainer for LLM](../200
 
 1. Modular native-PyTorch implementations of popular LLMs
 2. Training [recipes](https://pytorch.org/torchtune/main/overview.html#key-concepts) for a variety of fine-tuning techniques
-3. Support for distributed training using [FSDP2](https://github.com/pytorch/torchtitan/blob/main/docs/fsdp.md)
+3. Support for distributed training using [FSDP2](https://github.com/pytorch/torchtitan/blob/main/torchtitan/distributed/FSDP.md)
 4. YAML [configs](https://pytorch.org/torchtune/main/overview.html#key-concepts) for easily configuring training runs
 
 An example for using `torchtune`:
@@ -460,7 +460,7 @@ class LoraConfig:
 
 ### Model & Dataset Initialization / Model Exporting
 
-For model and dataset initialization, we'll reuse the existing [Kubeflow Trainer Initializers](https://github.com/kubeflow/trainer/tree/master/pkg/initializer). For example:
+For model and dataset initialization, we'll reuse the existing [Kubeflow Trainer Initializers](https://github.com/kubeflow/trainer/tree/master/pkg/initializers). For example:
 
 ```yaml
 # Dataset Initialization
