@@ -1117,19 +1117,7 @@ func TestValidate(t *testing.T) {
 					},
 				}).Obj(),
 			wantError: field.ErrorList{
-				field.Invalid(runtimePatchesPath,
-					[]trainer.RuntimePatch{
-						{
-							Manager: "test.io/manager",
-							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
-								Template: &trainer.JobSetTemplatePatch{
-									Spec: &trainer.JobSetSpecPatch{
-										ReplicatedJobs: []trainer.ReplicatedJobPatch{{Name: "invalid"}},
-									},
-								},
-							},
-						},
-					},
+				field.Invalid(runtimePatchesPath.Index(0).Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).Child("name"), "invalid",
 					"must not have replicated job that doesn't exist in the runtime job template"),
 			},
 		},
@@ -1185,32 +1173,7 @@ func TestValidate(t *testing.T) {
 					},
 				}).Obj(),
 			wantError: field.ErrorList{
-				field.Invalid(runtimePatchesPath,
-					[]trainer.RuntimePatch{
-						{
-							Manager: "test.io/manager",
-							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
-								Template: &trainer.JobSetTemplatePatch{
-									Spec: &trainer.JobSetSpecPatch{
-										ReplicatedJobs: []trainer.ReplicatedJobPatch{{
-											Name: constants.Node,
-											Template: &trainer.JobTemplatePatch{
-												Spec: &trainer.JobSpecPatch{
-													Template: &trainer.PodTemplatePatch{
-														Spec: &trainer.PodSpecPatch{
-															InitContainers: []trainer.ContainerPatch{
-																{Name: "invalid"},
-															},
-														},
-													},
-												},
-											},
-										}},
-									},
-								},
-							},
-						},
-					},
+				field.Invalid(runtimePatchesPath.Index(0).Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).Child("template", "spec", "template", "spec").Child("initContainers").Index(0).Child("name"), "invalid",
 					fmt.Sprintf("must not have initContainer that doesn't exist in the runtime job %s", constants.Node)),
 			},
 		},
@@ -1266,32 +1229,7 @@ func TestValidate(t *testing.T) {
 					},
 				}).Obj(),
 			wantError: field.ErrorList{
-				field.Invalid(runtimePatchesPath,
-					[]trainer.RuntimePatch{
-						{
-							Manager: "test.io/manager",
-							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
-								Template: &trainer.JobSetTemplatePatch{
-									Spec: &trainer.JobSetSpecPatch{
-										ReplicatedJobs: []trainer.ReplicatedJobPatch{{
-											Name: constants.Node,
-											Template: &trainer.JobTemplatePatch{
-												Spec: &trainer.JobSpecPatch{
-													Template: &trainer.PodTemplatePatch{
-														Spec: &trainer.PodSpecPatch{
-															Containers: []trainer.ContainerPatch{
-																{Name: "invalid"},
-															},
-														},
-													},
-												},
-											},
-										}},
-									},
-								},
-							},
-						},
-					},
+				field.Invalid(runtimePatchesPath.Index(0).Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).Child("template", "spec", "template", "spec").Child("containers").Index(0).Child("name"), "invalid",
 					fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", constants.Node)),
 			},
 		},
@@ -1355,40 +1293,7 @@ func TestValidate(t *testing.T) {
 					},
 				}).Obj(),
 			wantError: field.ErrorList{
-				field.Invalid(runtimePatchesPath,
-					[]trainer.RuntimePatch{
-						{
-							Manager: "test.io/manager",
-							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
-								Template: &trainer.JobSetTemplatePatch{
-									Spec: &trainer.JobSetSpecPatch{
-										ReplicatedJobs: []trainer.ReplicatedJobPatch{{
-											Name: constants.Node,
-											Template: &trainer.JobTemplatePatch{
-												Spec: &trainer.JobSpecPatch{
-													Template: &trainer.PodTemplatePatch{
-														Spec: &trainer.PodSpecPatch{
-															Containers: []trainer.ContainerPatch{
-																{
-																	Name: constants.Node,
-																	Env: []corev1.EnvVar{
-																		{
-																			Name:  "ENV_NAME",
-																			Value: "OVERRIDE",
-																		},
-																	},
-																},
-															},
-														},
-													},
-												},
-											},
-										}},
-									},
-								},
-							},
-						},
-					},
+				field.Invalid(runtimePatchesPath.Index(0).Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).Child("template", "spec", "template", "spec").Child("containers").Index(0).Child("env"), constants.Node,
 					fmt.Sprintf("must not have envs for the %s, %s, %s containers", constants.DatasetInitializer, constants.ModelInitializer, constants.Node)),
 			},
 		},
@@ -3387,6 +3292,144 @@ func TestValidate(t *testing.T) {
 			wantError: field.ErrorList{
 				field.Invalid(runtimePatchesPath.Index(1).Child("manager"), "not-domain-prefixed",
 					`must be a domain-prefixed path (such as "acme.io/foo")`),
+			},
+		},
+		"invalid replicated job in patch[1] reports the index of the offending patch": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.Node),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{Name: ptr.To(constants.Node)},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				RuntimePatches([]trainer.RuntimePatch{
+					{
+						Manager: "test.io/manager-a",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														Containers: []trainer.ContainerPatch{{Name: constants.Node}},
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+					{
+						Manager: "test.io/manager-b",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{Name: "invalid"}},
+								},
+							},
+						},
+					},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimePatchesPath.Index(1).Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).Child("name"), "invalid",
+					"must not have replicated job that doesn't exist in the runtime job template"),
+			},
+		},
+		"invalid container in patch[1] reports the index of the offending patch": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.Node),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{Name: ptr.To(constants.Node)},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				RuntimePatches([]trainer.RuntimePatch{
+					{
+						Manager: "test.io/manager-a",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														Containers: []trainer.ContainerPatch{{Name: constants.Node}},
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+					{
+						Manager: "test.io/manager-b",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														Containers: []trainer.ContainerPatch{
+															{Name: constants.Node},
+															{Name: "invalid"},
+														},
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimePatchesPath.Index(1).Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).Child("template", "spec", "template", "spec", "containers").Index(1).Child("name"), "invalid",
+					fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", constants.Node)),
 			},
 		},
 	}
