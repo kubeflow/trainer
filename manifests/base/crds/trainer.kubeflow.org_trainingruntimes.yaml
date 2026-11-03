@@ -9789,6 +9789,10 @@ spec:
                         (!has(self.replicatedJobs) || self.replicatedJobs.all(rj,
                         !has(rj.dependsOn) || size(rj.dependsOn) == 0)))'
                 type: object
+                x-kubernetes-validations:
+                - message: replicatedJob name must be no more than 20 characters
+                  rule: '!has(self.spec) || !has(self.spec.replicatedJobs) || self.spec.replicatedJobs.all(r,
+                    size(r.name) <= 20)'
             type: object
             x-kubernetes-validations:
             - message: scheduling and podGroupPolicy are mutually exclusive

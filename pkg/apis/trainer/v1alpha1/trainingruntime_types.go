@@ -139,6 +139,7 @@ type TrainingRuntimeSpec struct {
 
 // JobSetTemplateSpec represents a template of the desired JobSet.
 // +kubebuilder:validation:MinProperties=1
+// +kubebuilder:validation:XValidation:rule="!has(self.spec) || !has(self.spec.replicatedJobs) || self.spec.replicatedJobs.all(r, size(r.name) <= 20)", message="replicatedJob name must be no more than 20 characters"
 type JobSetTemplateSpec struct {
 	// metadata for custom JobSet's labels and annotations.
 	// JobSet name and namespace is equal to the TrainJob's name and namespace.
