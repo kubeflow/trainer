@@ -17,6 +17,8 @@ limitations under the License.
 package webhooks
 
 import (
+	"strings"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
@@ -309,6 +311,22 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 						Obj()
 				},
 				gomega.MatchError(gomega.ContainSubstring("references resourceClaim \"gpu\" which is not defined in the Pod's resourceClaims")),
+			),
+			ginkgo.Entry("Should succeed to create trainingRuntime with a 20 characters replicatedJob name",
+				func() *trainer.TrainingRuntime {
+					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
+					runtime.Spec.Template.Spec.ReplicatedJobs[0].Name = strings.Repeat("a", 20)
+					return runtime
+				},
+				gomega.Succeed(),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with a replicatedJob name longer than 20 characters",
+				func() *trainer.TrainingRuntime {
+					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
+					runtime.Spec.Template.Spec.ReplicatedJobs[0].Name = strings.Repeat("a", 21)
+					return runtime
+				},
+				gomega.MatchError(gomega.ContainSubstring("replicatedJob name must be no more than 20 characters")),
 			),
 			ginkgo.Entry("Should succeed to create trainingRuntime with TrainJob-level gang scheduling",
 				func() *trainer.TrainingRuntime {
