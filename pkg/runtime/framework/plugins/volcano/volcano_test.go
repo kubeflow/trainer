@@ -398,7 +398,7 @@ func TestVolcano(t *testing.T) {
 				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(true)},
 			},
 			info: &runtime.Info{
-				TemplateSpec: createBaseInfo.TemplateSpec,
+				TemplateSpec: newBaseInfo().TemplateSpec,
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
@@ -410,7 +410,7 @@ func TestVolcano(t *testing.T) {
 			},
 			objs: nil,
 			expectInfo: &runtime.Info{
-				TemplateSpec: createBaseInfo.TemplateSpec,
+				TemplateSpec: newBaseInfo().TemplateSpec,
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
@@ -437,7 +437,7 @@ func TestVolcano(t *testing.T) {
 				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(false)},
 			},
 			info: &runtime.Info{
-				TemplateSpec: createBaseInfo.TemplateSpec,
+				TemplateSpec: newBaseInfo().TemplateSpec,
 				Annotations: map[string]string{
 					"scheduling.volcano.sh/queue-name": "q1",
 				},
@@ -457,7 +457,7 @@ func TestVolcano(t *testing.T) {
 			},
 			objs: nil,
 			expectInfo: &runtime.Info{
-				TemplateSpec: createBaseInfo.TemplateSpec,
+				TemplateSpec: newBaseInfo().TemplateSpec,
 				Annotations: map[string]string{
 					"scheduling.volcano.sh/queue-name": "q1",
 				},
