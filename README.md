@@ -47,8 +47,8 @@ Latest News 🔥
 <!-- overview-start -->
 
 Kubeflow Trainer is a Kubernetes-native distributed AI platform for scalable large language model
-(LLM) fine-tuning and training of AI models across a wide range of frameworks, including
-PyTorch, MLX, HuggingFace, DeepSpeed, Megatron-LM, JAX, XGBoost, and more.
+(LLM) fine-tuning, hyperparameter optimization, and training of AI models across a wide range of frameworks,
+including PyTorch, MLX, HuggingFace, DeepSpeed, Megatron-LM, JAX, XGBoost, and more.
 
 Kubeflow Trainer brings MPI to Kubernetes, orchestrating multi-node, multi-GPU distributed
 jobs efficiently across high-performance computing (HPC) clusters. This enables high-throughput
@@ -75,7 +75,7 @@ develop and fine-tune LLMs while leveraging the Kubeflow Trainer APIs: TrainJob 
 <!-- overview-end -->
 
 <h1 align="center">
-    <img src="./docs/images/trainer-tech-stack.drawio.svg" alt="logo" width="500">
+    <img src="./docs/images/trainer-overview.drawio.png" alt="logo" width="900">
   <br>
 </h1>
 
