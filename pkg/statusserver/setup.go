@@ -50,9 +50,10 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.StatusServer, tlsOpts *configa
 		return err
 	}
 
-	// Review tokens with the status server client, so unauthenticated requests
-	// cannot consume the main reconciler's rate limits
-	authorizer := NewTokenReviewAuthorizer(cli)
+	// Initialize OIDC provider for token authentication using the API server's
+	// internal OIDC discovery endpoint. This avoids TokenReview API calls that
+	// could cause DOS when many nodes update status concurrently.
+	authorizer := NewProjectedServiceAccountTokenAuthorizer(mgr.GetConfig())
 
 	server, err := NewServer(cli, cfg, tlsConfig, authorizer)
 	if err != nil {

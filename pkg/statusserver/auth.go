@@ -19,13 +19,10 @@ package statusserver
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 
-	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/apiserver/pkg/authentication/serviceaccount"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/coreos/go-oidc/v3/oidc"
+	"k8s.io/client-go/rest"
 )
 
 type TokenAuthorizer interface {
@@ -33,60 +30,84 @@ type TokenAuthorizer interface {
 	Authorize(ctx context.Context, rawIDToken, namespace, trainJobName string) (bool, error)
 }
 
-// +kubebuilder:rbac:groups=authentication.k8s.io,resources=tokenreviews,verbs=create
-
-type tokenReviewAuthorizer struct {
-	client client.Client
+type projectedServiceAccountTokenAuthorizer struct {
+	oidcProvider *oidc.Provider
+	config       *rest.Config
 }
 
-var _ TokenAuthorizer = &tokenReviewAuthorizer{}
+var _ TokenAuthorizer = &projectedServiceAccountTokenAuthorizer{}
 
-// NewTokenReviewAuthorizer creates a validator for checking a bearer token has permission to
-// update the requested train job. Tokens are validated by the Kubernetes API server using the
-// TokenReview API, so it works with any service account token issuer configured in the cluster.
-func NewTokenReviewAuthorizer(c client.Client) TokenAuthorizer {
-	return &tokenReviewAuthorizer{
-		client: c,
+// projectedToken is the decoded JWT claims of a k8s projected service account token.
+// Note: we only decode the subset of claims we actually need.
+type projectedToken struct {
+	Issuer     string `json:"iss"`
+	Kubernetes struct {
+		Namespace string `json:"namespace"`
+	} `json:"kubernetes.io"`
+}
+
+// NewProjectedServiceAccountTokenAuthorizer creates a validator for checking a bearer token has permission to
+// update the requested train job. Tokens are validated locally using OIDC discovery from the Kubernetes
+// API server's internal endpoint, avoiding TokenReview API calls that could cause DOS.
+func NewProjectedServiceAccountTokenAuthorizer(config *rest.Config) TokenAuthorizer {
+	return &projectedServiceAccountTokenAuthorizer{
+		config: config,
 	}
 }
 
-// Init is a no-op: tokens are only reviewed when status updates are received, so the authorizer
-// does not depend on any external endpoint at startup.
-func (t *tokenReviewAuthorizer) Init(_ context.Context) error {
+func (p *projectedServiceAccountTokenAuthorizer) Init(ctx context.Context) error {
+	// Use the Kubernetes API server's internal OIDC discovery endpoint instead
+	// of the external issuer URL. This works on all clusters (EKS, GKE, AKS, KinD)
+	// without requiring external network access or encountering TLS cert issues.
+	// The API server exposes /.well-known/openid-configuration and /openid/v1/jwks
+	// endpoints that can be accessed with the authenticated in-cluster client.
+	apiServerHost := p.config.Host
+
+	// Create an authenticated HTTP client using the provided rest config
+	httpClient, err := rest.HTTPClientFor(p.config)
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP client: %w", err)
+	}
+
+	// Create context with the authenticated HTTP client
+	ctx = oidc.ClientContext(ctx, httpClient)
+
+	// Point OIDC provider to API server's internal OIDC endpoints
+	provider, err := oidc.NewProvider(ctx, apiServerHost)
+	if err != nil {
+		return fmt.Errorf("failed to create OIDC provider from API server (%s): %w", apiServerHost, err)
+	}
+	p.oidcProvider = provider
+
 	return nil
 }
 
-func (t *tokenReviewAuthorizer) Authorize(ctx context.Context, authHeader, namespace, trainJobName string) (bool, error) {
-	log := ctrl.LoggerFrom(ctx).WithValues("namespace", namespace, "trainJobName", trainJobName)
+func (p *projectedServiceAccountTokenAuthorizer) Authorize(ctx context.Context, authHeader, namespace, trainJobName string) (bool, error) {
+	if p.oidcProvider == nil {
+		return false, fmt.Errorf("OIDC provider has not been initialized")
+	}
 
 	rawToken := extractRawToken(authHeader)
-	if rawToken == "" {
-		log.V(5).Info("Missing or malformed bearer token")
-		return false, nil
-	}
 
-	// Ask the API server to check the token signature, expiry, bound pod and the TrainJob-specific audience.
+	// Create authorizer with TrainJob-specific audience
 	expectedAudience := TokenAudience(namespace, trainJobName)
-	review := &authenticationv1.TokenReview{
-		Spec: authenticationv1.TokenReviewSpec{
-			Token:     rawToken,
-			Audiences: []string{expectedAudience},
-		},
-	}
-	if err := t.client.Create(ctx, review); err != nil {
-		return false, fmt.Errorf("failed to review token: %w", err)
-	}
-	if !review.Status.Authenticated || !slices.Contains(review.Status.Audiences, expectedAudience) {
-		log.V(5).Info("Token review rejected", "authenticated", review.Status.Authenticated,
-			"audiences", review.Status.Audiences, "error", review.Status.Error)
+	verifier := p.oidcProvider.Verifier(&oidc.Config{
+		ClientID: expectedAudience,
+	})
+
+	// Check token signature, expiry, and audience
+	idToken, err := verifier.Verify(ctx, rawToken)
+	if err != nil {
 		return false, nil
 	}
 
-	// Check token is issued to a service account in the same namespace as the train job
-	tokenNamespace, _, err := serviceaccount.SplitUsername(review.Status.User.Username)
-	if err != nil || tokenNamespace != namespace {
-		log.V(5).Info("Token is not issued to a service account in the train job namespace",
-			"username", review.Status.User.Username)
+	// Check token is bound to a pod in the same namespace as the train job
+	parsedToken := projectedToken{}
+	err = idToken.Claims(&parsedToken)
+	if err != nil {
+		return false, nil
+	}
+	if parsedToken.Kubernetes.Namespace != namespace {
 		return false, nil
 	}
 
