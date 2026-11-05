@@ -17,6 +17,10 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
 - fix(manifests): BREAKING CHANGE honour dataCache.lws.install in the Helm chart ([#4120](https://github.com/kubeflow/trainer/pull/4120) by @reckless-sherixx)
 - fix(manifests): BREAKING CHANGE keep the CRDs on helm uninstall ([#4122](https://github.com/kubeflow/trainer/pull/4122) by @reckless-sherixx)
 - chore(api): BREAKING CHANGE: rename CertManagement configuration fields to generic names ([#3386](https://github.com/kubeflow/trainer/pull/3386) by @tariq-hasan)
+- fix(runtimes): emit PRTE env vars so MPI plugin works with Open MPI 5 ([#4029](https://github.com/kubeflow/trainer/pull/4029) by @matbun)
+  - **IMPORTANT**: suspended TrainJobs that use the MPI plugin (e.g. DeepSpeed, MLX) and were created before the upgrade
+    fail to resume after upgrading to v2.4, because the new `PRTE_MCA_*` env vars cannot be applied to the existing immutable JobSet.
+    Wait for MPI-based TrainJobs to complete before upgrading, or recreate the affected TrainJobs after the upgrade.
 
 ## 🚀 Features
 
@@ -72,7 +76,6 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
 - fix: nightly security Python dependency updates ([#4278](https://github.com/kubeflow/trainer/pull/4278) by @github-actions[bot])
 - fix(runtimes): install the CUDA 13 build of MLX in the MLX runtime image ([#4246](https://github.com/kubeflow/trainer/pull/4246) by @matbun)
 - fix(manifests): rename serviceMonitor value to prometheus to align with JobSet ([#4244](https://github.com/kubeflow/trainer/pull/4244) by @robert-bell)
-- fix(runtimes): emit PRTE env vars so MPI plugin works with Open MPI 5 ([#4029](https://github.com/kubeflow/trainer/pull/4029) by @matbun)
 - fix(controller): break ties when picking the best OptimizationJob trial ([#4192](https://github.com/kubeflow/trainer/pull/4192) by @btxu-db)
 - fix: nightly security dependency updates ([#4047](https://github.com/kubeflow/trainer/pull/4047) by @github-actions[bot])
 - fix(docs): configure scheduler for Volcano gang scheduling ([#4199](https://github.com/kubeflow/trainer/pull/4199) by @auraCodesKM)
