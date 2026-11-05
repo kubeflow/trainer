@@ -152,11 +152,12 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 
 	// TODO (andreyvelich): Add more test cases.
 	cases := map[string]struct {
-		trainingRuntime *trainer.TrainingRuntime
-		trainJob        *trainer.TrainJob
-		ObjCmpOpts      []cmp.Option
-		wantObjs        []runtime.Object
-		wantError       error
+		trainingRuntime     *trainer.TrainingRuntime
+		trainJob            *trainer.TrainJob
+		ObjCmpOpts          []cmp.Option
+		wantObjs            []runtime.Object
+		wantError           error
+		wantValidationError bool
 	}{
 		// Test cases for the PlainML MLPolicy.
 		"succeeded to build PodGroup and JobSet with NumNodes from the TrainJob and container from the Runtime.": {
@@ -2515,6 +2516,33 @@ test-job-node-0-1.test-job slots=8
 				Obj(),
 			wantError: errorNotFoundSpecifiedTrainingRuntime,
 		},
+		"TrainJob that is not valid for the runtime returns a ValidationError": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+				RuntimeSpec(
+					testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+						JobSetSpec(
+							testingutil.MakeJobSetWrapper("", "").
+								// The dataset-initializer job has no container named dataset-initializer.
+								ReplaceContainer(constants.DatasetInitializer, constants.DatasetInitializer, "renamed", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+								Obj().Spec,
+						).
+						Obj(),
+				).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job-4").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Initializer(
+					testingutil.MakeTrainJobInitializerWrapper().
+						DatasetInitializer(
+							testingutil.MakeTrainJobDatasetInitializerWrapper().
+								StorageUri("hf://test/dataset").
+								Obj(),
+						).
+						Obj(),
+				).
+				Obj(),
+			wantValidationError: true,
+		},
 	}
 	cmpOpts := []cmp.Option{
 		cmpopts.SortSlices(func(a, b runtime.Object) bool {
@@ -2551,7 +2579,12 @@ test-job-node-0-1.test-job slots=8
 			}
 
 			objs, err := trainingRuntime.NewObjects(ctx, tc.trainJob)
-			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+			if tc.wantValidationError {
+				var validationErr *jobruntimes.ValidationError
+				if !errors.As(err, &validationErr) {
+					t.Errorf("Expected a ValidationError, got: %v", err)
+				}
+			} else if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}
 
