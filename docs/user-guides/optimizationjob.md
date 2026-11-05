@@ -43,9 +43,9 @@ runtimes. For the example below, you need:
   `manager.config.featureGates.TrainJobStatus=true`. See
   [TrainJob progress and training metrics](trainjob-progress.md) for status server prerequisites
   and configuration.
-- Capacity for two concurrent trials requesting one CPU and 128 MiB of memory each, plus the
-  search algorithm Pod. The cluster must be able to pull the example's Python image and the
-  search algorithm image `ghcr.io/kubeflow/katib/suggestion-optuna:v0.19.0`.
+- Capacity for two concurrent trials requesting one CPU and 256 MiB of memory each, with a
+  512 MiB memory limit, plus the search algorithm Pod. The cluster must be able to pull the
+  example's Python image and `ghcr.io/kubeflow/katib/suggestion-optuna:v0.19.0`.
 
 Check the installed resources:
 
