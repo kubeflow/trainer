@@ -10,6 +10,8 @@ This guide gives an overview for Kubeflow Trainer project.
 :relative-docs: docs/
 ```
 
+![Kubeflow Overview](../images/trainer-overview.drawio.png)
+
 ## Who is This For?
 
 Kubeflow Trainer documentation is organized around three key personas:
