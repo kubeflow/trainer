@@ -1,0 +1,37 @@
+# Presubmit gate for the Python tooling and CI action wiring under .github:
+# the unit tests use the `*_test.py` suffix, so select
+# that pattern explicitly because it is not unittest discover's default.
+name: CI Scripts Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    paths:
+      - '.github/resources/scripts/*.py'
+      - '.github/resources/scripts/*.js'
+      - '.github/resources/ci-workflow-inventory.json'
+      # Any trigger change must update the expected-workflow inventory.
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  python-script-tests:
+    name: Run .github scripts unit tests
+    runs-on: ubuntu-latest
+    if: github.repository == 'kubeflow/trainer'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: '3.11'
+      - name: Install workflow script dependencies
+        run: python3 -m pip install -r .github/resources/scripts/requirements.txt
+      - name: Run Python resource script unit tests
+        working-directory: .github/resources/scripts
+        run: python3 -m unittest discover -v -p '*_test.py'
