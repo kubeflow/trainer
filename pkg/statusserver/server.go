@@ -25,6 +25,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -104,10 +105,34 @@ func NewServer(c client.Client, cfg *configapi.StatusServer, tlsConfig *tls.Conf
 		WriteTimeout: writeTimeout,
 		IdleTimeout:  idleTimeout,
 	}
+	if !tlsConfigPermitsHTTP2(tlsConfig) {
+		httpServer.Protocols = http1OnlyProtocols()
+	}
 
 	s.httpServer = &httpServer
 
 	return s, nil
+}
+
+// http1OnlyProtocols returns an *http.Protocols that enables HTTP/1 only.
+func http1OnlyProtocols() *http.Protocols {
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
+	return protocols
+}
+
+// tlsConfigPermitsHTTP2 reports whether cfg can serve HTTP/2. Go's net/http
+// enables HTTP/2 automatically when http.Server.TLSConfig is set, and its
+// startup check rejects TLS <= 1.2 cipher lists without an ECDHE AES-128-GCM
+// suite, failing ListenAndServeTLS before any connection is served. TLS 1.3
+// and the default (empty) cipher list always qualify because Go's defaults
+// include an eligible suite.
+func tlsConfigPermitsHTTP2(cfg *tls.Config) bool {
+	if cfg.MinVersion >= tls.VersionTLS13 || len(cfg.CipherSuites) == 0 {
+		return true
+	}
+	return slices.Contains(cfg.CipherSuites, tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) ||
+		slices.Contains(cfg.CipherSuites, tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)
 }
 
 // Start implements manager.Runnable and starts the HTTPS Server.
