@@ -178,16 +178,18 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	allErrs = append(allErrs, j.checkRuntimePatchesImmutability(ctx, oldObj, newObj)...)
 
 	// Validate per-patch: ensure patched resources exist in the runtime template
-	for _, runtimePatch := range newObj.Spec.RuntimePatches {
-		allErrs = append(allErrs, validation.IsDomainPrefixedPath(runtimePatchesPath.Child("manager"), runtimePatch.Manager)...)
+	for i, runtimePatch := range newObj.Spec.RuntimePatches {
+		patchPath := runtimePatchesPath.Index(i)
+		allErrs = append(allErrs, validation.IsDomainPrefixedPath(patchPath.Child("manager"), runtimePatch.Manager)...)
 		if runtimePatch.TrainingRuntimeSpec == nil || runtimePatch.TrainingRuntimeSpec.Template == nil ||
 			runtimePatch.TrainingRuntimeSpec.Template.Spec == nil {
 			continue
 		}
-		for _, rJobPatch := range runtimePatch.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs {
+		for rj, rJobPatch := range runtimePatch.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs {
+			replicatedJobPath := patchPath.Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(rj)
 			containers, ok := rJobContainerNames[rJobPatch.Name]
 			if !ok {
-				allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+				allErrs = append(allErrs, field.Invalid(replicatedJobPath.Child("name"), rJobPatch.Name,
 					"must not have replicated job that doesn't exist in the runtime job template"))
 				continue
 			}
@@ -196,19 +198,20 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 				continue
 			}
 			podSpecPatch := rJobPatch.Template.Spec.Template.Spec
+			podSpecPath := replicatedJobPath.Child("template", "spec", "template", "spec")
 
-			for _, c := range podSpecPatch.InitContainers {
+			for k, c := range podSpecPatch.InitContainers {
 				if !containers.Has(c.Name) {
-					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+					allErrs = append(allErrs, field.Invalid(podSpecPath.Child("initContainers").Index(k).Child("name"), c.Name,
 						fmt.Sprintf("must not have initContainer that doesn't exist in the runtime job %s", rJobPatch.Name)))
 				}
 			}
-			for _, c := range podSpecPatch.Containers {
+			for k, c := range podSpecPatch.Containers {
 				if !containers.Has(c.Name) {
-					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+					allErrs = append(allErrs, field.Invalid(podSpecPath.Child("containers").Index(k).Child("name"), c.Name,
 						fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", rJobPatch.Name)))
 				} else if len(c.Env) > 0 && (c.Name == constants.DatasetInitializer || c.Name == constants.ModelInitializer || c.Name == constants.Node) {
-					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+					allErrs = append(allErrs, field.Invalid(podSpecPath.Child("containers").Index(k).Child("env"), c.Name,
 						fmt.Sprintf("must not have envs for the %s, %s, %s containers", constants.DatasetInitializer, constants.ModelInitializer, constants.Node)))
 				}
 			}
