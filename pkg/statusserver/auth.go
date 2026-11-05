@@ -18,10 +18,7 @@ package statusserver
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -58,10 +55,12 @@ func NewProjectedServiceAccountTokenAuthorizer(config *rest.Config) TokenAuthori
 }
 
 func (p *projectedServiceAccountTokenAuthorizer) Init(ctx context.Context) error {
-	issuerURL, err := getClusterOIDCIssuerURL()
-	if err != nil {
-		return fmt.Errorf("failed to discover issuer URL: %w", err)
-	}
+	// Use the Kubernetes API server's internal OIDC discovery endpoint instead
+	// of the external issuer URL. This works on all clusters (EKS, GKE, AKS, KinD)
+	// without requiring external network access or encountering TLS cert issues.
+	// The API server exposes /.well-known/openid-configuration and /openid/v1/jwks
+	// endpoints that can be accessed with the authenticated in-cluster client.
+	apiServerHost := p.config.Host
 
 	// Create an authenticated HTTP client using the provided rest config
 	httpClient, err := rest.HTTPClientFor(p.config)
@@ -72,9 +71,10 @@ func (p *projectedServiceAccountTokenAuthorizer) Init(ctx context.Context) error
 	// Create context with the authenticated HTTP client
 	ctx = oidc.ClientContext(ctx, httpClient)
 
-	provider, err := oidc.NewProvider(ctx, issuerURL)
+	// Point OIDC provider to API server's internal OIDC endpoints
+	provider, err := oidc.NewProvider(ctx, apiServerHost)
 	if err != nil {
-		return fmt.Errorf("failed to create OIDC provider: %w", err)
+		return fmt.Errorf("failed to create OIDC provider from API server (%s): %w", apiServerHost, err)
 	}
 	p.oidcProvider = provider
 
@@ -125,34 +125,4 @@ func extractRawToken(authHeader string) string {
 	}
 
 	return parts[1]
-}
-
-// getClusterOIDCIssuerURL tries to look up the cluster token issuer from the in-cluster service account token
-// Different clusters may use different issuers. This is a reliable way of discovering the issuer.
-func getClusterOIDCIssuerURL() (string, error) {
-	tokenBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
-	if err != nil {
-		return "", err
-	}
-
-	parts := strings.Split(strings.TrimSpace(string(tokenBytes)), ".")
-	if len(parts) != 3 {
-		return "", fmt.Errorf("serviceaccount token is not a jwt")
-	}
-
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return "", fmt.Errorf("serviceaccount token is not a jwt: %w", err)
-	}
-
-	var token projectedToken
-	if err := json.Unmarshal(payload, &token); err != nil {
-		return "", fmt.Errorf("serviceaccount token is not a jwt: %w", err)
-	}
-
-	if token.Issuer == "" {
-		return "", fmt.Errorf("serviceaccount token missing issuer claim")
-	}
-
-	return token.Issuer, nil
 }
