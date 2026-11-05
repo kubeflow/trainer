@@ -37,6 +37,7 @@ use iceberg::table::{StaticTable, Table};
 use iceberg_datafusion::{from_datafusion_error, to_datafusion_error};
 use iceberg_storage_opendal::OpenDalResolvingStorageFactory;
 use std::any::Any;
+use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::future;
 use std::pin::Pin;
@@ -511,8 +512,9 @@ async fn read_stream(
         .await
         .map_err(to_datafusion_error)?;
     // limit the number of files to read in parallel to support streaming from replicas
+    let file_urls: Arc<HashSet<String>> = Arc::new(file_urls.into_iter().collect());
     let stream = reader
-        .read(filter_and_create_stream(Ok(files), Arc::new(file_urls.clone())).await?)
+        .read(filter_and_create_stream(Ok(files), file_urls).await?)
         .map_err(to_datafusion_error)?
         .stream()
         .map_err(to_datafusion_error);
@@ -521,14 +523,12 @@ async fn read_stream(
 
 async fn filter_and_create_stream(
     result: Result<FileScanTaskStream>,
-    file_urls: Arc<Vec<String>>,
+    file_urls: Arc<HashSet<String>>,
 ) -> Result<Pin<Box<dyn Stream<Item = std::result::Result<FileScanTask, iceberg::Error>> + Send>>> {
     match result {
         Ok(stream) => Ok(Box::pin(
             stream
-                .try_filter(move |task| {
-                    future::ready(file_urls.clone().contains(&task.data_file_path))
-                })
+                .try_filter(move |task| future::ready(file_urls.contains(&task.data_file_path)))
                 .map(|result| result),
         )),
         Err(e) => Ok(Box::pin(futures::stream::once(future::ready(Err(
@@ -541,6 +541,57 @@ async fn filter_and_create_stream(
 mod tests {
     use super::*;
     use arrow_schema::{DataType, Field, Schema};
+    use futures::stream;
+    use iceberg::spec::DataFileFormat;
+
+    #[tokio::test]
+    async fn filter_and_create_stream_keeps_only_assigned_files() {
+        let schema = Arc::new(
+            iceberg::spec::Schema::builder()
+                .with_schema_id(1)
+                .build()
+                .unwrap(),
+        );
+        let task = |path: &str| FileScanTask {
+            file_size_in_bytes: 4,
+            start: 0,
+            length: 4,
+            record_count: Some(4),
+            data_file_path: String::from(path),
+            data_file_format: DataFileFormat::Parquet,
+            schema: schema.clone(),
+            project_field_ids: vec![],
+            predicate: None,
+            deletes: vec![],
+            partition: None,
+            partition_spec: None,
+            name_mapping: None,
+            case_sensitive: true,
+        };
+
+        let planned = stream::iter(vec![
+            Ok(task("s3://bucket/a.parquet")),
+            Ok(task("s3://bucket/b.parquet")),
+            Ok(task("s3://bucket/c.parquet")),
+        ]);
+        // d.parquet is assigned but not planned, so it cannot reach the output.
+        let assigned: Arc<HashSet<String>> = Arc::new(
+            ["s3://bucket/b.parquet", "s3://bucket/d.parquet"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+        );
+
+        let mut filtered = filter_and_create_stream(Ok(Box::pin(planned)), assigned)
+            .await
+            .unwrap();
+        let mut kept = Vec::new();
+        while let Some(result) = filtered.next().await {
+            kept.push(result.unwrap().data_file_path);
+        }
+
+        assert_eq!(kept, vec![String::from("s3://bucket/b.parquet")]);
+    }
 
     #[test]
     fn fails_when_source_schema_contains_cache_index() {
