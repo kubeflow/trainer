@@ -52,16 +52,16 @@ spec:
         resourcesPerNode:
           requests:
             cpu: "1"
-            memory: 128Mi
+            memory: 256Mi
           limits:
             cpu: "1"
-            memory: 128Mi
+            memory: 512Mi
         image: python:3.11-slim-bookworm
         command:
           - /bin/sh
           - -c
           - |
-            pip install --quiet kubeflow-trainer
+            pip install --quiet kubeflow
             python3 - << 'EOF'
             import logging
             import os
