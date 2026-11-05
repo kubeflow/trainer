@@ -490,7 +490,8 @@ func TestValidateCreate(t *testing.T) {
 				clientBuilder = clientBuilder.WithObjects(tc.trainingRuntime)
 			}
 
-			runtimes, err := runtimecore.New(context.Background(), clientBuilder.Build(), testingutil.AsIndex(clientBuilder), nil)
+			c := clientBuilder.Build()
+			runtimes, err := runtimecore.New(context.Background(), c, c, testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -587,7 +588,8 @@ func TestValidateUpdate(t *testing.T) {
 			t.Cleanup(cancel)
 
 			clientBuilder := testingutil.NewClientBuilder().WithObjects(clusterRuntime)
-			runtimes, err := runtimecore.New(context.Background(), clientBuilder.Build(), testingutil.AsIndex(clientBuilder), nil)
+			c := clientBuilder.Build()
+			runtimes, err := runtimecore.New(context.Background(), c, c, testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
 				t.Fatal(err)
 			}

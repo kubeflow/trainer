@@ -50,7 +50,7 @@ var ClusterTrainingRuntimeGroupKind = schema.GroupKind{
 	Kind:  trainer.ClusterTrainingRuntimeKind,
 }.String()
 
-func NewClusterTrainingRuntime(context.Context, client.Client, client.FieldIndexer, *configapi.Configuration) (runtime.Runtime, error) {
+func NewClusterTrainingRuntime(context.Context, client.Client, client.Reader, client.FieldIndexer, *configapi.Configuration) (runtime.Runtime, error) {
 	return &ClusterTrainingRuntime{
 		TrainingRuntime: trainingRuntimeFactory,
 	}, nil
@@ -71,7 +71,15 @@ func (r *ClusterTrainingRuntime) NewObjects(ctx context.Context, trainJob *train
 
 		// Create snapshot for future reconciliations
 		if err := createRuntimeSnapshot(ctx, r.client, trainJob, &clTrainingRuntime); err != nil {
-			return nil, fmt.Errorf("creating runtime snapshot: %w", err)
+			if !apierrors.IsAlreadyExists(err) {
+				return nil, fmt.Errorf("creating runtime snapshot: %w", err)
+			}
+			// The snapshot already exists: the cached read above was stale, or another reconcile created it
+			// first. The existing snapshot is authoritative, so use it instead of the live runtime.
+			clTrainingRuntime = trainer.ClusterTrainingRuntime{}
+			if err := getRuntimeSnapshot(ctx, r.apiReader, trainJob, &clTrainingRuntime); err != nil {
+				return nil, fmt.Errorf("unable to get existing runtime snapshot: %w", err)
+			}
 		}
 	}
 
