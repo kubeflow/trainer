@@ -548,6 +548,23 @@ func TestValidateUpdate(t *testing.T) {
 				).
 				Obj(),
 		},
+		"update adds a feature-gated field while the gate is enabled: passes": {
+			enableFeatureGates: []featuregate.Feature{features.TrainJobDynamicResourceAllocation},
+			oldObj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Obj(),
+			newObj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						ResourceClaimsPerNode(trainer.TrainerResourceClaim{
+							Name:                      "gpu",
+							ResourceClaimTemplateName: "gpu-template",
+						}).
+						Obj(),
+				).
+				Obj(),
+		},
 		"update of a TrainJob that already uses a feature-gated field while the gate is disabled: passes": {
 			oldObj: testingutil.MakeTrainJobWrapper("default", "test").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
