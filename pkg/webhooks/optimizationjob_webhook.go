@@ -81,6 +81,16 @@ func (w *OptimizationJobValidator) ValidateCreate(ctx context.Context, obj *trai
 		Spec: obj.Spec.TrainJobTemplate.Spec,
 	}
 
+	// The TrainJob webhook rejects DRA fields while the gate is disabled, so every trial would be rejected.
+	if !features.Enabled(features.TrainJobDynamicResourceAllocation) && usesDRA(syntheticTrainJob) {
+		for _, err := range draFieldPaths(syntheticTrainJob) {
+			cloneErr := *err
+			cloneErr.Field = field.NewPath("spec", "trainJobTemplate").Child(err.Field).String()
+			allErrs = append(allErrs, &cloneErr)
+		}
+		return nil, allErrs.ToAggregate()
+	}
+
 	runtimeRefGK := runtime.RuntimeRefToRuntimeRegistryKey(syntheticTrainJob.Spec.RuntimeRef)
 	r, ok := w.runtimes[runtimeRefGK]
 	if !ok {

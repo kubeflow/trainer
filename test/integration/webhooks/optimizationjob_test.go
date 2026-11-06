@@ -290,6 +290,24 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 		)
 	})
 
+	ginkgo.When("TrainJobDynamicResourceAllocation feature gate is disabled", func() {
+		ginkgo.It("Should reject creation of an OptimizationJob with DRA fields in trainJobTemplate", func() {
+			optimizationJob := testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).Obj()
+			optimizationJob.Spec.TrainJobTemplate.Spec.Trainer = testingutil.MakeTrainJobTrainerWrapper().
+				ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "gpu-template"}).
+				Obj()
+
+			ginkgo.By("Creating the OptimizationJob while the feature gate is enabled")
+			gomega.Expect(k8sClient.Create(ctx, optimizationJob.DeepCopy())).Should(gomega.Succeed())
+			gomega.Expect(k8sClient.DeleteAllOf(ctx, &trainer.OptimizationJob{}, client.InNamespace(ns.Name))).To(gomega.Succeed())
+
+			featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, features.TrainJobDynamicResourceAllocation, false)
+
+			ginkgo.By("Rejecting the OptimizationJob while the feature gate is disabled")
+			gomega.Expect(k8sClient.Create(ctx, optimizationJob.DeepCopy())).Should(testingutil.BeForbiddenError())
+		})
+	})
+
 	ginkgo.When("OptimizationJob feature gate is disabled", func() {
 		ginkgo.It("Should reject creation and allow updating and deleting an existing OptimizationJob", func() {
 			ginkgo.By("Creating an OptimizationJob while the feature gate is enabled")
