@@ -18,9 +18,11 @@ package webhooks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
@@ -81,28 +83,35 @@ func (w *OptimizationJobValidator) ValidateCreate(ctx context.Context, obj *trai
 		Spec: obj.Spec.TrainJobTemplate.Spec,
 	}
 
-	runtimeRefGK := runtime.RuntimeRefToRuntimeRegistryKey(syntheticTrainJob.Spec.RuntimeRef)
-	r, ok := w.runtimes[runtimeRefGK]
-	if !ok {
-		return nil, append(allErrs, field.Invalid(
-			field.NewPath("spec", "trainJobTemplate", "spec", "runtimeRef"),
-			syntheticTrainJob.Spec.RuntimeRef,
-			fmt.Sprintf("unsupported runtime: %s", runtimeRefGK),
-		)).ToAggregate()
-	}
-
-	warnings, trialErrs := r.ValidateObjects(ctx, nil, syntheticTrainJob)
-	for _, err := range trialErrs {
-		if err.Field == "metadata.name" {
-			allErrs = append(allErrs, field.Invalid(
-				field.NewPath("metadata", "name"),
-				obj.Name,
-				fmt.Sprintf("OptimizationJob name is too long: trial TrainJob %q exceeds runtime limits: %s", trialName, err.Detail),
-			))
-		} else {
-			cloneErr := *err
-			cloneErr.Field = field.NewPath("spec", "trainJobTemplate").Child(err.Field).String()
-			allErrs = append(allErrs, &cloneErr)
+	// Run the TrainJob webhook's create checks on the trial, so a template that every trial would fail is rejected here.
+	warnings, err := (&TrainJobValidator{runtimes: w.runtimes}).ValidateCreate(ctx, syntheticTrainJob)
+	if err != nil {
+		var agg utilerrors.Aggregate
+		if !errors.As(err, &agg) {
+			// The TrainJob webhook returns a plain error only for an unsupported runtime.
+			return nil, append(allErrs, field.Invalid(
+				field.NewPath("spec", "trainJobTemplate", "spec", "runtimeRef"),
+				syntheticTrainJob.Spec.RuntimeRef,
+				err.Error(),
+			)).ToAggregate()
+		}
+		for _, aggErr := range agg.Errors() {
+			var trialErr *field.Error
+			if !errors.As(aggErr, &trialErr) {
+				allErrs = append(allErrs, field.InternalError(field.NewPath("spec", "trainJobTemplate"), aggErr))
+				continue
+			}
+			if trialErr.Field == "metadata.name" {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("metadata", "name"),
+					obj.Name,
+					fmt.Sprintf("OptimizationJob name is too long: trial TrainJob %q exceeds runtime limits: %s", trialName, trialErr.Detail),
+				))
+			} else {
+				cloneErr := *trialErr
+				cloneErr.Field = field.NewPath("spec", "trainJobTemplate").Child(trialErr.Field).String()
+				allErrs = append(allErrs, &cloneErr)
+			}
 		}
 	}
 
