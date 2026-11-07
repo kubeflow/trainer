@@ -274,7 +274,7 @@ this is not: valid: yaml: content
 	}
 
 	defaultCertManagement := &configapi.CertManagement{
-		Enable:      ptr.To(true),
+		Enable:      new(true),
 		ServiceName: "kubeflow-trainer-controller-manager",
 		SecretName:  "kubeflow-trainer-webhook-cert",
 	}
@@ -296,7 +296,7 @@ this is not: valid: yaml: content
 
 	defaultMetrics := configapi.ControllerMetrics{
 		BindAddress:   ":8443",
-		SecureServing: ptr.To(true),
+		SecureServing: new(true),
 		Auth:          &configapi.MetricsAuthConfig{Enabled: ptr.To(false)},
 	}
 
@@ -391,8 +391,8 @@ this is not: valid: yaml: content
 				},
 				Metrics: configapi.ControllerMetrics{
 					BindAddress:   ":9443",
-					SecureServing: ptr.To(true),
-					Auth:          &configapi.MetricsAuthConfig{Enabled: ptr.To(false)},
+					SecureServing: new(true),
+					Auth:          &configapi.MetricsAuthConfig{Enabled: new(false)},
 				},
 				Health: configapi.ControllerHealth{
 					HealthProbeBindAddress: ":8082",
@@ -432,7 +432,7 @@ this is not: valid: yaml: content
 				ClientConnection: defaultClientConnection,
 				StatusServer:     defaultStatusServer,
 				LeaderElection: &componentconfigv1alpha1.LeaderElectionConfiguration{
-					LeaderElect:       ptr.To(true),
+					LeaderElect:       new(true),
 					ResourceName:      "trainer-leader",
 					ResourceNamespace: "kubeflow",
 					ResourceLock:      "leases",
@@ -819,7 +819,7 @@ func TestIsCertManagementEnabled(t *testing.T) {
 			name: "CertManagement.Enable is true",
 			cfg: configapi.Configuration{
 				CertManagement: &configapi.CertManagement{
-					Enable: ptr.To(true),
+					Enable: new(true),
 				},
 			},
 			want: true,
@@ -828,7 +828,7 @@ func TestIsCertManagementEnabled(t *testing.T) {
 			name: "CertManagement.Enable is false",
 			cfg: configapi.Configuration{
 				CertManagement: &configapi.CertManagement{
-					Enable: ptr.To(false),
+					Enable: new(false),
 				},
 			},
 			want: false,
