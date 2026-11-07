@@ -47,3 +47,6 @@ trainer-controller-manager.exe
 
 # Sphinx documentation build artifacts
 docs/_build/
+
+# Generated gRPC stubs for the search algorithm service
+pkg/search_algorithm/optuna/proto/*_pb2*.py
