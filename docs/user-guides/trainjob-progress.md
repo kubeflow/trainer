@@ -35,10 +35,10 @@ to understand the basics of Kubeflow Trainer.
 
 ### Status server rate limits
 
-Each status update makes two Kubernetes API requests from the status server: a TokenReview to
-validate the trainer's token, and the TrainJob status update. Both share the status server's
-client rate limits (5 QPS and a burst of 10 by default). If many TrainJobs report progress at the
-same time, raise these limits with Helm:
+Each status update makes one Kubernetes API request from the status server: the TrainJob status update.
+Token validation is performed locally using OIDC without additional API calls. The status server's
+client rate limits (5 QPS and a burst of 10 by default) apply to status updates. If many TrainJobs
+report progress at the same time, raise these limits with Helm:
 
 ```bash
 --set manager.config.statusServer.qps=20 --set manager.config.statusServer.burst=40
@@ -191,7 +191,7 @@ to the controller endpoint.
 #### Technical Details
 
 - **Environment Variables**: The controller injects `KUBEFLOW_TRAINER_SERVER_URL` (the HTTPS endpoint), `KUBEFLOW_TRAINER_SERVER_CA_CERT` (path to the CA cert file), and `KUBEFLOW_TRAINER_SERVER_TOKEN` (path to the bearer token file).
-- **Authentication**: Each request is authenticated using a projected service account token (validated by the controller with the Kubernetes TokenReview API). The projected service account token is issued with a TrainJob-specific audience so the controller can verify that update requests target the correct TrainJob.
+- **Authentication**: Each request is authenticated using a projected service account token validated locally by the controller using OIDC discovery (via the Kubernetes API server's internal `/.well-known/openid-configuration` endpoint). The projected service account token is issued with a TrainJob-specific audience so the controller can verify that update requests target the correct TrainJob.
 - **TLS Configuration**: The endpoint reuses the same webhook TLS certificates as the controller, with automatic cert rotation.
 
 #### Implementation Guidance

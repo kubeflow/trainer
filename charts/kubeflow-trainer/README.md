@@ -147,8 +147,8 @@ manager:
 | manager.config.clientConnection.qps | int | `50` | QPS rate limit for the manager's Kubernetes API client. Accepts fractional values (e.g. 0.5). |
 | manager.config.clientConnection.burst | int | `100` | Burst rate limit for the manager's Kubernetes API client |
 | manager.config.statusServer.port | int | `10443` | Port that the TrainJob status server serves on. |
-| manager.config.statusServer.qps | int | `5` | QPS rate limit for the TrainJob status server API client, used for both token reviews and status updates |
-| manager.config.statusServer.burst | int | `10` | Burst rate limit for the TrainJob status server API client, used for both token reviews and status updates |
+| manager.config.statusServer.qps | int | `5` | QPS rate limit for the TrainJob status server API client |
+| manager.config.statusServer.burst | int | `10` | Burst rate limit for the TrainJob status server API client |
 | prometheus.enabled | bool | `false` | Whether to create a Prometheus Operator ServiceMonitor. |
 | prometheus.labels | object | `{}` | Additional labels for selecting this ServiceMonitor from Prometheus. |
 | prometheus.authorization | object | `{"credentials":{"key":"token","name":""}}` | Secret-based authorization for authenticated metrics scraping. Required when metrics authentication is enabled. The Secret must be available in the ServiceMonitor namespace and readable by Prometheus. |

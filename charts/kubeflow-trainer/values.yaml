@@ -159,9 +159,9 @@ manager:
     statusServer:
       # -- Port that the TrainJob status server serves on.
       port: 10443
-      # -- QPS rate limit for the TrainJob status server API client, used for both token reviews and status updates
+      # -- QPS rate limit for the TrainJob status server API client
       qps: 5
-      # -- Burst rate limit for the TrainJob status server API client, used for both token reviews and status updates
+      # -- Burst rate limit for the TrainJob status server API client
       burst: 10
     featureGates: {}
 
