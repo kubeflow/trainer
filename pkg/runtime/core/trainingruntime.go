@@ -316,19 +316,20 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 	// runtime when no snapshot exists yet, as NewObjects does. On create there is no snapshot
 	// to read: one under this name still belongs to a deleted TrainJob of the same name.
 	trainingRuntime := &trainer.TrainingRuntime{}
-	useLiveRuntime := old == nil
-	if !useLiveRuntime {
-		if err := getRuntimeSnapshot(ctx, r.client, new, trainingRuntime); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return nil, field.ErrorList{
-					field.InternalError(field.NewPath("spec", "runtimeRef"), fmt.Errorf("unable to get runtime snapshot: %w", err)),
-				}
+	snapshotLoaded := false
+
+	if old != nil {
+		err := getRuntimeSnapshot(ctx, r.client, new, trainingRuntime)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, field.ErrorList{
+				field.InternalError(field.NewPath("spec", "runtimeRef"), fmt.Errorf("unable to get runtime snapshot: %w", err)),
 			}
-			trainingRuntime = &trainer.TrainingRuntime{}
-			useLiveRuntime = true
 		}
+		snapshotLoaded = err == nil
 	}
-	if useLiveRuntime {
+
+	if !snapshotLoaded {
+		trainingRuntime = &trainer.TrainingRuntime{}
 		if err := r.client.Get(ctx, client.ObjectKey{
 			Namespace: new.Namespace,
 			Name:      new.Spec.RuntimeRef.Name,

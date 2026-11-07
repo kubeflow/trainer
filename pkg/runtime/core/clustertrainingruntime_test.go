@@ -296,6 +296,20 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
 	validRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj()
+	staleSnapshot := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job-runtime-snapshot",
+			Namespace: metav1.NamespaceDefault,
+			OwnerReferences: []metav1.OwnerReference{{
+				UID:        "uid-deleted-test-job",
+				Controller: ptr.To(true),
+			}},
+		},
+	}
+	recreatedTrainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+		UID("uid-test-job").
+		RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+		Obj()
 
 	deprecatedRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("deprecated-runtime").Obj()
 	deprecatedRuntime.Labels = map[string]string{
@@ -304,7 +318,9 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 
 	cases := map[string]struct {
 		trainJob        *trainer.TrainJob
+		oldTrainJob     *trainer.TrainJob
 		existingRuntime *trainer.ClusterTrainingRuntime
+		existingObjects []client.Object
 		wantErrs        field.ErrorList
 		wantWarnings    admission.Warnings
 	}{
@@ -369,6 +385,21 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 				field.Forbidden(field.NewPath("spec", "trainer", "resourceClaimsPerNode"), ""),
 			},
 		},
+		"succeeds on create when the snapshot of a deleted TrainJob still exists": {
+			trainJob:        recreatedTrainJob,
+			existingRuntime: validRuntime,
+			existingObjects: []client.Object{staleSnapshot},
+			wantErrs:        nil,
+		},
+		"returns internal error on update when the snapshot belongs to another TrainJob": {
+			trainJob:        recreatedTrainJob,
+			oldTrainJob:     recreatedTrainJob,
+			existingRuntime: validRuntime,
+			existingObjects: []client.Object{staleSnapshot},
+			wantErrs: field.ErrorList{
+				field.InternalError(field.NewPath("spec", "runtimeRef"), errors.New("")),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -380,6 +411,7 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 			if tc.existingRuntime != nil {
 				clientBuilder = clientBuilder.WithObjects(tc.existingRuntime)
 			}
+			clientBuilder = clientBuilder.WithObjects(tc.existingObjects...)
 			c := clientBuilder.Build()
 
 			// Initialize the runtime factory (ClusterTrainingRuntime requires TrainingRuntime to be initialized first)
@@ -393,9 +425,9 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			warnings, fieldErrors := clTrainingRuntime.ValidateObjects(ctx, nil, tc.trainJob)
+			warnings, fieldErrors := clTrainingRuntime.ValidateObjects(ctx, tc.oldTrainJob, tc.trainJob)
 
-			if diff := cmp.Diff(tc.wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail")); diff != "" {
+			if diff := cmp.Diff(tc.wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); diff != "" {
 				t.Errorf("Unexpected field errors (-want,+got):\n%s", diff)
 			}
 
