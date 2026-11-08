@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -181,7 +182,15 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 	if startTime.IsZero() {
 		return ctrl.Result{}
 	}
-	deadline := startTime.Add(time.Duration(trainJob.Spec.ActiveDeadlineSeconds) * time.Second)
+	// time.Duration is an int64 nanosecond count, so spec.ActiveDeadlineSeconds above
+	// math.MaxInt64 / int64(time.Second) overflows when multiplied by time.Second and the
+	// deadline falls in the past. Clamp the seconds instead, so an absurdly large value
+	// behaves like a very distant deadline rather than an immediate failure.
+	deadlineSeconds := trainJob.Spec.ActiveDeadlineSeconds
+	if maxSeconds := int64(math.MaxInt64 / int64(time.Second)); deadlineSeconds > maxSeconds {
+		deadlineSeconds = maxSeconds
+	}
+	deadline := startTime.Add(time.Duration(deadlineSeconds) * time.Second)
 	now := r.clock.Now()
 	if now.After(deadline) {
 		ctrl.LoggerFrom(ctx).V(2).Info("TrainJob deadline exceeded, marking as failed",
