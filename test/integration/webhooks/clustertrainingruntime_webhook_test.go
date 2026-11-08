@@ -151,6 +151,31 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 					return runtime
 				},
 				gomega.MatchError(gomega.ContainSubstring("replicatedJob name must be no more than 20 characters"))),
+			ginkgo.Entry("Should succeed to create ClusterTrainingRuntime with Torch policy and the trainer replicatedJob named node",
+				func() *trainer.ClusterTrainingRuntime {
+					runtime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName).Obj()
+					runtime.Spec.MLPolicy = &trainer.MLPolicy{
+						MLPolicySource: trainer.MLPolicySource{Torch: &trainer.TorchMLPolicySource{}},
+					}
+					runtime.Spec.Template.Spec.ReplicatedJobs[2].Template.Labels = map[string]string{
+						constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+					}
+					return runtime
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create ClusterTrainingRuntime with Torch policy and the trainer replicatedJob not named node",
+				func() *trainer.ClusterTrainingRuntime {
+					runtime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName).Obj()
+					runtime.Spec.MLPolicy = &trainer.MLPolicy{
+						MLPolicySource: trainer.MLPolicySource{Torch: &trainer.TorchMLPolicySource{}},
+					}
+					runtime.Spec.Template.Spec.ReplicatedJobs[2].Name = "trainer"
+					runtime.Spec.Template.Spec.ReplicatedJobs[2].Template.Labels = map[string]string{
+						constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+					}
+					return runtime
+				},
+				gomega.MatchError(gomega.ContainSubstring(`must be "node" for the replicatedJob labeled`))),
 			ginkgo.Entry("Should succeed to create ClusterTrainingRuntime with per-ReplicatedJob scheduling",
 				func() *trainer.ClusterTrainingRuntime {
 					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)
