@@ -55,12 +55,12 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 				if *container.Name == constants.DatasetInitializer && trainJob.Spec.Initializer != nil && trainJob.Spec.Initializer.Dataset != nil {
 					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
 					// Update the dataset initializer envs.
+					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.Initializer.Dataset.Env...)...)
 					if storageUri := trainJob.Spec.Initializer.Dataset.StorageUri; storageUri != nil {
 						apply.UpsertEnvVars(env, *corev1ac.EnvVar().
 							WithName(jobsetplgconsts.InitializerEnvStorageUri).
 							WithValue(*storageUri))
 					}
-					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.Initializer.Dataset.Env...)...)
 					// Update the dataset initializer secret reference.
 					if trainJob.Spec.Initializer.Dataset.SecretRef != nil {
 						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
@@ -81,12 +81,12 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 				if *container.Name == constants.ModelInitializer && trainJob.Spec.Initializer != nil && trainJob.Spec.Initializer.Model != nil {
 					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
 					// Update the model initializer envs.
+					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.Initializer.Model.Env...)...)
 					if storageUri := trainJob.Spec.Initializer.Model.StorageUri; storageUri != nil {
 						apply.UpsertEnvVars(env, *corev1ac.EnvVar().
 							WithName(jobsetplgconsts.InitializerEnvStorageUri).
 							WithValue(*storageUri))
 					}
-					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.Initializer.Model.Env...)...)
 					// Update the model initializer secret reference.
 					if trainJob.Spec.Initializer.Model.SecretRef != nil {
 						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
