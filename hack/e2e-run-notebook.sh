@@ -62,5 +62,36 @@ print_results() {
     fi
 }
 
+# Local container backends run training in Docker containers outside Kubernetes, so
+# print_results shows nothing for them. Show their state and logs, so a notebook that
+# hangs or fails leaves something to debug from. Best effort: it never fails the script.
+print_local_containers() {
+    if ! command -v docker &> /dev/null || ! docker info &> /dev/null; then
+        return 0
+    fi
+
+    # Containers created by the SDK container backend carry this label.
+    local filter="label=trainer.kubeflow.org/trainjob-name"
+    local ids
+    ids="$(docker ps -aq --filter "${filter}" || true)"
+    if [ -z "${ids}" ]; then
+        return 0
+    fi
+
+    echo "Found local backend containers - showing state and logs"
+    docker ps -a --filter "${filter}" || true
+    local id
+    for id in ${ids}; do
+        # A container that is still running may be hung, so show what it is doing.
+        if [ "$(docker inspect --format '{{.State.Running}}' "${id}" || true)" = "true" ]; then
+            echo "Processes in container ${id}:"
+            docker top "${id}" || true
+        fi
+        echo "Last 200 log lines of container ${id}:"
+        docker logs --tail 200 "${id}" 2>&1 || true
+    done
+    return 0
+}
+
 (papermill "${NOTEBOOK_INPUT}" "${NOTEBOOK_OUTPUT}" ${PAPERMILL_PARAMS} --execution-timeout "${PAPERMILL_TIMEOUT}" && print_results) ||
-    (print_results && exit 1)
+    (print_results && print_local_containers && exit 1)
