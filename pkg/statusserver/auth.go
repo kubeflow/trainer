@@ -61,13 +61,11 @@ func (p *projectedServiceAccountTokenAuthorizer) Init(ctx context.Context) error
 	// without requiring external network access or encountering TLS cert issues.
 	// The API server exposes /.well-known/openid-configuration and /openid/v1/jwks
 	// endpoints that can be accessed with the authenticated in-cluster client.
-	apiServerHost := p.config.Host
-
-	// Debug logging to help diagnose KinD issues
-	fmt.Printf("DEBUG: Initializing OIDC provider with API server: %s\n", apiServerHost)
-	fmt.Printf("DEBUG: rest.Config CAData length: %d\n", len(p.config.CAData))
-	fmt.Printf("DEBUG: rest.Config CAFile: %s\n", p.config.CAFile)
-	fmt.Printf("DEBUG: rest.Config TLS ServerName: %s\n", p.config.ServerName)
+	//
+	// Use the DNS name (kubernetes.default.svc.cluster.local) instead of the cluster IP
+	// to match the issuer returned by OIDC discovery. The OIDC library validates that
+	// the issuer in the discovery document matches the issuer we request.
+	apiServerHost := "https://kubernetes.default.svc.cluster.local"
 
 	// Create an authenticated HTTP client using the provided rest config
 	httpClient, err := rest.HTTPClientFor(p.config)
@@ -79,15 +77,12 @@ func (p *projectedServiceAccountTokenAuthorizer) Init(ctx context.Context) error
 	ctx = oidc.ClientContext(ctx, httpClient)
 
 	// Point OIDC provider to API server's internal OIDC endpoints
-	fmt.Printf("DEBUG: Attempting to create OIDC provider...\n")
 	provider, err := oidc.NewProvider(ctx, apiServerHost)
 	if err != nil {
-		fmt.Printf("DEBUG: OIDC provider creation failed: %v\n", err)
 		return fmt.Errorf("failed to create OIDC provider from API server (%s): %w", apiServerHost, err)
 	}
 	p.oidcProvider = provider
 
-	fmt.Printf("DEBUG: OIDC provider initialized successfully\n")
 	return nil
 }
 
