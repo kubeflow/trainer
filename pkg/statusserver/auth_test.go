@@ -106,9 +106,18 @@ func TestProjectedServiceAccountTokenAuthorizerAuthorize(t *testing.T) {
 	)
 
 	ctx := context.Background()
+	// For tests, we need to fetch the discovery doc to get the actual JWKS URI
 	provider, err := oidc.NewProvider(ctx, issuer)
 	if err != nil {
 		t.Fatalf("Failed to create OIDC provider: %v", err)
+	}
+
+	// Extract the JWKS URI from the provider's discovery document
+	var discoveryClaims struct {
+		JWKSURI string `json:"jwks_uri"`
+	}
+	if err := provider.Claims(&discoveryClaims); err != nil {
+		t.Fatalf("Failed to get JWKS URI from discovery document: %v", err)
 	}
 
 	audience := TokenAudience(namespace, trainJobName)
@@ -131,86 +140,94 @@ func TestProjectedServiceAccountTokenAuthorizerAuthorize(t *testing.T) {
 	delete(missingExpiryClaims, "exp")
 
 	testcases := map[string]struct {
-		oidcProvider   *oidc.Provider
-		authHeader     string
-		wantAuthorized bool
-		wantErrMsg     string
+		initializeAuthorizer bool
+		authHeader           string
+		wantAuthorized       bool
+		wantErrMsg           string
 	}{
 		"uninitialized authorizer returns an error": {
-			oidcProvider: nil,
-			authHeader:   "Bearer " + validToken,
-			wantErrMsg:   "OIDC provider has not been initialized",
+			initializeAuthorizer: false,
+			authHeader:           "Bearer " + validToken,
+			wantErrMsg:           "OIDC verifier has not been initialized",
 		},
 		"valid token for the train job is authorized": {
-			oidcProvider:   provider,
-			authHeader:     "Bearer " + validToken,
-			wantAuthorized: true,
+			initializeAuthorizer: true,
+			authHeader:           "Bearer " + validToken,
+			wantAuthorized:       true,
 		},
 		"empty authorization header is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "",
+			initializeAuthorizer: true,
+			authHeader:           "",
 		},
 		"valid token under a non-Bearer scheme is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Basic " + validToken,
+			initializeAuthorizer: true,
+			authHeader:           "Basic " + validToken,
 		},
 		"token for a different train job is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Bearer " + otherJobToken,
+			initializeAuthorizer: true,
+			authHeader:           "Bearer " + otherJobToken,
 		},
 		"token for the same train job name in a different namespace is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Bearer " + signToken(t, key, testKeyID, oidc.RS256, tokenClaims(issuer, TokenAudience("other-namespace", trainJobName), namespace)),
+			initializeAuthorizer: true,
+			authHeader:           "Bearer " + signToken(t, key, testKeyID, oidc.RS256, tokenClaims(issuer, TokenAudience("other-namespace", trainJobName), namespace)),
 		},
 		"token from a pod in a different namespace is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Bearer " + signToken(t, key, testKeyID, oidc.RS256, tokenClaims(issuer, audience, "other-namespace")),
+			initializeAuthorizer: true,
+			authHeader:           "Bearer " + signToken(t, key, testKeyID, oidc.RS256, tokenClaims(issuer, audience, "other-namespace")),
 		},
 		"token without the kubernetes.io claim is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Bearer " + signToken(t, key, testKeyID, oidc.RS256, missingKubernetesClaims),
+			initializeAuthorizer: true,
+			authHeader:           "Bearer " + signToken(t, key, testKeyID, oidc.RS256, missingKubernetesClaims),
 		},
 		"expired token is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Bearer " + signToken(t, key, testKeyID, oidc.RS256, expiredClaims),
+			initializeAuthorizer: true,
+			authHeader:           "Bearer " + signToken(t, key, testKeyID, oidc.RS256, expiredClaims),
 		},
 		"token without an expiry is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Bearer " + signToken(t, key, testKeyID, oidc.RS256, missingExpiryClaims),
+			initializeAuthorizer: true,
+			authHeader:           "Bearer " + signToken(t, key, testKeyID, oidc.RS256, missingExpiryClaims),
 		},
 		"token that is not yet valid is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Bearer " + signToken(t, key, testKeyID, oidc.RS256, notYetValidClaims),
+			initializeAuthorizer: true,
+			authHeader:           "Bearer " + signToken(t, key, testKeyID, oidc.RS256, notYetValidClaims),
 		},
 		"token signed with an unpublished key is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Bearer " + signToken(t, otherKey, testKeyID, oidc.RS256, tokenClaims(issuer, audience, namespace)),
+			initializeAuthorizer: true,
+			authHeader:           "Bearer " + signToken(t, otherKey, testKeyID, oidc.RS256, tokenClaims(issuer, audience, namespace)),
 		},
 		"token with its signature stripped is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Bearer " + validTokenParts[0] + "." + validTokenParts[1] + ".",
+			initializeAuthorizer: true,
+			authHeader:           "Bearer " + validTokenParts[0] + "." + validTokenParts[1] + ".",
 		},
 		"token with the signature of another token is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Bearer " + validTokenParts[0] + "." + validTokenParts[1] + "." + otherJobTokenParts[2],
+			initializeAuthorizer: true,
+			authHeader:           "Bearer " + validTokenParts[0] + "." + validTokenParts[1] + "." + otherJobTokenParts[2],
 		},
 		"token that is not a JWT is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Bearer not-a-jwt",
+			initializeAuthorizer: true,
+			authHeader:           "Bearer not-a-jwt",
 		},
 		"token signed with an unsupported algorithm is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Bearer " + signToken(t, ecKey, testECKeyID, oidc.ES256, tokenClaims(issuer, audience, namespace)),
+			initializeAuthorizer: true,
+			authHeader:           "Bearer " + signToken(t, ecKey, testECKeyID, oidc.ES256, tokenClaims(issuer, audience, namespace)),
 		},
 		"token from a different issuer is not authorized": {
-			oidcProvider: provider,
-			authHeader:   "Bearer " + signToken(t, key, testKeyID, oidc.RS256, tokenClaims("https://other-issuer.example.com", audience, namespace)),
+			initializeAuthorizer: true,
+			authHeader:           "Bearer " + signToken(t, key, testKeyID, oidc.RS256, tokenClaims("https://other-issuer.example.com", audience, namespace)),
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			authorizer := &projectedServiceAccountTokenAuthorizer{oidcProvider: tc.oidcProvider}
+			authorizer := &projectedServiceAccountTokenAuthorizer{}
+			if tc.initializeAuthorizer {
+				// Initialize verifier from issuer for testing
+				// We create the keySet from the actual JWKS URI from discovery
+				keySet := oidc.NewRemoteKeySet(ctx, discoveryClaims.JWKSURI)
+				authorizer.issuer = issuer
+				authorizer.keySet = keySet
+				authorizer.verifier = oidc.NewVerifier(issuer, keySet, &oidc.Config{SkipClientIDCheck: true})
+			}
 
 			gotAuthorized, err := authorizer.Authorize(ctx, tc.authHeader, namespace, trainJobName)
 
@@ -248,15 +265,29 @@ func TestProjectedServiceAccountTokenAuthorizerAuthorizeKeyRotation(t *testing.T
 	)
 
 	ctx := context.Background()
+	// Fetch discovery doc to get JWKS URI
 	provider, err := oidc.NewProvider(ctx, issuer)
 	if err != nil {
 		t.Fatalf("Failed to create OIDC provider: %v", err)
 	}
-	authorizer := &projectedServiceAccountTokenAuthorizer{oidcProvider: provider}
 
-	claims := tokenClaims(issuer, TokenAudience(namespace, trainJobName), namespace)
-	tokenBeforeRotation := "Bearer " + signToken(t, key, testKeyID, oidc.RS256, claims)
-	tokenAfterRotation := "Bearer " + signToken(t, rotatedKey, rotatedKeyID, oidc.RS256, claims)
+	var discoveryClaims struct {
+		JWKSURI string `json:"jwks_uri"`
+	}
+	if err := provider.Claims(&discoveryClaims); err != nil {
+		t.Fatalf("Failed to get JWKS URI from discovery document: %v", err)
+	}
+
+	keySet := oidc.NewRemoteKeySet(ctx, discoveryClaims.JWKSURI)
+	authorizer := &projectedServiceAccountTokenAuthorizer{
+		issuer:   issuer,
+		keySet:   keySet,
+		verifier: oidc.NewVerifier(issuer, keySet, &oidc.Config{SkipClientIDCheck: true}),
+	}
+
+	testTokenClaims := tokenClaims(issuer, TokenAudience(namespace, trainJobName), namespace)
+	tokenBeforeRotation := "Bearer " + signToken(t, key, testKeyID, oidc.RS256, testTokenClaims)
+	tokenAfterRotation := "Bearer " + signToken(t, rotatedKey, rotatedKeyID, oidc.RS256, testTokenClaims)
 
 	steps := []struct {
 		name           string
