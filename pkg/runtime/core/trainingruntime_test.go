@@ -2857,7 +2857,7 @@ func TestTrainingRuntimeValidateObjects(t *testing.T) {
 			existingRuntime: validRuntime,
 			existingObjects: []client.Object{staleSnapshot},
 			wantErrs: field.ErrorList{
-				field.InternalError(field.NewPath("spec", "runtimeRef"), errors.New("")),
+				field.InternalError(field.NewPath("spec", "runtimeRef"), errors.New("unable to get runtime snapshot: invalid runtime snapshot: a snapshot configmap exists but is owned by another object")),
 			},
 		},
 	}
@@ -2881,7 +2881,17 @@ func TestTrainingRuntimeValidateObjects(t *testing.T) {
 
 			_, fieldErrors := trainingRuntime.ValidateObjects(ctx, tc.oldTrainJob, tc.trainJob)
 
-			if diff := cmp.Diff(tc.wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); diff != "" {
+			if diff := cmp.Diff(tc.wantErrs, fieldErrors,
+				cmpopts.IgnoreFields(field.Error{}, "Detail"),
+				cmp.FilterPath(func(p cmp.Path) bool {
+					sf, ok := p.Last().(cmp.StructField)
+					return ok && sf.Name() == "BadValue"
+				}, cmp.Transformer("ErrorString", func(v any) any {
+					if err, ok := v.(error); ok {
+						return err.Error()
+					}
+					return v
+				}))); diff != "" {
 				t.Errorf("Unexpected field errors (-want,+got):\n%s", diff)
 			}
 		})
