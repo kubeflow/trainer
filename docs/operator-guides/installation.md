@@ -26,7 +26,7 @@ kind create cluster # or minikube start
 Run the following command to deploy a released version of Kubeflow Trainer control plane:
 
 ```bash
-export VERSION=v2.3.0
+export VERSION=v2.4.0
 helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
     --namespace kubeflow-system \
     --create-namespace \
