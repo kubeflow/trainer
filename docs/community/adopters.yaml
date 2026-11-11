@@ -1,0 +1,149 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# =====================================================================
+# KUBEFLOW TRAINER ADOPTERS
+# =====================================================================
+# This file is rendered as the adopters directory on the website:
+# https://trainer.kubeflow.org/en/latest/community/adopters.html
+#
+# How to add your organization:
+# 1. Copy one of the entries below and paste it at the bottom of this file.
+# 2. Fill in the details and submit a pull request.
+#
+# Fields:
+#  - name:        Organization name (Required)
+#  - url:         Organization website URL (Required)
+#  - type:        "End User" if you use Kubeflow Trainer for your own workloads, or
+#                 "Provider" if you offer it as part of a product or service (Required)
+#  - description: One sentence on how you use Kubeflow Trainer (Optional)
+#  - contacts:    GitHub handles of people to contact about your adoption,
+#                 without the leading @, e.g. andreyvelich (Optional)
+#
+# To show your talks, case studies, tutorials, and blog posts on your card, add them to
+# docs/community/talks.yaml with your organization name in their "adopters" field.
+#
+# Entries are sorted by name on the website, so the order here does not matter.
+# =====================================================================
+
+- name: Akuity
+  url: https://akuity.io/
+  type: End User
+  contacts:
+    - terrytangyuan
+- name: Alibaba Cloud
+  url: https://us.alibabacloud.com/
+  type: Provider
+  contacts:
+    - cheyang
+- name: Alibaba DAMO Academy
+  url: https://damo.alibaba.com/
+  type: End User
+- name: Amazon Web Services
+  url: https://aws.amazon.com/
+  type: Provider
+  contacts:
+    - Jeffwan
+- name: Ant Group
+  url: https://www.antgroup.com/
+  type: End User
+  contacts:
+    - terrytangyuan
+- name: Apple
+  url: https://www.apple.com/
+  type: End User
+  description: Distributed AI platform for training, fine-tuning, and RL
+  contacts:
+    - andreyvelich
+- name: Atrio
+  url: https://www.atrio.io/
+  type: End User
+  contacts:
+    - cesargomez
+- name: Bloomberg
+  url: https://www.bloomberg.com/
+  type: End User
+  contacts:
+    - yuzisun
+- name: Bytedance
+  url: https://www.bytedance.com/
+  type: End User
+  contacts:
+    - Jeffwan
+- name: Cisco
+  url: https://www.cisco.com/
+  type: End User
+  contacts:
+    - ramdootp
+- name: Huawei
+  url: https://www.huawei.com/
+  type: End User
+  contacts:
+    - suleisl2000
+- name: Iguazio
+  url: https://www.iguazio.com/
+  type: Provider
+  contacts:
+    - yaronha
+- name: Mellanox Technologies
+  url: https://www.mellanox.com/
+  type: End User
+  contacts:
+    - vtlrazin
+- name: NVIDIA
+  url: https://www.nvidia.com/
+  type: End User
+  contacts:
+    - rongou
+- name: Pinduoduo
+  url: https://en.pinduoduo.com/
+  type: End User
+  contacts:
+    - antshuwen
+- name: Polyaxon
+  url: https://polyaxon.com/
+  type: Provider
+  contacts:
+    - mouradmourafiq
+- name: Qihoo 360
+  url: https://www.360.cn/
+  type: End User
+  contacts:
+    - xigang
+- name: Qutoutiao
+  url: https://www.qutoutiao.net/
+  type: End User
+  contacts:
+    - yuzhaojing
+- name: Red Hat
+  url: https://www.redhat.com/en/products/ai
+  type: Provider
+  description: Kubeflow Trainer is deployed as part of Red Hat OpenShift AI for distributed training
+  contacts:
+    - robert-bell
+- name: Tencent
+  url: http://tencent.com/en-us/
+  type: End User
+  contacts:
+    - zw0610
+- name: TuSimple
+  url: https://www.tusimple.com/
+  type: End User
+  contacts:
+    - henglianghe
+- name: vip
+  url: https://www.vip.com/
+  type: End User
+  contacts:
+    - oikomi

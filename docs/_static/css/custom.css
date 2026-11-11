@@ -93,12 +93,21 @@ body {
 }
 
 .top-nav-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
     color: var(--color-foreground-secondary, #2d3748) !important;
     text-decoration: none !important;
     padding: 0.4rem 0.75rem;
     border-radius: 4px;
     font-size: 0.9rem;
     transition: all 0.15s ease;
+}
+
+.top-nav-icon {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
 }
 
 .top-nav-links a:hover {
@@ -415,12 +424,323 @@ a.doc-card strong,
     margin-bottom: 0.5rem;
 }
 
+/* Icons in card titles, e.g. on the community landing page, sit above the title */
+.sd-card .sd-card-title .sd-octicon {
+    display: block;
+    margin-bottom: 0.6rem;
+    color: var(--kf-blue-light);
+}
+
 a.doc-card p,
 .sd-card .sd-card-body p {
     margin: 0;
     color: var(--kf-text-light);
     font-size: 0.95rem;
     line-height: 1.5;
+}
+
+/* ============================================
+   COMMUNITY PAGES (adopters, talks, blog posts)
+   ============================================ */
+
+body {
+    --kf-provider: #6b46c1;
+}
+
+body[data-theme="dark"] {
+    --kf-provider: #b794f4;
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="light"]) {
+        --kf-provider: #b794f4;
+    }
+}
+
+/* Searchable directory */
+.directory-search {
+    max-width: 500px;
+    margin: 2rem auto 1.5rem;
+}
+
+.directory-search-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.6rem 0.9rem;
+    border: 1px solid var(--kf-border);
+    border-radius: 8px;
+    background-color: var(--color-background-primary, #fff);
+    color: var(--kf-text);
+    font-size: 0.95rem;
+}
+
+.directory-search-input:focus {
+    outline: none;
+    border-color: var(--kf-blue-light);
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
+}
+
+.directory-count {
+    margin: 0.4rem 0 0;
+    text-align: center;
+    color: var(--kf-text-light);
+    font-size: 0.75rem;
+}
+
+.directory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+}
+
+.directory-grid [hidden] {
+    display: none !important;
+}
+
+.directory-empty {
+    margin: 2rem 0;
+    text-align: center;
+    color: var(--kf-text-light);
+}
+
+/* Cards */
+.adopter-card,
+.talk-card,
+.blog-post-card {
+    display: flex;
+    flex-direction: column;
+    padding: 1.1rem;
+    border: 1px solid var(--kf-border);
+    border-radius: 8px;
+    background-color: var(--kf-bg-subtle);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    transition: all 0.2s ease;
+}
+
+.adopter-card:hover,
+.talk-card:hover,
+.blog-post-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: var(--kf-blue-light);
+}
+
+.adopter-card p,
+.talk-card p {
+    margin: 0;
+}
+
+.community-icon {
+    flex-shrink: 0;
+    width: 0.95em;
+    height: 0.95em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Adopter cards */
+.adopter-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.adopter-name {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.adopter-name a {
+    color: var(--kf-heading);
+    text-decoration: none;
+}
+
+.adopter-name a:hover {
+    color: var(--kf-blue);
+}
+
+.adopter-badge {
+    flex-shrink: 0;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-family: var(--font-stack--monospace, monospace);
+    font-size: 0.65rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.adopter-badge-end-user {
+    color: var(--kf-blue);
+}
+
+.adopter-badge-provider {
+    color: var(--kf-provider);
+}
+
+.adopter-description {
+    margin-top: 0.5rem !important;
+    color: var(--kf-text-light);
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
+/* Pin talks and contacts to the bottom of the card */
+.adopter-footer {
+    margin-top: auto;
+    padding-top: 0.75rem;
+    font-size: 0.8rem;
+}
+
+.adopter-talks {
+    margin-bottom: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--kf-border);
+}
+
+.adopter-talks ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.adopter-talks li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin: 0.2rem 0;
+    line-height: 1.35;
+}
+
+.adopter-talks .community-icon {
+    position: relative;
+    top: 0.1em;
+    color: var(--kf-blue);
+}
+
+.adopter-label {
+    display: block;
+    margin-bottom: 0.25rem !important;
+    color: var(--kf-text-light);
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.adopter-contacts .adopter-label,
+.talk-adopters .adopter-label {
+    display: inline;
+    margin-right: 0.3rem;
+}
+
+.adopter-contact {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-right: 0.6rem;
+    white-space: nowrap;
+}
+
+.adopter-github-icon {
+    width: 0.9em;
+    height: 0.9em;
+    fill: currentColor;
+}
+
+.talk-date,
+.adopter-contacts {
+    color: var(--kf-text-light);
+    white-space: nowrap;
+}
+
+/* Talk cards */
+.talk-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+    font-size: 0.75rem;
+}
+
+.talk-type {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--kf-blue);
+    font-weight: 600;
+}
+
+.talk-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.talk-title a {
+    color: var(--kf-heading);
+    text-decoration: none;
+}
+
+.talk-title a:hover {
+    color: var(--kf-blue);
+}
+
+.talk-event {
+    margin-top: 0.4rem !important;
+    color: var(--kf-text-light);
+    font-size: 0.8rem;
+}
+
+.talk-adopters {
+    margin-top: auto !important;
+    padding-top: 0.6rem;
+    font-size: 0.8rem;
+}
+
+/* Blog post cards */
+a.blog-post-card {
+    color: var(--kf-heading);
+    text-decoration: none;
+}
+
+.blog-post-source {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--kf-border);
+    border-radius: 999px;
+    color: var(--kf-text-light);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.blog-post-source .community-icon {
+    color: var(--kf-blue);
+}
+
+.blog-post-title {
+    margin: 0.75rem 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.blog-post-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: auto;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--kf-border);
+    color: var(--kf-text-light);
+    font-size: 0.75rem;
 }
 
 /* ============================================
