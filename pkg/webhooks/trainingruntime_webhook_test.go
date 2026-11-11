@@ -538,3 +538,84 @@ func TestValidateScheduling(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateVolcanoPriorityClassName(t *testing.T) {
+	rJobsPath := field.NewPath("spec", "template", "spec", "replicatedJobs")
+	priorityClassNamePath := func(idx int) *field.Path {
+		return rJobsPath.Index(idx).Child("template", "spec", "template", "spec", "priorityClassName")
+	}
+	volcano := &trainer.PodGroupPolicy{PodGroupPolicySource: trainer.PodGroupPolicySource{
+		Volcano: &trainer.VolcanoPodGroupPolicySource{},
+	}}
+	coscheduling := &trainer.PodGroupPolicy{PodGroupPolicySource: trainer.PodGroupPolicySource{
+		Coscheduling: &trainer.CoschedulingPodGroupPolicySource{},
+	}}
+	specWith := func(policy *trainer.PodGroupPolicy, jobSet *testingutil.JobSetWrapper) *trainer.TrainingRuntimeSpec {
+		return &trainer.TrainingRuntimeSpec{
+			Template:       trainer.JobSetTemplateSpec{Spec: jobSet.Obj().Spec},
+			PodGroupPolicy: policy,
+		}
+	}
+
+	cases := map[string]struct {
+		spec      *trainer.TrainingRuntimeSpec
+		wantError field.ErrorList
+	}{
+		"volcano, no priorityClassName anywhere": {
+			spec: specWith(volcano, testingutil.MakeJobSetWrapper("ns", "valid")),
+		},
+		"volcano, priorityClassName on the trainer node only": {
+			spec: specWith(volcano, testingutil.MakeJobSetWrapper("ns", "valid").
+				PodPriorityClassNameForJobs("high-priority", constants.Node)),
+		},
+		"volcano, priorityClassName on a non-trainer job": {
+			spec: specWith(volcano, testingutil.MakeJobSetWrapper("ns", "valid").
+				PodPriorityClassNameForJobs("high-priority", constants.DatasetInitializer)),
+			wantError: field.ErrorList{
+				field.Invalid(priorityClassNamePath(0), "high-priority", ""),
+			},
+		},
+		// The deepspeed and mlx shape: the launcher carries the trainer ancestor label, so a value on
+		// the job named node is rejected even though that is where the training Pods run.
+		"volcano, priorityClassName on node when the launcher is the trainer ancestor": {
+			spec: specWith(volcano, testingutil.MakeJobSetWrapper("ns", "valid").
+				LauncherReplica().
+				ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+				ReplicatedJobLabel(constants.LabelTrainJobAncestor, "", constants.Node).
+				PodPriorityClassNameForJobs("high-priority", constants.Node)),
+			wantError: field.ErrorList{
+				field.Invalid(priorityClassNamePath(3), "high-priority", ""),
+			},
+		},
+		"volcano, priorityClassName on the launcher when it is the trainer ancestor": {
+			spec: specWith(volcano, testingutil.MakeJobSetWrapper("ns", "valid").
+				LauncherReplica().
+				ReplicatedJobLabel(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+				PodPriorityClassNameForJobs("high-priority", constants.Launcher)),
+		},
+		"volcano, priorityClassName on every job": {
+			spec: specWith(volcano, testingutil.MakeJobSetWrapper("ns", "valid").
+				PodPriorityClassName("high-priority")),
+			wantError: field.ErrorList{
+				field.Invalid(priorityClassNamePath(0), "high-priority", ""),
+				field.Invalid(priorityClassNamePath(1), "high-priority", ""),
+			},
+		},
+		"coscheduling is not covered by this rule": {
+			spec: specWith(coscheduling, testingutil.MakeJobSetWrapper("ns", "valid").
+				PodPriorityClassName("high-priority")),
+		},
+		"no podGroupPolicy is not covered by this rule": {
+			spec: specWith(nil, testingutil.MakeJobSetWrapper("ns", "valid").
+				PodPriorityClassName("high-priority")),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			gotErr := validateVolcanoPriorityClassName(tc.spec)
+			if diff := cmp.Diff(tc.wantError, gotErr, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); len(diff) != 0 {
+				t.Errorf("validateVolcanoPriorityClassName() mismatch (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
