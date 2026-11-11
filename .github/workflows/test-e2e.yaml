@@ -27,6 +27,8 @@ permissions:
 jobs:
   cpu-e2e-test:
     name: CPU E2E Test
+    # Runs take 65 to 76 minutes. Without a limit a hung job holds the runner for 6 hours.
+    timeout-minutes: 120
     runs-on: cncf-ubuntu-16-64-x86
     env:
       GOPATH: ${{ github.workspace }}/go
@@ -60,8 +62,9 @@ jobs:
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/question-answering/fine-tune-distilbert.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_fine-tune-distilbert.ipynb PAPERMILL_TIMEOUT=1800
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/speech-recognition/speech-recognition.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_speech-recognition.ipynb PAPERMILL_TIMEOUT=1800
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/audio-classification/audio-classification.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_audio-classification.ipynb PAPERMILL_TIMEOUT=1800
-          make test-e2e-notebook NOTEBOOK_INPUT=./examples/local/local-training-mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_local-training-mnist.ipynb PAPERMILL_TIMEOUT=1800
-          make test-e2e-notebook NOTEBOOK_INPUT=./examples/local/local-container-mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_local-container-mnist.ipynb PAPERMILL_TIMEOUT=1800
+          # The local notebooks take about 100 seconds, so a hung cell fails after 10 minutes, not 30.
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/local/local-training-mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_local-training-mnist.ipynb PAPERMILL_TIMEOUT=600
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/local/local-container-mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_local-container-mnist.ipynb PAPERMILL_TIMEOUT=600
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/xgboost/distributed-training/xgboost-distributed.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_xgboost-distributed.ipynb PAPERMILL_TIMEOUT=1800
 
       # TODO (andreyvelich): Discuss how we can upload artifacts for multiple Notebooks.
@@ -75,6 +78,8 @@ jobs:
 
   was-e2e-test:
     name: Workload-Aware Scheduling E2E Test
+    # Runs take 8 to 10 minutes.
+    timeout-minutes: 30
     runs-on: cncf-ubuntu-16-64-x86
 
     strategy:
