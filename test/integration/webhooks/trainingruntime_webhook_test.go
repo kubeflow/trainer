@@ -328,6 +328,27 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 				},
 				gomega.MatchError(gomega.ContainSubstring("replicatedJob name must be no more than 20 characters")),
 			),
+			ginkgo.Entry("Should succeed to create trainingRuntime with Torch policy and the trainer replicatedJob named node",
+				func() *trainer.TrainingRuntime {
+					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
+					runtime.Spec.MLPolicy = &trainer.MLPolicy{
+						MLPolicySource: trainer.MLPolicySource{Torch: &trainer.TorchMLPolicySource{}},
+					}
+					return runtime
+				},
+				gomega.Succeed(),
+			),
+			ginkgo.Entry("Should fail to create trainingRuntime with Torch policy and the trainer replicatedJob not named node",
+				func() *trainer.TrainingRuntime {
+					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
+					runtime.Spec.MLPolicy = &trainer.MLPolicy{
+						MLPolicySource: trainer.MLPolicySource{Torch: &trainer.TorchMLPolicySource{}},
+					}
+					runtime.Spec.Template.Spec.ReplicatedJobs[2].Name = "trainer"
+					return runtime
+				},
+				gomega.MatchError(gomega.ContainSubstring(`must be "node" for the replicatedJob labeled`)),
+			),
 			ginkgo.Entry("Should succeed to create trainingRuntime with TrainJob-level gang scheduling",
 				func() *trainer.TrainingRuntime {
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
