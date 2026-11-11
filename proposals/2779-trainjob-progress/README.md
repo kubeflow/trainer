@@ -253,17 +253,13 @@ Token-based authentication using projected service account tokens will be used t
 - if the feature gate is enabled the control plane will inject a serviceAccountToken projected volume with custom audience `trainer.kubeflow.org` into all containers of all pods of the train job.
 - the runtime will need to send this token as a bearer token in all status update requests.
 - on receiving a status update request, the control plane will authorise the token by:
-  1. validating the provided token using a TokenReview request. The audience must be `trainer.kubeflow.org`.
+  1. validating the provided token locally using OIDC discovery from the API server's internal `/.well-known/openid-configuration` endpoint. The audience must match the TrainJob-specific expected value.
   2. validating the pod is part of the train job by:
-    - getting the pod name/namespace from the `kubernetes.io` claim of the decoded jwt token
-    - looking up all the pods for the train job
-    - verifying that the source pod is in the list of pods for the train job
+    - checking the `kubernetes.io/namespace` claim matches the TrainJob namespace
 
-Note that the token does _not_ have permissions for the kubernetes API server due to the custom audience. The control plane also does _not_ require the service account that the token is associated with to be granted any RBAC permissions. It only requires that the token is a valid, comes from the API server, and was issued to a pod that belongs to the TrainJob.
+Note that the token does _not_ have permissions for the kubernetes API server due to the custom audience. The control plane also does _not_ require the service account that the token is associated with to be granted any RBAC permissions. It only requires that the token is valid, comes from the API server, and was issued to a pod that belongs to the TrainJob.
 
-The new endpoint must rate-limit requests and cache TokenReview responses to avoid a misconfigured TrainJob (examples: a job with many nodes which all send status updates simultaneously; a job that progresses very quickly) from triggering API server rate-limiting which may cause denial-of-service for other TrainJobs or for the reconciler itself. The rate-limiting should be keyed on the jwt subject claim (the service account name and namespace).
-
-Deliberate malicious attacks can be mitigated by validating the jwt token against the API server public key before performing the TokenReview request. Tokens that are definitely invalid would not cause any API server requests.
+The endpoint uses local OIDC validation which avoids API calls per request. This prevents misconfigured TrainJobs (examples: a job with many nodes which all send status updates simultaneously; a job that progresses very quickly) from causing DOS via excessive API server requests.
 
 The below summarises the volumes the control plane will inject if the feature gate is enabled:
 ```yaml

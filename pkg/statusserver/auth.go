@@ -18,14 +18,15 @@ package statusserver
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
-	"slices"
+	"net/http"
+	"os"
 	"strings"
 
-	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/apiserver/pkg/authentication/serviceaccount"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/coreos/go-oidc/v3/oidc"
+	"k8s.io/client-go/rest"
 )
 
 type TokenAuthorizer interface {
@@ -33,60 +34,188 @@ type TokenAuthorizer interface {
 	Authorize(ctx context.Context, rawIDToken, namespace, trainJobName string) (bool, error)
 }
 
-// +kubebuilder:rbac:groups=authentication.k8s.io,resources=tokenreviews,verbs=create
-
-type tokenReviewAuthorizer struct {
-	client client.Client
+type projectedServiceAccountTokenAuthorizer struct {
+	verifier *oidc.IDTokenVerifier
+	keySet   oidc.KeySet
+	issuer   string
+	config   *rest.Config
 }
 
-var _ TokenAuthorizer = &tokenReviewAuthorizer{}
+var _ TokenAuthorizer = &projectedServiceAccountTokenAuthorizer{}
 
-// NewTokenReviewAuthorizer creates a validator for checking a bearer token has permission to
-// update the requested train job. Tokens are validated by the Kubernetes API server using the
-// TokenReview API, so it works with any service account token issuer configured in the cluster.
-func NewTokenReviewAuthorizer(c client.Client) TokenAuthorizer {
-	return &tokenReviewAuthorizer{
-		client: c,
+// projectedToken is the decoded JWT claims of a k8s projected service account token.
+// Note: we only decode the subset of claims we actually need.
+type projectedToken struct {
+	Issuer     string `json:"iss"`
+	Kubernetes struct {
+		Namespace string `json:"namespace"`
+	} `json:"kubernetes.io"`
+}
+
+// serviceAccountTokenPath is the default path where Kubernetes mounts the service account token
+const serviceAccountTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+// internalAPIServerHost is the internal DNS name for the Kubernetes API server
+const internalAPIServerHost = "https://kubernetes.default.svc.cluster.local"
+
+// NewProjectedServiceAccountTokenAuthorizer creates a validator for checking a bearer token has permission to
+// update the requested train job. Tokens are validated locally using OIDC discovery from the Kubernetes
+// API server's internal endpoint, avoiding TokenReview API calls that could cause DOS.
+func NewProjectedServiceAccountTokenAuthorizer(config *rest.Config) TokenAuthorizer {
+	return &projectedServiceAccountTokenAuthorizer{
+		config: config,
 	}
 }
 
-// Init is a no-op: tokens are only reviewed when status updates are received, so the authorizer
-// does not depend on any external endpoint at startup.
-func (t *tokenReviewAuthorizer) Init(_ context.Context) error {
+func (p *projectedServiceAccountTokenAuthorizer) Init(ctx context.Context) error {
+	// Step 1: Read the issuer from the controller's own mounted service account token
+	// This works on all clusters (KinD, EKS, GKE, AKS) regardless of their issuer configuration
+	issuer, err := readIssuerFromServiceAccountToken()
+	if err != nil {
+		return fmt.Errorf("failed to read issuer from service account token: %w", err)
+	}
+	p.issuer = issuer
+
+	// Create an authenticated HTTP client using the provided rest config
+	httpClient, err := rest.HTTPClientFor(p.config)
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP client: %w", err)
+	}
+
+	// Create context with the authenticated HTTP client
+	ctx = oidc.ClientContext(ctx, httpClient)
+
+	// Step 2: Verify the internal discovery endpoint is accessible and get supported algorithms
+	// We fetch from internal endpoint but we DON'T pass internalAPIServerHost to NewProvider
+	// because that would fail issuer validation. Instead, we fetch discovery manually.
+	discoveryURL := internalAPIServerHost + "/.well-known/openid-configuration"
+	resp, err := httpClient.Get(discoveryURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch discovery document from %s: %w", discoveryURL, err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("discovery document request failed with status %d", resp.StatusCode)
+	}
+
+	var discoveryDoc struct {
+		Issuer     string   `json:"issuer"`
+		JWKSURI    string   `json:"jwks_uri"`
+		Algorithms []string `json:"id_token_signing_alg_values_supported"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&discoveryDoc); err != nil {
+		return fmt.Errorf("failed to parse discovery document: %w", err)
+	}
+
+	// Verify the discovery document's issuer matches what we read from the token
+	if discoveryDoc.Issuer != issuer {
+		return fmt.Errorf("issuer mismatch: token has %q but discovery document advertises %q", issuer, discoveryDoc.Issuer)
+	}
+
+	// Verify RS256 is supported
+	supportsRS256 := false
+	for _, alg := range discoveryDoc.Algorithms {
+		if alg == "RS256" {
+			supportsRS256 = true
+			break
+		}
+	}
+	if !supportsRS256 {
+		return fmt.Errorf("OIDC provider does not support RS256 algorithm (required for service account tokens)")
+	}
+
+	// Step 3: Build the key set explicitly against the internal JWKS endpoint
+	// This ignores the discovery document's jwks_uri (which points to external endpoints on EKS/GKE)
+	// and instead uses the internal JWKS endpoint directly
+	internalJWKSURL := internalAPIServerHost + "/openid/v1/jwks"
+	keySet := oidc.NewRemoteKeySet(ctx, internalJWKSURL)
+	p.keySet = keySet
+
+	// Step 4: Construct the verifier with the real cluster issuer and internal KeySet
+	// The verifier will check tokens against the actual cluster issuer (from Step 1)
+	// while fetching keys from the internal endpoint (from Step 3)
+	p.verifier = oidc.NewVerifier(issuer, keySet, &oidc.Config{
+		SkipClientIDCheck: true, // We check audience separately in Authorize()
+	})
+
 	return nil
 }
 
-func (t *tokenReviewAuthorizer) Authorize(ctx context.Context, authHeader, namespace, trainJobName string) (bool, error) {
-	log := ctrl.LoggerFrom(ctx).WithValues("namespace", namespace, "trainJobName", trainJobName)
+// readIssuerFromServiceAccountToken reads the controller's own service account token
+// and extracts the issuer claim. This gives us the real cluster issuer regardless of
+// whether it's kubernetes.default.svc.cluster.local (KinD), an EKS URL, or a GKE URL.
+func readIssuerFromServiceAccountToken() (string, error) {
+	// Read the token file
+	tokenBytes, err := os.ReadFile(serviceAccountTokenPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read service account token: %w", err)
+	}
+
+	token := string(tokenBytes)
+
+	// JWT tokens have three parts separated by dots: header.payload.signature
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return "", fmt.Errorf("service account token is not a valid JWT (expected 3 parts, got %d)", len(parts))
+	}
+
+	// Decode the payload (second part)
+	payloadJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", fmt.Errorf("failed to decode token payload: %w", err)
+	}
+
+	// Parse the payload to extract the issuer
+	var claims struct {
+		Issuer string `json:"iss"`
+	}
+	if err := json.Unmarshal(payloadJSON, &claims); err != nil {
+		return "", fmt.Errorf("failed to parse token claims: %w", err)
+	}
+
+	if claims.Issuer == "" {
+		return "", fmt.Errorf("service account token does not contain an issuer claim")
+	}
+
+	return claims.Issuer, nil
+}
+
+func (p *projectedServiceAccountTokenAuthorizer) Authorize(ctx context.Context, authHeader, namespace, trainJobName string) (bool, error) {
+	if p.verifier == nil {
+		return false, fmt.Errorf("OIDC verifier has not been initialized")
+	}
 
 	rawToken := extractRawToken(authHeader)
 	if rawToken == "" {
-		log.V(5).Info("Missing or malformed bearer token")
 		return false, nil
 	}
 
-	// Ask the API server to check the token signature, expiry, bound pod and the TrainJob-specific audience.
+	// Create a verifier with TrainJob-specific audience check
 	expectedAudience := TokenAudience(namespace, trainJobName)
-	review := &authenticationv1.TokenReview{
-		Spec: authenticationv1.TokenReviewSpec{
-			Token:     rawToken,
-			Audiences: []string{expectedAudience},
-		},
-	}
-	if err := t.client.Create(ctx, review); err != nil {
-		return false, fmt.Errorf("failed to review token: %w", err)
-	}
-	if !review.Status.Authenticated || !slices.Contains(review.Status.Audiences, expectedAudience) {
-		log.V(5).Info("Token review rejected", "authenticated", review.Status.Authenticated,
-			"audiences", review.Status.Audiences, "error", review.Status.Error)
+
+	// Create a new verifier with audience check for this specific request
+	// We reuse the stored keySet which points to the internal JWKS endpoint
+	verifierWithAudience := oidc.NewVerifier(p.issuer, p.keySet, &oidc.Config{
+		ClientID: expectedAudience,
+	})
+
+	// Verify token signature, expiry, issuer, and audience
+	idToken, err := verifierWithAudience.Verify(ctx, rawToken)
+	if err != nil {
+		// Token verification failed (invalid signature, expired, wrong audience, etc.)
 		return false, nil
 	}
 
-	// Check token is issued to a service account in the same namespace as the train job
-	tokenNamespace, _, err := serviceaccount.SplitUsername(review.Status.User.Username)
-	if err != nil || tokenNamespace != namespace {
-		log.V(5).Info("Token is not issued to a service account in the train job namespace",
-			"username", review.Status.User.Username)
+	// Check token is bound to a pod in the same namespace as the train job
+	parsedToken := projectedToken{}
+	if err := idToken.Claims(&parsedToken); err != nil {
+		return false, nil
+	}
+
+	if parsedToken.Kubernetes.Namespace != namespace {
 		return false, nil
 	}
 
