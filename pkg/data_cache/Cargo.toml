@@ -14,7 +14,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 async-trait = "0.1.89"
 iceberg-datafusion = "0.10.1"
 iceberg = "0.10.1"
-iceberg-storage-opendal = "0.10.1"
+iceberg-storage-opendal = "0.11.0"
 futures = "0.3.32"
 arrow-flight = "58"
 tonic = "0.14"
