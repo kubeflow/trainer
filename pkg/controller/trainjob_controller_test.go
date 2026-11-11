@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -154,6 +155,26 @@ func TestReconcileDeadline(t *testing.T) {
 			jobSet:     utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "deadline-job").Obj(),
 			now:        created.Add(time.Hour),
 			wantResult: ctrl.Result{},
+			wantJobSet: true,
+		},
+		"deadline seconds above the int64 nanosecond range are clamped to a distant deadline instead of failing": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
+				CreationTimestamp(created).
+				ActiveDeadlineSeconds(9223372037).
+				Obj(),
+			jobSet:     utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "deadline-job").Obj(),
+			now:        created.Time,
+			wantResult: ctrl.Result{RequeueAfter: time.Duration(math.MaxInt64/int64(time.Second)) * time.Second},
+			wantJobSet: true,
+		},
+		"deadline seconds set to math.MaxInt64 are clamped instead of overflowing": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
+				CreationTimestamp(created).
+				ActiveDeadlineSeconds(math.MaxInt64).
+				Obj(),
+			jobSet:     utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "deadline-job").Obj(),
+			now:        created.Time,
+			wantResult: ctrl.Result{RequeueAfter: time.Duration(math.MaxInt64/int64(time.Second)) * time.Second},
 			wantJobSet: true,
 		},
 		"finished TrainJob is not failed again once the deadline passes": {
