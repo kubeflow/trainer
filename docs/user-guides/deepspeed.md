@@ -28,6 +28,10 @@ ZeRO has three stages:
 - **ZeRO Stage 2**: Partitions optimizer states and gradients across processes.
 - **ZeRO Stage 3**: Partitions optimizer states, gradients, and model parameters across processes.
 
+:::{note}
+DeepSpeed can be orchestrated using either the default OpenMPI launcher (`mpirun`) or the PyTorch elastic launcher (`torchrun`). For annotated `TrainingRuntime` YAML configurations, ConfigMap setup, and architectural comparisons, see the [Distributed Training Runtimes Guide](../operator-guides/distributed-training-runtimes).
+:::
+
 ## Get DeepSpeed Runtime Packages
 
 Kubeflow Trainer includes a DeepSpeed runtime called [`deepspeed-distributed`](https://github.com/kubeflow/trainer/blob/master/manifests/base/runtimes/deepspeed_distributed.yaml),
@@ -313,6 +317,7 @@ Key configuration sections include:
 
 ## Next Steps
 
+- Explore [DeepSpeed TrainingRuntime configurations with Torch and MPI plugins](../operator-guides/distributed-training-runtimes).
 - Check out [the DeepSpeed T5 example](https://github.com/kubeflow/trainer/blob/master/examples/deepspeed/text-summarization/T5-Fine-Tuning.ipynb).
 - Learn more about `TrainerClient()` APIs [in the Kubeflow SDK](https://github.com/kubeflow/sdk/blob/main/kubeflow/trainer/api/trainer_client.py).
 - Explore [DeepSpeed documentation](https://www.deepspeed.ai/) for advanced configuration options.
