@@ -35,9 +35,25 @@ class HuggingFace(utils.DatasetProvider):
 
     def download_dataset(self):
         storage_uri_parsed = urlparse(self.config.storage_uri)
-        dataset_uri = (
-            storage_uri_parsed.netloc + "/" + storage_uri_parsed.path.split("/")[1]
+        # A dataset repo id is the first one or two path segments: `hf://imdb` names a
+        # dataset repo without a namespace, `hf://owner/imdb` one with a namespace.
+        # Anything after the repo id is a path inside the repo, not part of the id.
+        dataset_uri = "/".join(
+            [
+                part
+                for part in (
+                    storage_uri_parsed.netloc,
+                    *storage_uri_parsed.path.split("/"),
+                )
+                if part
+            ][:2]
         )
+
+        if not dataset_uri:
+            raise ValueError(
+                f"Invalid Hugging Face dataset URI: {self.config.storage_uri}. "
+                "Expected hf://<dataset> or hf://<namespace>/<dataset>."
+            )
 
         logging.info(f"Downloading dataset: {dataset_uri}")
         logging.info("-" * 40)

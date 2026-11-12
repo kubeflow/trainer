@@ -84,6 +84,30 @@ def test_load_config(test_name, test_config, expected):
                 "expected_repo_id": "org/dataset-v1",
             },
         ),
+        (
+            "Dataset without a namespace",
+            {
+                "config": {
+                    "storage_uri": "hf://imdb",
+                    "ignore_patterns": None,
+                    "access_token": None,
+                },
+                "should_login": False,
+                "expected_repo_id": "imdb",
+            },
+        ),
+        (
+            "Path inside the dataset repo is not part of the repo id",
+            {
+                "config": {
+                    "storage_uri": "hf://org/dataset-v1/data/train",
+                    "ignore_patterns": None,
+                    "access_token": None,
+                },
+                "should_login": False,
+                "expected_repo_id": "org/dataset-v1",
+            },
+        ),
     ],
 )
 def test_download_dataset(test_name, test_case):
@@ -115,3 +139,18 @@ def test_download_dataset(test_name, test_case):
             ignore_patterns=test_case["config"]["ignore_patterns"],
         )
     print("Test execution completed")
+
+
+def test_download_dataset_rejects_uri_without_repo_id():
+    """A storage URI without a repo id must fail clearly instead of raising IndexError"""
+
+    huggingface_dataset_instance = HuggingFace()
+    huggingface_dataset_instance.config = MagicMock(
+        storage_uri="hf://", ignore_patterns=None, access_token=None
+    )
+
+    with patch("huggingface_hub.snapshot_download") as mock_download:
+        with pytest.raises(ValueError, match="Invalid Hugging Face dataset URI"):
+            huggingface_dataset_instance.download_dataset()
+
+        mock_download.assert_not_called()
