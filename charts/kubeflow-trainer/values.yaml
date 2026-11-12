@@ -176,6 +176,7 @@ manager:
   # -- PodDisruptionBudget for manager pods. Disabled by default (no behavior change).
   # Use it with `manager.replicas` of 2 or more, since a PDB on a single replica blocks node drains.
   podDisruptionBudget:
+    # -- Whether to create a PodDisruptionBudget for manager pods.
     enabled: false
     # -- Minimum number of manager pods that must remain available during a voluntary disruption.
     minAvailable: 1

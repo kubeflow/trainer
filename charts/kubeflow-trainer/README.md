@@ -216,6 +216,7 @@ more than one replica:
 | manager.config.statusServer.qps | int | `5` | QPS rate limit for the TrainJob status server API client, used for both token reviews and status updates |
 | manager.config.statusServer.burst | int | `10` | Burst rate limit for the TrainJob status server API client, used for both token reviews and status updates |
 | manager.podDisruptionBudget | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget for manager pods. Disabled by default (no behavior change). Use it with `manager.replicas` of 2 or more, since a PDB on a single replica blocks node drains. |
+| manager.podDisruptionBudget.enabled | bool | `false` | Whether to create a PodDisruptionBudget for manager pods. |
 | manager.podDisruptionBudget.minAvailable | int | `1` | Minimum number of manager pods that must remain available during a voluntary disruption. |
 | prometheus.enabled | bool | `false` | Whether to create a Prometheus Operator ServiceMonitor. |
 | prometheus.labels | object | `{}` | Additional labels for selecting this ServiceMonitor from Prometheus. |
