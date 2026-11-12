@@ -42,6 +42,7 @@ func SetupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, opt
 	}
 	if err := NewTrainJobReconciler(
 		mgr.GetClient(),
+		mgr.GetAPIReader(),
 		mgr.GetEventRecorder("trainer-trainjob-controller"),
 		runtimes,
 	).SetupWithManager(mgr, options); err != nil {

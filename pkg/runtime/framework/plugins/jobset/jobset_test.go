@@ -3784,9 +3784,46 @@ func TestBuild(t *testing.T) {
 	cases := map[string]struct {
 		info      *runtime.Info
 		trainJob  *trainer.TrainJob
+		objs      []client.Object
 		wantObjs  []apiruntime.Object
 		wantError error
 	}{
+		"JobSet controlled by another TrainJob with the same name is not treated as created": {
+			info: &runtime.Info{},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("test-job-uid").
+				Obj(),
+			objs: []client.Object{
+				utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "deleted-test-job-uid").
+					Obj(),
+			},
+			wantError: fmt.Errorf("%w: %s/test-job", errorJobSetNotControlledByTrainJob, metav1.NamespaceDefault),
+		},
+		"JobSet without a controller is not updated while the TrainJob is suspended": {
+			info: &runtime.Info{},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("test-job-uid").
+				Suspend(true).
+				Obj(),
+			objs: []client.Object{
+				utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					Suspend(true).
+					Obj(),
+			},
+			wantError: fmt.Errorf("%w: %s/test-job", errorJobSetNotControlledByTrainJob, metav1.NamespaceDefault),
+		},
+		"running JobSet controlled by the TrainJob is left untouched": {
+			info: &runtime.Info{},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("test-job-uid").
+				Obj(),
+			objs: []client.Object{
+				utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "test-job-uid").
+					Obj(),
+			},
+		},
 		"init containers synced to JobSet replicated jobs": {
 			info: &runtime.Info{
 				Labels:      make(map[string]string),
@@ -4209,7 +4246,7 @@ func TestBuild(t *testing.T) {
 			var cancel func()
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
-			cli := utiltesting.NewClientBuilder().Build()
+			cli := utiltesting.NewClientBuilder().WithObjects(tc.objs...).Build()
 			p, err := New(ctx, cli, nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize JobSet plugin: %v", err)

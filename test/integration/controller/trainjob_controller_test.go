@@ -218,6 +218,53 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 				}, util.ConsistentDuration, util.Interval).Should(gomega.Succeed())
 			})
 
+			ginkgo.It("Should not use the JobSet of a deleted TrainJob with the same name", func() {
+				ginkgo.By("Creating a completed JobSet controlled by a TrainJob that no longer exists")
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				oldJobSet := testingutil.MakeJobSetWrapper(ns.Name, trainJobKey.Name).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, "deleted-trainjob-uid").
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, oldJobSet)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, trainJobKey, oldJobSet)).Should(gomega.Succeed())
+					meta.SetStatusCondition(&oldJobSet.Status.Conditions, metav1.Condition{
+						Type:    string(jobsetv1alpha2.JobSetCompleted),
+						Reason:  jobsetconsts.AllJobsCompletedReason,
+						Message: jobsetconsts.AllJobsCompletedMessage,
+						Status:  metav1.ConditionTrue,
+					})
+					g.Expect(k8sClient.Status().Update(ctx, oldJobSet)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Creating a TrainJob with the same name")
+				trainJob.Spec.Suspend = ptr.To(false)
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Checking that the TrainJob does not take the Complete condition of that JobSet")
+				gomega.Consistently(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(meta.IsStatusConditionTrue(gotTrainJob.Status.Conditions, trainer.TrainJobComplete)).Should(gomega.BeFalse())
+					gotJobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotJobSet)).Should(gomega.Succeed())
+					g.Expect(gotJobSet.UID).Should(gomega.Equal(oldJobSet.UID))
+				}, util.ConsistentDuration, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Checking that the TrainJob creates its own JobSet once the old one is gone")
+				gomega.Expect(k8sClient.Delete(ctx, oldJobSet)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					gotJobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotJobSet)).Should(gomega.Succeed())
+					g.Expect(metav1.IsControlledBy(gotJobSet, gotTrainJob)).Should(gomega.BeTrue())
+					g.Expect(meta.IsStatusConditionTrue(gotTrainJob.Status.Conditions, trainer.TrainJobComplete)).Should(gomega.BeFalse())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
 			ginkgo.It("Should succeeded to update JobSet when TrainJob is suspended", func() {
 				ginkgo.By("Creating TrainingRuntime and suspended TrainJob")
 				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())

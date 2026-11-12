@@ -49,10 +49,13 @@ import (
 )
 
 type TrainJobReconciler struct {
-	log      logr.Logger
-	client   client.Client
-	recorder events.EventRecorder
-	runtimes map[string]jobruntimes.Runtime
+	log    logr.Logger
+	client client.Client
+	// apiReader reads from the API server, so that a JobSet created in the same
+	// reconciliation is visible before the cache observes it.
+	apiReader client.Reader
+	recorder  events.EventRecorder
+	runtimes  map[string]jobruntimes.Runtime
 	// clock is the time source for the activeDeadlineSeconds arithmetic. Tests
 	// substitute a fake clock so the requeue delay can be asserted exactly.
 	clock clock.PassiveClock
@@ -63,15 +66,17 @@ var _ predicate.TypedPredicate[*trainer.TrainJob] = (*TrainJobReconciler)(nil)
 
 func NewTrainJobReconciler(
 	client client.Client,
+	apiReader client.Reader,
 	recorder events.EventRecorder,
 	runtimes map[string]jobruntimes.Runtime,
 ) *TrainJobReconciler {
 	return &TrainJobReconciler{
-		log:      ctrl.Log.WithName("trainjob-controller"),
-		client:   client,
-		recorder: recorder,
-		runtimes: runtimes,
-		clock:    clock.RealClock{},
+		log:       ctrl.Log.WithName("trainjob-controller"),
+		client:    client,
+		apiReader: apiReader,
+		recorder:  recorder,
+		runtimes:  runtimes,
+		clock:     clock.RealClock{},
 	}
 }
 
@@ -192,8 +197,16 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 		// TODO(#3833): a failed JobSet delete is only logged here and never retried, since the
 		// TrainJob is already Failed on the next reconcile. Moving this deletion to a JobSet
 		// ComponentDeleterPlugin would let reconcileObjects retry it.
-		jobSet := &jobsetv1alpha2.JobSet{
-			ObjectMeta: metav1.ObjectMeta{Name: trainJob.Name, Namespace: trainJob.Namespace},
+		jobSet := &jobsetv1alpha2.JobSet{}
+		if err := r.apiReader.Get(ctx, client.ObjectKeyFromObject(trainJob), jobSet); err != nil {
+			if client.IgnoreNotFound(err) != nil {
+				ctrl.LoggerFrom(ctx).V(2).Info("Failed to get JobSet after deadline exceeded", "error", err)
+			}
+			return ctrl.Result{}
+		}
+		// Only delete the JobSet that this TrainJob controls, not another one with the same name.
+		if !metav1.IsControlledBy(jobSet, trainJob) {
+			return ctrl.Result{}
 		}
 		if err := client.IgnoreNotFound(r.client.Delete(ctx, jobSet)); err != nil {
 			ctrl.LoggerFrom(ctx).V(2).Info("Failed to delete JobSet after deadline exceeded", "error", err)

@@ -62,6 +62,7 @@ var (
 
 	errorInvalidReplicas                = errors.New("replicatedJob replicas must be greater than or equal to 1")
 	errorPodCountNotDivisibleByReplicas = errors.New("replicatedJob Pod count must be divisible by replicas")
+	errorJobSetNotControlledByTrainJob  = errors.New("JobSet with the TrainJob name exists and is not controlled by the TrainJob")
 )
 
 type JobSet struct {
@@ -526,6 +527,11 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 		}
 		oldJobSet = nil
 	}
+	// A JobSet that this TrainJob does not control must be neither updated nor treated as
+	// already created, e.g. the JobSet of a deleted TrainJob with the same name.
+	if oldJobSet != nil && !metav1.IsControlledBy(oldJobSet, trainJob) {
+		return nil, fmt.Errorf("%w: %s/%s", errorJobSetNotControlledByTrainJob, oldJobSet.Namespace, oldJobSet.Name)
+	}
 	if oldJobSet != nil &&
 		!ptr.Deref(trainJob.Spec.Suspend, false) &&
 		!ptr.Deref(oldJobSet.Spec.Suspend, false) {
@@ -641,6 +647,10 @@ func (j *JobSet) Status(ctx context.Context, trainJob *trainer.TrainJob) (*train
 			return nil, nil
 		}
 		return nil, err
+	}
+	// The conditions of a JobSet that this TrainJob does not control say nothing about it.
+	if !metav1.IsControlledBy(jobSet, trainJob) {
+		return nil, nil
 	}
 	status := trainJob.Status.DeepCopy()
 
