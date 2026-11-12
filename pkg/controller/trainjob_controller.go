@@ -231,26 +231,25 @@ func (r *TrainJobReconciler) Generic(e event.TypedGenericEvent[*trainer.TrainJob
 }
 
 func setSuspendedCondition(trainJob *trainer.TrainJob) {
-	var newCond metav1.Condition
-	switch {
-	case ptr.Deref(trainJob.Spec.Suspend, false):
-		newCond = metav1.Condition{
+	if ptr.Deref(trainJob.Spec.Suspend, false) {
+		meta.SetStatusCondition(&trainJob.Status.Conditions, metav1.Condition{
 			Type:    trainer.TrainJobSuspended,
 			Status:  metav1.ConditionTrue,
 			Message: constants.TrainJobSuspendedMessage,
 			Reason:  trainer.TrainJobSuspendedReason,
-		}
-	case meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobSuspended):
-		newCond = metav1.Condition{
+		})
+		return
+	}
+
+	cond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobSuspended)
+	if cond != nil && cond.Status == metav1.ConditionTrue && cond.Reason == trainer.TrainJobSuspendedReason {
+		meta.SetStatusCondition(&trainJob.Status.Conditions, metav1.Condition{
 			Type:    trainer.TrainJobSuspended,
 			Status:  metav1.ConditionFalse,
 			Message: constants.TrainJobResumedMessage,
 			Reason:  trainer.TrainJobResumedReason,
-		}
-	default:
-		return
+		})
 	}
-	meta.SetStatusCondition(&trainJob.Status.Conditions, newCond)
 }
 
 func setFailedCondition(trainJob *trainer.TrainJob, message, reason string) {
