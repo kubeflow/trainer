@@ -58,6 +58,8 @@ var (
 type TrainingRuntime struct {
 	framework *fwkcore.Framework
 	client    client.Client
+	// apiReader reads directly from the API server, bypassing the informer cache.
+	apiReader client.Reader
 }
 
 var TrainingRuntimeGroupKind = schema.GroupKind{
@@ -69,7 +71,7 @@ var _ runtime.Runtime = (*TrainingRuntime)(nil)
 
 var trainingRuntimeFactory *TrainingRuntime
 
-func NewTrainingRuntime(ctx context.Context, c client.Client, indexer client.FieldIndexer, cfg *configapi.Configuration) (runtime.Runtime, error) {
+func NewTrainingRuntime(ctx context.Context, c client.Client, apiReader client.Reader, indexer client.FieldIndexer, cfg *configapi.Configuration) (runtime.Runtime, error) {
 	if err := indexer.IndexField(ctx, &trainer.TrainJob{}, idxer.TrainJobRuntimeRefKey, idxer.IndexTrainJobTrainingRuntime); err != nil {
 		return nil, fmt.Errorf("setting index on TrainingRuntime for TrainJob: %w", err)
 	}
@@ -83,6 +85,7 @@ func NewTrainingRuntime(ctx context.Context, c client.Client, indexer client.Fie
 	trainingRuntimeFactory = &TrainingRuntime{
 		framework: fwk,
 		client:    c,
+		apiReader: apiReader,
 	}
 	return trainingRuntimeFactory, nil
 }
@@ -103,7 +106,15 @@ func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.Trai
 
 		// Create snapshot for future reconciliations
 		if err := createRuntimeSnapshot(ctx, r.client, trainJob, &trainingRuntime); err != nil {
-			return nil, fmt.Errorf("creating runtime snapshot: %w", err)
+			if !apierrors.IsAlreadyExists(err) {
+				return nil, fmt.Errorf("creating runtime snapshot: %w", err)
+			}
+			// The snapshot already exists: the cached read above was stale, or another reconcile created it
+			// first. The existing snapshot is authoritative, so use it instead of the live runtime.
+			trainingRuntime = trainer.TrainingRuntime{}
+			if err := getRuntimeSnapshot(ctx, r.apiReader, trainJob, &trainingRuntime); err != nil {
+				return nil, fmt.Errorf("unable to get existing runtime snapshot: %w", err)
+			}
 		}
 	}
 
