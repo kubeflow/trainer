@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -70,11 +71,12 @@ const Name = "Volcano"
 // +kubebuilder:rbac:groups=scheduling.volcano.sh,resources=podgroups,verbs=create;get;list;watch;update;patch;delete
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=priorityclasses,verbs=get;list;watch
 
-func New(_ context.Context, client client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
+func New(ctx context.Context, client client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
 	v := &Volcano{
 		client:     client,
 		restMapper: client.RESTMapper(),
 		scheme:     client.Scheme(),
+		logger:     ctrl.LoggerFrom(ctx).WithValues("pluginName", Name),
 	}
 	v.podGroupCRDInstalled = sync.OnceValue(func() bool {
 		_, err := v.restMapper.RESTMapping(
