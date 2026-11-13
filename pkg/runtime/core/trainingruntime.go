@@ -101,6 +101,12 @@ func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.Trai
 			return nil, fmt.Errorf("%w: %w", errorNotFoundSpecifiedTrainingRuntime, err)
 		}
 
+		// Validate the exact runtime that is about to be snapshotted. The webhook validated the TrainJob
+		// against the runtime as it was at admission, which may have changed since.
+		if _, errs := r.validateRuntime(ctx, &trainingRuntime, nil, trainJob); len(errs) != 0 {
+			return nil, runtime.NewValidationError(errs)
+		}
+
 		// Create snapshot for future reconciliations
 		if err := createRuntimeSnapshot(ctx, r.client, trainJob, &trainingRuntime); err != nil {
 			return nil, fmt.Errorf("creating runtime snapshot: %w", err)
@@ -340,6 +346,11 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 			}
 		}
 	}
+	return r.validateRuntime(ctx, trainingRuntime, old, new)
+}
+
+// validateRuntime validates the TrainJob against the given runtime.
+func (r *TrainingRuntime) validateRuntime(ctx context.Context, trainingRuntime *trainer.TrainingRuntime, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var warnings admission.Warnings
 	if trainingruntimeutil.IsSupportDeprecated(trainingRuntime.Labels) {
 		warnings = append(warnings, fmt.Sprintf(
