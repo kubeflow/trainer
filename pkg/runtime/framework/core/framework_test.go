@@ -2555,8 +2555,10 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 		"jobSet has not been finalized, yet": {
 			registry: fwkplugins.NewRegistry(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				UID("testing-uid").
 				Obj(),
 			jobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "testing", "testing-uid").
 				Conditions(metav1.Condition{
 					Type:    string(jobsetv1alpha2.JobSetSuspended),
 					Reason:  jobsetconsts.JobSetSuspendedReason,
@@ -2569,8 +2571,10 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 		"succeeded to obtain completed terminal condition": {
 			registry: fwkplugins.NewRegistry(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				UID("testing-uid").
 				Obj(),
 			jobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "testing", "testing-uid").
 				Conditions(metav1.Condition{
 					Type:               string(jobsetv1alpha2.JobSetCompleted),
 					LastTransitionTime: lastTransitionTime,
@@ -2594,8 +2598,10 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 		"succeeded to obtain failed terminal condition": {
 			registry: fwkplugins.NewRegistry(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				UID("testing-uid").
 				Obj(),
 			jobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "testing", "testing-uid").
 				Conditions(metav1.Condition{
 					Type:               string(jobsetv1alpha2.JobSetFailed),
 					LastTransitionTime: lastTransitionTime,
@@ -2616,6 +2622,37 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 				},
 			},
 		},
+		"jobSet controlled by another TrainJob with the same name is ignored": {
+			registry: fwkplugins.NewRegistry(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				UID("testing-uid").
+				Obj(),
+			jobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "testing", "deleted-testing-uid").
+				Conditions(metav1.Condition{
+					Type:               string(jobsetv1alpha2.JobSetCompleted),
+					LastTransitionTime: lastTransitionTime,
+					Message:            jobsetconsts.AllJobsCompletedMessage,
+					Reason:             jobsetconsts.AllJobsCompletedReason,
+					Status:             metav1.ConditionTrue,
+				}).
+				Obj(),
+		},
+		"jobSet without a controller is ignored": {
+			registry: fwkplugins.NewRegistry(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				UID("testing-uid").
+				Obj(),
+			jobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				Conditions(metav1.Condition{
+					Type:               string(jobsetv1alpha2.JobSetFailed),
+					LastTransitionTime: lastTransitionTime,
+					Message:            jobsetconsts.FailedJobsMessage,
+					Reason:             jobsetconsts.FailedJobsReason,
+					Status:             metav1.ConditionTrue,
+				}).
+				Obj(),
+		},
 		"failed to obtain TrainJob status due to multiple trainJobStatus plugin": {
 			registry: fwkplugins.Registry{
 				jobset.Name:              jobset.New,
@@ -2626,16 +2663,20 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 		"JobSet with empty replicated jobs status": {
 			registry: fwkplugins.NewRegistry(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				UID("testing-uid").
 				Obj(),
 			jobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "testing", "testing-uid").
 				Obj(),
 			wantStatus: &trainer.TrainJobStatus{},
 		},
 		"succeeded to obtain JobsStatus from JobSet with multiple replicated jobs": {
 			registry: fwkplugins.NewRegistry(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				UID("testing-uid").
 				Obj(),
 			jobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "testing", "testing-uid").
 				ReplicatedJobsStatuses([]jobsetv1alpha2.ReplicatedJobStatus{
 					{
 						Name:      constants.DatasetInitializer,
@@ -2695,8 +2736,10 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 		"succeeded to obtain JobsStatus from JobSet with failed job": {
 			registry: fwkplugins.NewRegistry(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				UID("testing-uid").
 				Obj(),
 			jobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "testing", "testing-uid").
 				ReplicatedJobsStatuses([]jobsetv1alpha2.ReplicatedJobStatus{
 					{
 						Name:      constants.Node,
