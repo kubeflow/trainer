@@ -78,3 +78,17 @@ class CacheDatasetInitializer:
     readiness_period_seconds: str = "10"
     readiness_timeout_seconds: str = "5"
     readiness_failure_threshold: str = "3"
+
+
+# Configuration for the Kaggle dataset initializer.
+@dataclass
+class KaggleDatasetInitializer:
+    storage_uri: str
+    access_token: Optional[str] = None
+
+
+# Configuration for the Kaggle model initializer.
+@dataclass
+class KaggleModelInitializer:
+    storage_uri: str
+    access_token: Optional[str] = None

@@ -48,11 +48,15 @@ def main():
             from pkg.initializers.dataset.s3 import S3
 
             provider_cls = S3
+        case utils.KAGGLE_SCHEME:
+            from pkg.initializers.dataset.kaggle import Kaggle
+
+            provider_cls = Kaggle
         case _:
             raise ValueError(
                 f"Unsupported dataset storage URI scheme {scheme!r}: "
                 f"expected one of {utils.HF_SCHEME!r}, "
-                f"{utils.CACHE_SCHEME!r}, or {utils.S3_SCHEME!r}"
+                f"{utils.CACHE_SCHEME!r}, {utils.S3_SCHEME!r}, or {utils.KAGGLE_SCHEME!r}"
             )
 
     provider = provider_cls()
