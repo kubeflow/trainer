@@ -96,6 +96,15 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
+	// A TrainJob being deleted must not be reconciled. With foreground deletion, the TrainJob
+	// remains visible until the garbage collector has removed its dependents, and each removal
+	// of the owned JobSet triggers a new reconciliation. Proceeding would re-create the JobSet
+	// (and its Jobs and Pods) and loop until the garbage collector wins the race.
+	if !trainJob.DeletionTimestamp.IsZero() {
+		log.V(2).Info("Skipping TrainJob being deleted")
+		return ctrl.Result{}, nil
+	}
+
 	var err error
 	// Keep track of the origin TrainJob status
 	prevTrainJob := trainJob.DeepCopy()
