@@ -311,8 +311,250 @@ Key configuration sections include:
 }
 ```
 
-## Next Steps
+## DeepSpeed Configuration through the Torch Plugin
 
+Kubeflow Trainer supports [DeepSpeed](https://www.deepspeed.ai/) distributed training through
+the Torch plugin, which uses the [`torchrun` utility](https://docs.pytorch.org/docs/elastic/run.html)
+to launch distributed PyTorch processes. DeepSpeed configuration is provided through a JSON
+configuration file that is mounted into the training container, and the `torchrun` command
+receives the `--deepspeed` argument pointing to that file.
+
+### TrainingRuntime Configuration
+
+The following example shows a `TrainingRuntime` with the Torch policy configured to inject
+the `PET_*` environment variables required by `torchrun`. The DeepSpeed configuration file
+is provided via a ConfigMap that is mounted into the training container at `/etc/deepspeed/config.json`.
+
+```yaml
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Example: DeepSpeed configuration through the Torch plugin.
+#
+# This TrainingRuntime configures the Torch plugin to inject PET_* environment variables.
+# The DeepSpeed config JSON is supplied via a separate ConfigMap that is mounted into
+# the training container at /etc/deepspeed/config.json.
+#
+# Apply: kubectl apply -f deepspeed-trainingruntime.yaml
+# Check: kubectl get trainingruntime deepspeed-runtime
+# Logs:  kubectl logs -l jobset.sigs.k8s.io/jobset-name=deepspeed-example
+# Clean: kubectl delete trainingruntime deepspeed-runtime
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainingRuntime
+metadata:
+  name: deepspeed-runtime
+spec:
+  mlPolicy:
+    torch:
+      envInjection:
+        targets:
+          - jobName: node
+            containerNames:
+              - node
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deepspeed-config
+  namespace: default
+data:
+  config.json: |
+    {
+      "train_micro_batch_size_per_gpu": 2,
+      "gradient_accumulation_steps": 1,
+      "optimizer": {
+        "type": "AdamW",
+        "params": {
+          "lr": 3e-4,
+          "betas": [0.9, 0.95],
+          "eps": 1e-8,
+          "weight_decay": 0.1
+        }
+      },
+      "bf16": {"enabled": true},
+      "zero_optimization": {
+        "stage": 2,
+        "allgather_partitions": true,
+        "allgather_bucket_size": 5e8,
+        "overlap_comm": true,
+        "reduce_scatter": true,
+        "reduce_bucket_size": 5e8,
+        "contiguous_gradients": true
+      }
+    }
+```
+
+
+## DeepSpeed Configuration through the Torch Plugin
+
+Kubeflow Trainer supports [DeepSpeed](https://www.deepspeed.ai/) distributed training through
+the Torch plugin, which uses the [`torchrun` utility](https://docs.pytorch.org/docs/elastic/run.html)
+to launch distributed PyTorch processes. DeepSpeed configuration is provided through a JSON
+configuration file that is mounted into the training container, and the `torchrun` command
+receives the `--deepspeed` argument pointing to that file.
+
+### TrainingRuntime Configuration
+
+The following example shows a `TrainingRuntime` with the Torch policy configured to inject
+the `PET_*` environment variables required by `torchrun`. The DeepSpeed configuration file
+is provided via a ConfigMap that is mounted into the training container at `/etc/deepspeed/config.json`.
+
+```yaml
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Example: DeepSpeed configuration through the Torch plugin.
+#
+# This TrainingRuntime configures the Torch plugin to inject PET_* environment variables.
+# The DeepSpeed config JSON is supplied via a separate ConfigMap that is mounted into
+# the training container at /etc/deepspeed/config.json.
+#
+# Apply: kubectl apply -f deepspeed-trainingruntime.yaml
+# Check: kubectl get trainingruntime deepspeed-runtime
+# Logs:  kubectl logs -l jobset.sigs.k8s.io/jobset-name=deepspeed-example
+# Clean: kubectl delete trainingruntime deepspeed-runtime
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainingRuntime
+metadata:
+  name: deepspeed-runtime
+spec:
+  mlPolicy:
+    torch:
+      envInjection:
+        targets:
+          - jobName: node
+            containerNames:
+              - node
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deepspeed-config
+  namespace: default
+data:
+  config.json: |
+    {
+      "train_micro_batch_size_per_gpu": 2,
+      "gradient_accumulation_steps": 1,
+      "optimizer": {
+        "type": "AdamW",
+        "params": {
+          "lr": 3e-4,
+          "betas": [0.9, 0.95],
+          "eps": 1e-8,
+          "weight_decay": 0.1
+        }
+      },
+      "bf16": {"enabled": true},
+      "zero_optimization": {
+        "stage": 2,
+        "allgather_partitions": true,
+        "allgather_bucket_size": 5e8,
+        "overlap_comm": true,
+        "reduce_scatter": true,
+        "reduce_bucket_size": 5e8,
+        "contiguous_gradients": true
+      }
+    }
+```
+
+
+
+### TrainJob with DeepSpeed
+
+The following `TrainJob` demonstrates how to configure DeepSpeed through the Torch plugin.
+The `torchrun` launcher is used with the `--deepspeed` argument pointing to a DeepSpeed
+configuration JSON file. The configuration file is supplied via a ConfigMap that is
+mounted into the training container at `/etc/deepspeed/config.json`.
+
+```yaml
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Example: DeepSpeed training with the Torch plugin.
+#
+# This TrainJob uses the `torchdistributed` runtime and configures DeepSpeed via the
+# `torchrun --deepspeed` argument. The DeepSpeed configuration JSON is provided through
+# a ConfigMap (`deepspeed-config`) mounted into the trainer container at
+# `/etc/deepspeed/config.json`. The `PET_*` environment variables (e.g.
+# `PET_NNODES`, `PET_NPROC_PER_NODE`, `PET_NODE_RANK`, `PET_MASTER_ADDR`,
+# `PET_MASTER_PORT`) are automatically injected by the Torch plugin into the
+# trainer container.
+#
+# Apply: kubectl apply -f deepspeed-trainjob.yaml
+# Check: kubectl get trainjob deepspeed-example
+# Logs:  kubectl logs -l jobset.sigs.k8s.io/jobset-name=deepspeed-example
+# Clean: kubectl delete trainjob deepspeed-example
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: deepspeed-example
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: TrainingRuntime
+    name: deepspeed-runtime
+  trainer:
+    numNodes: 1
+    numProcPerNode: 1
+    resourcesPerNode:
+      gpu: 4
+    command:
+      - torchrun
+    args:
+      - --deepspeed
+      - /etc/deepspeed/config.json
+    env: []
+    image: docker.io/pytorch/pytorch:2.3.0-cuda12.1-runtime
+    commandOverwrite: false
+  template:
+    spec:
+      containers:
+        - name: node
+          volumeMounts:
+            - name: deepspeed-config
+              mountPath: /etc/deepspeed
+          envFrom:
+            - configMapRef:
+                name: deepspeed-config
+      volumes:
+        - name: deepspeed-config
+          configMap:
+            name: deepspeed-config
+```
 - Check out [the DeepSpeed T5 example](https://github.com/kubeflow/trainer/blob/master/examples/deepspeed/text-summarization/T5-Fine-Tuning.ipynb).
 - Learn more about `TrainerClient()` APIs [in the Kubeflow SDK](https://github.com/kubeflow/sdk/blob/main/kubeflow/trainer/api/trainer_client.py).
 - Explore [DeepSpeed documentation](https://www.deepspeed.ai/) for advanced configuration options.
