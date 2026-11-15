@@ -1635,6 +1635,15 @@ func TestValidateScheduling(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "scheduling", "replicatedJobs").Index(1).Child("job", "disruptionMode"), "", ""),
 			},
 		},
+		// Verify that empty targetReplicatedJobs is skipped defensively without panicking.
+		// Schema validation is enforced at the webhook and CRD layers.
+		"empty targetReplicatedJobs in replicatedJobs": {
+			scheduling: &trainer.TrainingRuntimeScheduling{
+				ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+					{TargetReplicatedJobs: []string{}},
+				},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -61,6 +61,9 @@ func newWorkloadBuilders(info *runtime.Info, trainJob *trainer.TrainJob) []*work
 
 	builders := make([]*workloadbuilder.Builder, 0, len(scheduling.ReplicatedJobs))
 	for i, entry := range scheduling.ReplicatedJobs {
+		if len(entry.TargetReplicatedJobs) == 0 {
+			continue
+		}
 		templateName, _ := podGroupTemplateName(trainJob, scheduling, entry.TargetReplicatedJobs[0])
 		entryPath := schedulingPath.Child("replicatedJobs").Index(i)
 		if entry.Job != nil {

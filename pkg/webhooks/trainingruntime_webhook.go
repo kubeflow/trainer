@@ -44,6 +44,7 @@ const (
 	rJobContainerClaimErrorMsg = "references resourceClaim %q which is not defined in the Pod's resourceClaims"
 
 	schedulingFeatureGateErrorMsg      = "TrainJobWorkloadAwareScheduling feature gate is disabled"
+	schedulingTargetRequiredErrorMsg   = "must specify at least one target replicatedJob"
 	schedulingTargetNotFoundErrorMsg   = "must reference a replicatedJob in spec.template.spec.replicatedJobs"
 	schedulingUntargetedErrorMsg       = "must be targeted by a spec.scheduling.replicatedJobs entry when spec.scheduling.replicatedJobs is set"
 	schedulingJobReplicasErrorMsg      = "must target a ReplicatedJob with at most 1 replicas; a PodGroup per replica is not supported yet"
@@ -199,6 +200,10 @@ func validateScheduling(ctx context.Context, newSpec, oldSpec *trainer.TrainingR
 	targeted := sets.New[string]()
 	for i, entry := range scheduling.ReplicatedJobs {
 		targetsPath := schedulingPath.Child("replicatedJobs").Index(i).Child("targetReplicatedJobs")
+		if len(entry.TargetReplicatedJobs) == 0 {
+			allErrs = append(allErrs, field.Required(targetsPath, schedulingTargetRequiredErrorMsg))
+			continue
+		}
 		for j, name := range entry.TargetReplicatedJobs {
 			if _, ok := replicas[name]; !ok {
 				allErrs = append(allErrs, field.Invalid(targetsPath.Index(j), name, schedulingTargetNotFoundErrorMsg))

@@ -352,6 +352,20 @@ func TestValidateScheduling(t *testing.T) {
 				},
 			}),
 		},
+		"targetReplicatedJobs is empty": {
+			enableWAS: true,
+			newSpec: runtimeSpec(&trainer.TrainingRuntimeScheduling{
+				ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+					{TargetReplicatedJobs: []string{}},
+				},
+			}),
+			wantError: field.ErrorList{
+				field.Required(schedulingPath.Child("replicatedJobs").Index(0).Child("targetReplicatedJobs"), ""),
+				field.Invalid(rJobsPath.Index(0).Child("name"), constants.DatasetInitializer, ""),
+				field.Invalid(rJobsPath.Index(1).Child("name"), constants.ModelInitializer, ""),
+				field.Invalid(rJobsPath.Index(2).Child("name"), constants.Node, ""),
+			},
+		},
 		"targetReplicatedJobs references a ReplicatedJob which does not exist": {
 			enableWAS: true,
 			newSpec: runtimeSpec(&trainer.TrainingRuntimeScheduling{
