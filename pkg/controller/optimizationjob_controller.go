@@ -586,10 +586,20 @@ func (r *OptimizationJobReconciler) constructTrainJob(optJob *trainer.Optimizati
 
 	for _, param := range params {
 		envName := fmt.Sprintf("%s%s", constants.EnvVarPrefix, param.Name)
-		tj.Spec.Trainer.Env = append(tj.Spec.Trainer.Env, corev1.EnvVar{
-			Name:  envName,
-			Value: param.Value,
-		})
+		found := false
+		for i := range tj.Spec.Trainer.Env {
+			if tj.Spec.Trainer.Env[i].Name == envName {
+				tj.Spec.Trainer.Env[i].Value = param.Value
+				found = true
+				break
+			}
+		}
+		if !found {
+			tj.Spec.Trainer.Env = append(tj.Spec.Trainer.Env, corev1.EnvVar{
+				Name:  envName,
+				Value: param.Value,
+			})
+		}
 	}
 
 	if err := controllerutil.SetControllerReference(optJob, tj, r.Scheme); err != nil {

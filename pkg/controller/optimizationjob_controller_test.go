@@ -2408,6 +2408,37 @@ func TestConstructTrainJob(t *testing.T) {
 	if diff := cmp.Diff(expectedOnlyOptLabel, tjNoLabels.Labels); diff != "" {
 		t.Errorf("Labels mismatch for nil labels (-want +got):\n%s", diff)
 	}
+
+	// Test when TrainJobTemplate already has the parameter env var
+	optJobExistingEnv := &trainer.OptimizationJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-optjob-existing-env",
+			Namespace: "default",
+		},
+		Spec: trainer.OptimizationJobSpec{
+			TrainJobTemplate: trainer.TrainJobTemplateSpec{
+				Spec: trainer.TrainJobSpec{
+					Trainer: &trainer.Trainer{
+						Env: []corev1.EnvVar{
+							{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+							{Name: "OTHER_ENV", Value: "foo"},
+						},
+					},
+				},
+			},
+		},
+	}
+	tjExistingEnv, err := r.constructTrainJob(optJobExistingEnv, params)
+	if err != nil {
+		t.Fatalf("unexpected error with existing env: %v", err)
+	}
+	expectedEnv := []corev1.EnvVar{
+		{Name: constants.EnvVarPrefix + "lr", Value: "0.01"},
+		{Name: "OTHER_ENV", Value: "foo"},
+	}
+	if diff := cmp.Diff(expectedEnv, tjExistingEnv.Spec.Trainer.Env); diff != "" {
+		t.Errorf("Env mismatch for existing env (-want +got):\n%s", diff)
+	}
 }
 
 func TestConstructAlgorithmDeployment(t *testing.T) {
