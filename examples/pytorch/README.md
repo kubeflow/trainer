@@ -10,7 +10,7 @@ This directory contains examples for training PyTorch models using the Kubeflow 
 | Question Answering | DistilBERT | SQuAD | [fine-tune-distilbert.ipynb](./question-answering/fine-tune-distilbert.ipynb) |
 | Speech Recognition | Transformer | Speech Commands | [speech-recognition.ipynb](./speech-recognition/speech-recognition.ipynb) |
 | Audio Classification | CNN (M5) | GTZAN | [audio-classification.ipynb](./audio-classification/audio-classification.ipynb) |
-| Data Caching | [Model] | [Dataset] | [data-cache-example.ipynb](./data-cache/data-cache-example.ipynb) |
+| Data Caching | [Model] | [Dataset] | [fine-tune-with-cache.ipynb](./data-cache/fine-tune-with-cache.ipynb) |
 
 ## Prerequisites
 
