@@ -474,6 +474,48 @@ func TestNewInfo(t *testing.T) {
 				},
 			},
 		},
+		"limits without requests are counted as requests in SinglePodRequests": {
+			infoOpts: []InfoOption{
+				WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 4, corev1.PodSpec{
+					InitContainers: []corev1.Container{{
+						Name: "init",
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("8Gi")},
+						},
+					}},
+					Containers: []corev1.Container{{
+						Name: constants.Node,
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU: resource.MustParse("2"),
+								"nvidia.com/gpu":   resource.MustParse("2"),
+							},
+						},
+					}},
+				}, corev1ac.PodSpec()),
+			},
+			wantInfo: &Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				Scheduler:   &Scheduler{PodLabels: make(map[string]string)},
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{{
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](4),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("8Gi"),
+							"nvidia.com/gpu":      resource.MustParse("2"),
+						},
+					}},
+				},
+			},
+		},
 		"scheduling is specified": {
 			infoOpts: []InfoOption{
 				WithScheduling(&trainer.TrainingRuntimeScheduling{

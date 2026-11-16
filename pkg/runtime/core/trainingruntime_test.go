@@ -2341,6 +2341,50 @@ test-job-node-0-1.test-job slots=8
 				wantJobSetWithMergedGPU(metav1.NamespaceDefault, "test-job", "uid", resRequests, "4"),
 			},
 		},
+		"PodGroup minResources counts the gpu that resourcesPerNode sets only in limits": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(1).
+							Obj(),
+					).
+					PodGroupPolicyCoschedulingSchedulingTimeout(120).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Obj(),
+			).Obj(),
+			trainJob: func() *trainer.TrainJob {
+				trainerSpec := testingutil.MakeTrainJobTrainerWrapper().
+					NumNodes(4).
+					Obj()
+				trainerSpec.ResourcesPerNode = &corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						"nvidia.com/gpu": resource.MustParse("2"),
+					},
+				}
+				return testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+					UID("uid").
+					RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+					Trainer(trainerSpec).
+					Obj()
+			}(),
+			wantObjs: []runtime.Object{
+				(&testingutil.JobSetWrapper{JobSet: *wantJobSetWithMergedGPU(metav1.NamespaceDefault, "test-job", "uid", resRequests, "2")}).
+					NumNodes(4).
+					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
+					Obj(),
+				testingutil.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					MinMember(6). // 6 replicas = 4 Trainer nodes + 2 Initializers.
+					MinResources(corev1.ResourceList{
+						// Each Trainer node requests 1 CPU and, since the request defaults to the limit, 2 GPUs.
+						corev1.ResourceCPU: resource.MustParse("4"),
+						"nvidia.com/gpu":   resource.MustParse("8"),
+					}).
+					SchedulingTimeout(120).
+					Obj(),
+			},
+		},
 		// Test cases for the DRA resourceClaimsPerNode.
 		"resourceClaimsPerNode is added to the Pod resourceClaims and the node container claims": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
