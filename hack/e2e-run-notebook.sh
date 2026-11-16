@@ -40,7 +40,7 @@ fi
 # Example: "-p num_cpu 3 -p gpu 1"
 PAPERMILL_PARAMS="${PAPERMILL_PARAMS:-}"
 
-print_results() {
+print_cluster_diagnostics() {
     # Only run kubectl commands if we're testing Kubernetes notebooks
     if command -v kubectl &> /dev/null && kubectl cluster-info &> /dev/null; then
         # Always show TrainJob status
@@ -62,10 +62,11 @@ print_results() {
     fi
 }
 
-# Local container backends run training in Docker containers outside Kubernetes, so
-# print_results shows nothing for them. Show their state and logs, so a notebook that
-# hangs or fails leaves something to debug from. Best effort: it never fails the script.
-print_local_containers() {
+# The trainer SDK's local container backend runs training in Docker/Podman containers on
+# the host, outside the Kind cluster, so the cluster diagnostics have no pod status or
+# logs for them. Dump these containers' state and logs so a hung or failed notebook
+# leaves something to debug from. Best effort: it never fails the script.
+print_local_container_diagnostics() {
     if ! command -v docker &> /dev/null || ! docker info &> /dev/null; then
         return 0
     fi
@@ -93,5 +94,16 @@ print_local_containers() {
     return 0
 }
 
-(papermill "${NOTEBOOK_INPUT}" "${NOTEBOOK_OUTPUT}" ${PAPERMILL_PARAMS} --execution-timeout "${PAPERMILL_TIMEOUT}" && print_results) ||
-    (print_results && print_local_containers && exit 1)
+# Run diagnostics before exiting so a hung or failed notebook always leaves debug output.
+# $? is the pending exit status: non-zero means the notebook or the cluster diagnostics
+# failed. Best effort: never changes the exit status.
+on_exit() {
+    local status=$?
+    trap - EXIT
+    print_cluster_diagnostics || true
+    print_local_container_diagnostics || true
+    exit "${status}"
+}
+trap on_exit EXIT
+
+papermill "${NOTEBOOK_INPUT}" "${NOTEBOOK_OUTPUT}" ${PAPERMILL_PARAMS} --execution-timeout "${PAPERMILL_TIMEOUT}"
