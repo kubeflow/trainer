@@ -97,6 +97,42 @@ func TestPlainML(t *testing.T) {
 				},
 			},
 		},
+		"no action when mlPolicySource flux is not null": {
+			info: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						FluxPolicy(nil).
+						Obj(),
+				},
+			},
+			wantInfo: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						FluxPolicy(nil).
+						Obj(),
+				},
+			},
+		},
+		"no action when mlPolicySource xgboost is not null": {
+			info: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						XGBoostPolicy().
+						Obj(),
+				},
+			},
+			wantInfo: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						XGBoostPolicy().
+						Obj(),
+				},
+			},
+		},
 
 		"trainJob trainer numNodes are respected rather than runtimeInfo": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
