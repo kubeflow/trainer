@@ -2390,6 +2390,7 @@ func TestValidate(t *testing.T) {
 				}).
 				Obj(),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				UID("test-uid").
 				Suspend(true).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
@@ -2419,6 +2420,13 @@ func TestValidate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test",
 					Namespace: metav1.NamespaceDefault,
+					OwnerReferences: []metav1.OwnerReference{{
+						APIVersion: trainer.GroupVersion.String(),
+						Kind:       trainer.TrainJobKind,
+						Name:       "test",
+						UID:        "test-uid",
+						Controller: ptr.To(true),
+					}},
 				},
 				Status: jobsetv1alpha2.JobSetStatus{
 					ReplicatedJobsStatus: []jobsetv1alpha2.ReplicatedJobStatus{
@@ -2436,6 +2444,127 @@ func TestValidate(t *testing.T) {
 			wantError: field.ErrorList{
 				field.Forbidden(runtimePatchesPath, "RuntimePatches cannot be modified when the JobSet's ReplicatedJob node is still active"),
 			},
+		},
+		"allow changes to runtimePatches when trainJob is suspended and an active jobSet with the trainJob name is not controlled by the trainJob": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.DatasetInitializer),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.DatasetInitializer),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							{
+								Name: ptr.To(constants.Node),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.Node),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				RuntimePatches([]trainer.RuntimePatch{
+					{
+						Manager: "test.io/manager",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														ServiceAccountName: ptr.To("service-account"),
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+				}).
+				Obj(),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				UID("test-uid").
+				Suspend(true).
+				RuntimePatches([]trainer.RuntimePatch{
+					{
+						Manager: "test.io/manager",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														ServiceAccountName: ptr.To("service-account-updated"),
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+				}).
+				Obj(),
+			jobSet: &jobsetv1alpha2.JobSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: metav1.NamespaceDefault,
+					OwnerReferences: []metav1.OwnerReference{{
+						APIVersion: trainer.GroupVersion.String(),
+						Kind:       trainer.TrainJobKind,
+						Name:       "test",
+						UID:        "other-uid",
+						Controller: ptr.To(true),
+					}},
+				},
+				Status: jobsetv1alpha2.JobSetStatus{
+					ReplicatedJobsStatus: []jobsetv1alpha2.ReplicatedJobStatus{
+						{
+							Name:   constants.DatasetInitializer,
+							Active: 0,
+						},
+						{
+							Name:   constants.Node,
+							Active: 2,
+						},
+					},
+				},
+			},
+			wantError: nil,
 		},
 		"forbid atomic update: suspending trainJob with runtimePatches change is rejected when jobSet has an active replicatedJob": {
 			info: &runtime.Info{
@@ -2489,6 +2618,7 @@ func TestValidate(t *testing.T) {
 				}).
 				Obj(),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				UID("test-uid").
 				Suspend(true).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
@@ -2518,6 +2648,13 @@ func TestValidate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test",
 					Namespace: metav1.NamespaceDefault,
+					OwnerReferences: []metav1.OwnerReference{{
+						APIVersion: trainer.GroupVersion.String(),
+						Kind:       trainer.TrainJobKind,
+						Name:       "test",
+						UID:        "test-uid",
+						Controller: ptr.To(true),
+					}},
 				},
 				Status: jobsetv1alpha2.JobSetStatus{
 					ReplicatedJobsStatus: []jobsetv1alpha2.ReplicatedJobStatus{
@@ -2600,6 +2737,7 @@ func TestValidate(t *testing.T) {
 				}).
 				Obj(),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				UID("test-uid").
 				Suspend(true).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
@@ -2629,6 +2767,13 @@ func TestValidate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test",
 					Namespace: metav1.NamespaceDefault,
+					OwnerReferences: []metav1.OwnerReference{{
+						APIVersion: trainer.GroupVersion.String(),
+						Kind:       trainer.TrainJobKind,
+						Name:       "test",
+						UID:        "test-uid",
+						Controller: ptr.To(true),
+					}},
 				},
 				Status: jobsetv1alpha2.JobSetStatus{
 					ReplicatedJobsStatus: []jobsetv1alpha2.ReplicatedJobStatus{

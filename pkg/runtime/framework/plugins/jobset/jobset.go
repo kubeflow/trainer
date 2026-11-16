@@ -389,12 +389,14 @@ func (j *JobSet) checkRuntimePatchesImmutability(ctx context.Context, oldObj, ne
 			allErrs = append(allErrs, field.Forbidden(runtimePatchesPath, "RuntimePatches can only be modified when the TrainJob is suspended before or after the update"))
 		} else if err := j.client.Get(ctx, client.ObjectKeyFromObject(newObj), jobSet); client.IgnoreNotFound(err) != nil {
 			allErrs = append(allErrs, field.InternalError(runtimePatchesPath, err))
-		} else {
-			// If the JobSet exists, check whether it's inactive
+		} else if metav1.IsControlledBy(jobSet, newObj) {
+			// If the TrainJob's own JobSet exists, check whether it's inactive
 			// so changes won't have side effects on the JobSet's Pods
 			// that are still running.
 			// This can happen while the TrainJob is transitioning out
 			// from unsuspended state.
+			// A JobSet with the TrainJob name that the TrainJob does not control
+			// does not run its Pods, so it does not block the change.
 			for _, replicatedJob := range jobSet.Status.ReplicatedJobsStatus {
 				if replicatedJob.Active > 0 {
 					allErrs = append(allErrs, field.Forbidden(runtimePatchesPath,
