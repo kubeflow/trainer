@@ -46,7 +46,7 @@ metadata:
 spec:
   searchAlgorithm:
     random:
-      randomState: 42
+      seed: 42
   parameters:
     - name: "lr"
       searchSpace:
@@ -85,8 +85,8 @@ spec:
 ## 3. Goals
 
 - **Tighter TrainJob Integration:** Introduce the `OptimizationJob` CRD focused exclusively on `TrainJobs`, using a structured `TrainJobTemplateSpec`.
-- **Native Parameter Injection:** Replace legacy brittle regex YAML substitution with standard Kubernetes mechanisms: prefixed environment variables (e.g., `KUBEFLOW_TRAINER_OPT_LR`) and Pod annotations.
-- **Dependency Reduction (No Katib DB or Trial CRD):** Rely strictly on the `TrainJob` annotations for historical parameters and the Progress API for evaluating metrics.
+- **Native Parameter Injection:** Replace legacy brittle regex YAML substitution with standard Kubernetes mechanisms: prefixed environment variables (e.g., `KUBEFLOW_TRAINER_OPT_lr` for a parameter named `lr`).
+- **Dependency Reduction (No Katib DB or Trial CRD):** Rely strictly on the `TrainJob` spec (`spec.trainer.env`) for historical parameters and the Progress API for evaluating metrics.
 - **Comprehensive Search Space API**: Define a robust API capable of supporting various parameter distributions to accurately model hyperparameter search spaces.
 - **Single Canonical Provider (Optuna MVP):** Hard-scope the backend suggestion engine to Optuna to stabilize the orchestration loop before multi-tenant provider support is added in future interations.
 - **Stateless Algorithm Execution**: Compute suggestions dynamically using a stateless gRPC provider model that reconstructs trial history directly from the Kubernetes API rather than relying on a Katib DB.
@@ -338,7 +338,7 @@ type Result struct {
 
 ## 6. Sample YAML (Phase 1)
 
-The `TrainJobTemplate` utilizes a structured approach. Hyperparameters are dynamically injected by the controller directly into the Pod as prefixed environment variables (e.g., `KUBEFLOW_TRAINER_OPT_<PARAM_NAME>`) and appended as annotations on the `TrainJob` metadata.
+The `TrainJobTemplate` utilizes a structured approach. Hyperparameters are dynamically injected by the controller directly into the Pod as prefixed environment variables (e.g., `KUBEFLOW_TRAINER_OPT_<PARAM_NAME>`, where `<PARAM_NAME>` is the parameter name verbatim).
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
@@ -378,7 +378,7 @@ spec:
         command:
           - "python"
           - "train.py"
-        # The ML script reads KUBEFLOW_TRAINER_OPT_LEARNING_RATE and KUBEFLOW_TRAINER_OPT_BATCH_SIZE
+        # The ML script reads KUBEFLOW_TRAINER_OPT_learning_rate and KUBEFLOW_TRAINER_OPT_batch_size
         # either manually or via the Kubeflow Python SDK helper functions.
 
 status:
@@ -416,7 +416,7 @@ For the initial v1alpha1 release, we will use the **existing Katib gRPC API desi
 
 - The controller will act as a translation adapter. It will map the new, strictly typed `OptimizationJob` structs (e.g., `SearchSpace`, `RandomAlgorithm`) into the legacy `Experiment` and `Trial` protobuf messages.
 - This allows us to natively reuse the existing, Python suggestion images (e.g., `ghcr.io/kubeflow/katib/suggestion-optuna:latest`) without requiring any immediate modifications to the Python microservices.
-- The controller remains stateless: it reconstructs the trial history by reading `TrainJob` annotations and passes the full history via the `GetSuggestionsRequest` on demand.
+- The controller remains stateless: it reconstructs the trial history by reading the `KUBEFLOW_TRAINER_OPT_*` environment variables of the `TrainJob`s it owns and passes the full history via the `GetSuggestionsRequest` on demand.
 
 **Phase 2: gRPC Contract Refactoring (Post-Release)**
 After the core orchestration loop is stabilized in the first release, the gRPC contract will be refactored. The legacy `Experiment` protobuf dependency will be removed. The KEP will be updated at that time to align with the new structure.
@@ -433,7 +433,7 @@ Our model evolves this architecture into a stateless, provider-agnostic system:
 For Phase 1, we maintain isolation by deploying one dedicated `Suggestion` service container per `OptimizationJob`. This pod runs continuously for the duration of the job, but holds no persistent state or database volume; the `OptimizationJob` controller manages the complete lifecycle of this service, provisioning it upon job start and terminating it upon job completion.
 
 **Stateless Orchestration**
-Unlike Katib, our controller treats the service as an ephemeral provider. The controller orchestrates the experiment by gathering history from completed `TrainJob` annotations and passing this full, point-in-time snapshot to the `GetSuggestions` gRPC method.
+Unlike Katib, our controller treats the service as an ephemeral provider. The controller orchestrates the experiment by gathering history from completed `TrainJob`s and passing this full, point-in-time snapshot to the `GetSuggestions` gRPC method.
 
 **Independence**
 The Provider calculates the next parameters and returns them, "forgetting" the interaction immediately. This keeps mathematical execution stateless and entirely independent of the Kubernetes cluster state, removing the need for a persistent database or stateful sidecars.
@@ -464,13 +464,13 @@ The core successful conditions for the Phase 1 MVP are:
 **Status: Deferred to Phase 2**
 Initially, we considered creating a new, provider-agnostic gRPC protobuf schema for Phase 1 to prevent the schema from bloating. However, to ensure a faster and more stable initial release, we have decided to use the existing Katib `api.v1.beta1` protobufs via an adapter pattern in the Go controller. Once the first release is complete, this decision will be revisited, and the gRPC contract will be decoupled and refactored.
 
-### 8.2. Decision: Parameter Propagation via Environment Variables & Annotations
+### 8.2. Decision: Parameter Propagation via Environment Variables
 
 **Status: Resolved in v1alpha1**
 We have deprecated string templating (`{{.param}}`). To pass parameters to the training container reliably, `OptimizationJob` leverages native Kubernetes downward API mechanisms:
 
-- **The Design:** The controller injects `KUBEFLOW_TRAINER_OPT_<PARAM_NAME>` as environment variables directly into the `trainJob.spec.trainer.env` array. It simultaneously stores the raw JSON parameter assignment as an Annotation on the TrainJob metadata.
-- **The "Why":** This aligns well with the unified Kubeflow Python SDK (KEP-46). Data scientists can use SDK helper functions (e.g., `get_hyperparameters()`) to cleanly parse the environment variables inside their training scripts without modifying YAML command arguments. The metadata annotations allow the controller to reconstruct trial history purely from the Kubernetes API without requiring Katib DB.
+- **The Design:** The controller injects `KUBEFLOW_TRAINER_OPT_<PARAM_NAME>` as environment variables directly into the `trainJob.spec.trainer.env` array, where `<PARAM_NAME>` is the parameter name verbatim (names are restricted to `^[A-Za-z_][A-Za-z0-9_]*$` at admission, so every name is a valid environment variable name). No annotations are written; the environment variables are the single source of truth for a trial's assignment.
+- **The "Why":** This aligns well with the unified Kubeflow Python SDK (KEP-46). Data scientists can use SDK helper functions (e.g., `get_hyperparameters()`) to cleanly parse the environment variables inside their training scripts without modifying YAML command arguments. Because the assignments live in the `TrainJob` spec, the controller reconstructs trial history purely from the Kubernetes API (the `spec.trainer.env` of its owned `TrainJob`s) without requiring Katib DB, and the SDK reads the same environment variables inside the trial.
 
 
 
@@ -484,7 +484,7 @@ Search algorithms (TPE/BO) and Pruning algorithms (ASHA/Hyperband) represent dif
 ### 8.4. Decision: Deprecating the Trial CRD
 
 **Status: Resolved in v1alpha1**
-With the new unified TrainJob API exposing metrics directly, the `OptimizationJob` controller bypasses the Trial CRD entirely. The `OptimizationJob` directly creates TrainJobs and reconstructs historical state by reading their labels and annotations.
+With the new unified TrainJob API exposing metrics directly, the `OptimizationJob` controller bypasses the Trial CRD entirely. The `OptimizationJob` directly creates TrainJobs and reconstructs historical state by reading their `spec.trainer.env`.
 
 ### 8.5. Decision: Search Space Concrete Types (OneOf Pattern)
 
@@ -541,12 +541,12 @@ from kubeflow.trainer import (
 
 
 def train_fn(learning_rate: str, batch_size: str):
-    from kubeflow.trainer import report_metrics
+    from kubeflow.trainer import update_trainjob_status
 
     lr = float(learning_rate)
     bs = int(batch_size)
     ...
-    report_metrics({"val_loss": val_loss})  # feeds the Objective below (see 9.3)
+    update_trainjob_status(metrics={"val_loss": val_loss})  # feeds the Objective below (see 9.3)
 
 
 # The same template used by TrainerClient().train(**template).
@@ -599,6 +599,27 @@ Because trials are plain `TrainJob` resources, every trial is also individually 
 through the existing `get_job()`, `get_job_logs()`, and `get_job_events()` APIs — no
 Trial-specific SDK surface is needed.
 
+**Status semantics.** `get_optimization_job()` returns exactly the conditions defined in
+Section 7.4 (`Created`, `Complete`, `Failed`). Unlike `TrainJob`, the CRD has no `Running`
+condition, and the SDK does not synthesize one: a job that is `Created` with no terminal
+condition is in progress, and per-trial state (including `Running`) is available through
+`get_job()` on the individual `TrainJob`s.
+
+**Failure semantics.** In Phase 1 the controller marks the `OptimizationJob` `Failed` (reason
+`TrialFailed`) as soon as any single trial fails; a configurable `TrialPolicy` is tracked in
+[kubeflow/trainer#3743](https://github.com/kubeflow/trainer/issues/3743).
+`wait_for_optimization_job_status()` therefore fails fast: it raises on the first poll that
+observes `Failed`, with the condition reason in the message, exactly as `wait_for_job_status()`
+does for a `Failed` TrainJob. It does not cancel trials that are still running; callers that
+want them stopped call `delete_optimization_job()`, which cascades to the owned `TrainJob`s.
+
+**Backend scope.** `optimize()` and the methods above are implemented for the Kubernetes
+backend only. `optimize()` on `LocalProcessBackendConfig` or `ContainerBackendConfig` raises
+`NotImplementedError`. Local execution of optimization jobs needs a client-side search loop
+and suggestion provider that do not exist today and is out of scope for this KEP (previously
+tracked in [kubeflow/sdk#153](https://github.com/kubeflow/sdk/issues/153), closed as not
+planned).
+
 ### 9.2. Consuming Suggestions in the Training Code
 
 Per Section 8.2, the controller injects suggestions as `KUBEFLOW_TRAINER_OPT_<PARAM_NAME>`
@@ -607,7 +628,8 @@ environment variables. The SDK surfaces them to user code through two mechanisms
 **1. Automatic** `func_args` **override (CustomTrainer).** The launcher script that the SDK
 already generates to marshal `func_args` into the container gains one step: before invoking
 the user function, it scans the environment for the `KUBEFLOW_TRAINER_OPT_` prefix and
-overrides any matching `func_args` key with the suggested value. This preserves the SDK's
+overrides the `func_args` key whose name equals the stripped variable name (exact,
+case-sensitive match) with the suggested value. This preserves the SDK's
 core promise — the *same* training function and the *same* `TrainJobTemplate` work for both
 `train()` and `optimize()`:
 
@@ -627,8 +649,10 @@ def get_hyperparameters() -> dict[str, int | float | str]:
     """Read hyperparameter suggestions injected by the OptimizationJob controller."""
 ```
 
-- Scans the environment for the `KUBEFLOW_TRAINER_OPT_` prefix and strips it, lower-casing
-the remaining key back to the parameter name.
+- Scans the environment for the `KUBEFLOW_TRAINER_OPT_` prefix and strips it; the remainder
+is the parameter name verbatim. The controller preserves the casing given in
+`spec.parameters`, so `learningRate` and `learning_rate` round-trip unchanged and the helper
+applies no case folding.
 - Values from `uniform`/`logUniform` spaces are coerced with the CRD `type`
 (`Int` -> `int`, `Float` -> `float`); `categorical` choices remain strings.
 - Returns an empty dict when running outside an optimization trial, so the same training
@@ -636,7 +660,7 @@ code works unchanged under `train()`.
 
 
 
-### 9.3. Reporting the Objective Metric: `report_metrics()`
+### 9.3. Reporting the Objective Metric: `update_trainjob_status()`
 
 The suggestion flow above is one half of the trial contract; the objective metric flowing
 back is the other. Per Section 8.6, the OptimizationJob controller consumes metrics from the
@@ -646,26 +670,33 @@ which are populated through the push endpoint whose credentials
 (`KUBEFLOW_TRAINER_SERVER_URL` / `_CA_CERT` / `_TOKEN`) the control plane injects into
 training pods.
 
-KEP-2779 defines the transport and shows raw-`urllib` instrumentation; the SDK completes the
-user experience with a thin wrapper, symmetric to `get_hyperparameters()`:
+The SDK already ships this wrapper as `kubeflow.trainer.update_trainjob_status(progress_percent,
+estimated_remaining_seconds, metrics)`. No new `report_metrics()` function is introduced; trials
+report the objective through the existing call:
 
 ```python
-def report_metrics(metrics: dict[str, float], step: int | None = None) -> None:
-    """Push training metrics (e.g. the optimization objective) to the TrainJob status."""
+from kubeflow.trainer import update_trainjob_status
+
+update_trainjob_status(metrics={"val_loss": val_loss})
 ```
 
 - Reads the `KUBEFLOW_TRAINER_SERVER_*` environment variables and POSTs the payload to the
-KEP-2779 endpoint; implemented with the standard library only.
-- No-ops (with a debug log) when the environment variables are absent, so instrumented code
-runs unchanged outside the cluster and under plain `train()` without the feature gate.
+KEP-2779 endpoint; returns `False` silently when they are absent, so instrumented code runs
+unchanged outside the cluster and under plain `train()` without the feature gate.
 - The metric name used for the `Objective` (e.g. `val_loss`) must match a key reported here;
-`optimize()` documentation makes this contract explicit.
-- Framework callbacks planned in KEP-2779 (e.g. a Transformers `KubeflowTrainerCallback`)
-are expected to call this same helper, so manually instrumented and callback-instrumented
-trials behave identically.
+the controller scores a trial on the last reported value of that metric. `optimize()`
+documentation makes this contract explicit.
+- `update_trainjob_status()` throttles to one request per 5 seconds and silently drops calls
+inside that window. For the objective this matters: a final report issued less than 5 seconds
+after the previous one is lost and the trial is scored on the stale value. Proposed: add a
+`force: bool = False` parameter so the final objective report bypasses the throttle; until it
+exists, documentation tells users to report the objective once per epoch rather than per step.
+- The Transformers `KubeflowCallback` (`transformers.integrations`) posts to the same
+KEP-2779 endpoint with its own client, so callback-instrumented trials land in the same
+`TrainJob` status fields and are scored identically to manually instrumented ones.
 
 The transport, authentication, and status schema remain owned by KEP-2779; this section only
-fixes the user-facing function signature.
+fixes which SDK call trials use.
 
 ### 9.4. Backend-Neutral Search Space Types & SDK-to-CRD Mapping
 
@@ -753,6 +784,7 @@ plain dictionaries in the interim.
 
 - **2026-06-01:** Initial KEP draft creation for the `OptimizationJob` CRD.
 - **2026-08-09:** Added Phase 2 Kubeflow SDK integration design (`TrainerClient().optimize()`).
+- **2026-10-30:** Aligned Phase 1 text with the merged controller (env vars only, `seed`) and clarified Phase 2 status/failure/backend semantics, casing, and metric reporting via `update_trainjob_status()`.
 
 
 
@@ -779,4 +811,4 @@ design unchanged.
 ### Stateful Sidecars with Persistent Storage
 
 Katib currently deploys a stateful `Suggestion` sidecar and a persistent DB layer for every experiment. We could have replicated this architecture for `OptimizationJob`.
-Deploying dedicated databases for every hyperparameter tuning job introduces severe cluster resource bloat and operational complexity. By reconstructing the trial history directly from completed `TrainJob` annotations and passing it statelessly to the gRPC provider, we eliminate the need for persistent storage and sidecar lifecycle management.
+Deploying dedicated databases for every hyperparameter tuning job introduces severe cluster resource bloat and operational complexity. By reconstructing the trial history directly from completed `TrainJob` specs and passing it statelessly to the gRPC provider, we eliminate the need for persistent storage and sidecar lifecycle management.
