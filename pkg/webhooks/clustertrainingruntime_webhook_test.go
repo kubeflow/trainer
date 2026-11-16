@@ -105,6 +105,7 @@ func TestClusterTrainingRuntimeValidateUpdate(t *testing.T) {
 	cases := map[string]struct {
 		oldObj    *trainer.ClusterTrainingRuntime
 		newObj    *trainer.ClusterTrainingRuntime
+		warnings  admission.Warnings
 		wantError field.ErrorList
 	}{
 		"valid update succeeds": {
@@ -119,6 +120,24 @@ func TestClusterTrainingRuntimeValidateUpdate(t *testing.T) {
 						}(),
 					},
 				}).Obj(),
+		},
+		"support=deprecated on updated object emits deprecation warning": {
+			oldObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj(),
+			newObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: func() jobsetv1alpha2.JobSetSpec {
+							js := testingutil.MakeJobSetWrapper("", "")
+							js.Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node)
+							return js.Obj().Spec
+						}(),
+					},
+				}).
+				Label(constants.LabelSupport, constants.SupportDeprecated).
+				Obj(),
+			warnings: admission.Warnings{
+				"ClusterTrainingRuntime \"test-runtime\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: " + constants.RuntimeDeprecationPolicyURL,
+			},
 		},
 		"invalid update with invalid replicas fails": {
 			oldObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj(),
@@ -197,8 +216,8 @@ func TestClusterTrainingRuntimeValidateUpdate(t *testing.T) {
 			if diff := cmp.Diff(tc.wantError.ToAggregate(), err, cmpopts.IgnoreFields(field.Error{}, "Detail")); len(diff) != 0 {
 				t.Errorf("Unexpected error from ValidateUpdate (-want, +got): %s", diff)
 			}
-			if len(warnings) != 0 {
-				t.Errorf("ValidateUpdate() warnings = %v, want nil", warnings)
+			if diff := cmp.Diff(tc.warnings, warnings); diff != "" {
+				t.Fatalf("unexpected warnings (-want, +got): %s", diff)
 			}
 		})
 	}

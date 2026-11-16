@@ -61,9 +61,17 @@ func (w *ClusterTrainingRuntimeValidator) ValidateCreate(ctx context.Context, ob
 func (w *ClusterTrainingRuntimeValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.ClusterTrainingRuntime) (admission.Warnings, error) {
 	log := ctrl.LoggerFrom(ctx).WithName("clustertrainingruntime-webhook")
 	log.V(5).Info("Validating update", "clusterTrainingRuntime", klog.KObj(newObj))
+	var warnings admission.Warnings
+	if trainingruntime.IsSupportDeprecated(newObj.Labels) {
+		warnings = append(warnings, fmt.Sprintf(
+			"ClusterTrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
+			newObj.Name,
+			constants.RuntimeDeprecationPolicyURL,
+		))
+	}
 	allErrs := validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs)
 	allErrs = append(allErrs, validateScheduling(ctx, &newObj.Spec, &oldObj.Spec)...)
-	return nil, allErrs.ToAggregate()
+	return warnings, allErrs.ToAggregate()
 }
 
 func (w *ClusterTrainingRuntimeValidator) ValidateDelete(ctx context.Context, obj *trainer.ClusterTrainingRuntime) (admission.Warnings, error) {
