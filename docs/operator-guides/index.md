@@ -111,7 +111,6 @@ job-template
 runtime-patches
 dynamic-resource-allocation
 workload-aware-scheduling
-network-policies
 extension-framework
 job-scheduling/index
 ```

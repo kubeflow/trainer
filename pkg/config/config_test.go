@@ -27,10 +27,16 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/rest"
 	componentconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,6 +45,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/features"
+	"github.com/kubeflow/trainer/v2/pkg/util/cert"
 )
 
 func TestLoad(t *testing.T) {
@@ -70,6 +78,15 @@ webhook:
 clientConnection:
   qps: 100
   burst: 200
+networkPolicy:
+  enabled: true
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 192.0.2.0/24
+      ports:
+        - protocol: TCP
+          port: 443
 `), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
 	}
@@ -403,6 +420,13 @@ this is not: valid: yaml: content
 				ClientConnection: &configapi.ClientConnection{
 					QPS:   ptr.To[float32](100),
 					Burst: ptr.To[int32](200),
+				},
+				NetworkPolicy: &configapi.NetworkPolicyConfig{
+					Enabled: ptr.To(true),
+					Egress: []networkingv1.NetworkPolicyEgressRule{{
+						To:    []networkingv1.NetworkPolicyPeer{{IPBlock: &networkingv1.IPBlock{CIDR: "192.0.2.0/24"}}},
+						Ports: []networkingv1.NetworkPolicyPort{{Protocol: ptr.To(corev1.ProtocolTCP), Port: ptr.To(intstr.FromInt(443))}},
+					}},
 				},
 				StatusServer: defaultStatusServer,
 			},
@@ -769,6 +793,56 @@ this is not: valid: yaml: content
 	}
 }
 
+func TestApplyNetworkPolicyCache(t *testing.T) {
+	for name, tc := range map[string]struct {
+		policy       *configapi.NetworkPolicyConfig
+		optimization bool
+	}{
+		"omitted":              {},
+		"disabled":             {policy: &configapi.NetworkPolicyConfig{Enabled: ptr.To(false)}},
+		"enabled":              {policy: &configapi.NetworkPolicyConfig{Enabled: ptr.To(true)}},
+		"with OptimizationJob": {policy: &configapi.NetworkPolicyConfig{Enabled: ptr.To(true)}, optimization: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobStatus, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OptimizationJob, tc.optimization)
+			options := ctrl.Options{}
+			ApplyNetworkPolicyCache(&options, &configapi.Configuration{NetworkPolicy: tc.policy})
+			if tc.policy == nil || !ptr.Deref(tc.policy.Enabled, false) {
+				if len(options.Cache.ByObject) != 0 || options.Client.Cache == nil {
+					t.Fatal("disabled isolation must use direct cleanup reads without adding caches")
+				}
+				if diff := cmp.Diff([]client.Object{&networkingv1.NetworkPolicy{}}, options.Client.Cache.DisableFor); diff != "" {
+					t.Fatal(diff)
+				}
+				return
+			}
+			for object, scope := range options.Cache.ByObject {
+				if len(scope.Namespaces) != 2 {
+					t.Fatalf("%T must watch only infrastructure namespaces: %v", object, scope.Namespaces)
+				}
+				for _, namespace := range []string{corev1.NamespaceDefault, cert.GetOperatorNamespace()} {
+					if _, found := scope.Namespaces[namespace]; !found {
+						t.Fatalf("%T missing infrastructure namespace %q", object, namespace)
+					}
+				}
+			}
+			var slicesScoped, servicesScoped bool
+			for object := range options.Cache.ByObject {
+				switch object.(type) {
+				case *discoveryv1.EndpointSlice:
+					slicesScoped = true
+				case *corev1.Service:
+					servicesScoped = true
+				}
+			}
+			if !slicesScoped || servicesScoped == tc.optimization {
+				t.Fatal("scope EndpointSlices and preserve the OptimizationJob Service watch")
+			}
+		})
+	}
+}
+
 func TestHealthEndpointPath(t *testing.T) {
 	testcases := map[string]struct {
 		endpointName string
@@ -1082,35 +1156,5 @@ tls:
 				t.Errorf("Unexpected CurvePreferences (-want,+got):\n%s", diff)
 			}
 		})
-	}
-}
-
-func TestNetworkPolicyConfigLoad(t *testing.T) {
-	scheme := runtime.NewScheme()
-	if err := configapi.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	filename := filepath.Join(t.TempDir(), "network-policy.yaml")
-	data := []byte(`apiVersion: config.trainer.kubeflow.org/v1alpha1
-kind: Configuration
-networkPolicy:
-  enabled: true
-  egress:
-    - to:
-        - ipBlock:
-            cidr: 192.0.2.0/24
-      ports:
-        - protocol: TCP
-          port: 443
-`)
-	if err := os.WriteFile(filename, data, 0600); err != nil {
-		t.Fatal(err)
-	}
-	_, cfg, err := Load(scheme, filename)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.NetworkPolicy == nil || !ptr.Deref(cfg.NetworkPolicy.Enabled, false) || cfg.NetworkPolicy.Egress[0].To[0].IPBlock.CIDR != "192.0.2.0/24" {
-		t.Fatalf("unexpected policy config: %#v", cfg.NetworkPolicy)
 	}
 }

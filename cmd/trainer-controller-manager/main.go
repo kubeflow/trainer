@@ -112,6 +112,7 @@ func main() {
 
 	restCfg := ctrl.GetConfigOrDie()
 	config.ApplyClientConnection(restCfg, &cfg)
+	config.ApplyNetworkPolicyCache(&options, &cfg)
 
 	setupLog.Info("Creating manager", "qps", restCfg.QPS, "burst", restCfg.Burst)
 	mgr, err := ctrl.NewManager(restCfg, options)

@@ -104,6 +104,14 @@ rules:
   - list
   - update
 - apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - jobset.x-k8s.io
   resources:
   - jobsets
@@ -125,7 +133,6 @@ rules:
   - get
   - list
   - patch
-  - update
   - watch
 - apiGroups:
   - node.k8s.io

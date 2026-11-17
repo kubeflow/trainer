@@ -203,7 +203,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestNewPluginOrderIsDeterministic(t *testing.T) {
-	// Verify the implementation detail that plugins are executed in name order.
+	// Isolation runs first; other plugins retain deterministic name order.
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	clientBuilder := testingutil.NewClientBuilder()
@@ -230,13 +230,46 @@ func TestNewPluginOrderIsDeterministic(t *testing.T) {
 	for i, p := range fwk.componentBuilderPlugins {
 		buildNames[i] = p.(framework.Plugin).Name()
 	}
-	assertSorted("componentBuilderPlugins", buildNames)
+	if len(buildNames) == 0 || buildNames[0] != networkpolicy.Name {
+		t.Fatalf("isolation must be first: %v", buildNames)
+	}
+	assertSorted("componentBuilderPlugins", buildNames[1:])
 
 	validationNames := make([]string, len(fwk.customValidationPlugins))
 	for i, p := range fwk.customValidationPlugins {
 		validationNames[i] = p.(framework.Plugin).Name()
 	}
 	assertSorted("customValidationPlugins", validationNames)
+}
+
+type orderedBuilder struct {
+	framework.ComponentBuilderPlugin
+	order int
+}
+
+func (p *orderedBuilder) BuildOrder() int { return p.order }
+
+func TestNewComponentBuilderOrder(t *testing.T) {
+	c := testingutil.NewClientBuilder()
+	first := &orderedBuilder{ComponentBuilderPlugin: &networkpolicy.NetworkPolicy{}, order: -10}
+	last := &orderedBuilder{ComponentBuilderPlugin: &networkpolicy.NetworkPolicy{}, order: 10}
+	tieA := &orderedBuilder{ComponentBuilderPlugin: &networkpolicy.NetworkPolicy{}}
+	tieB := &orderedBuilder{ComponentBuilderPlugin: &networkpolicy.NetworkPolicy{}}
+	plain := &flux.Flux{}
+	registry := fwkplugins.Registry{}
+	for name, plugin := range map[string]framework.Plugin{"Z-first": first, "A-last": last, "B-tie": tieB, "A-tie": tieA, "C-default": plain} {
+		registry[name] = func(context.Context, client.Client, client.FieldIndexer, *configapi.Configuration) (framework.Plugin, error) {
+			return plugin, nil
+		}
+	}
+	fwk, err := New(context.Background(), c.Build(), registry, testingutil.AsIndex(c), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []framework.ComponentBuilderPlugin{first, tieA, tieB, plain, last}
+	if !slices.Equal(fwk.componentBuilderPlugins, want) {
+		t.Fatal("builders must follow explicit order, then deterministic name order; unspecified order is zero")
+	}
 }
 
 func TestRunEnforceMLPolicyPlugins(t *testing.T) {
