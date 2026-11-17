@@ -81,6 +81,12 @@
   type: End User
   contacts:
     - Jeffwan
+- name: Capital One
+  url: https://www.capitalone.com/
+  type: End User
+  description: Pytorch training and fine-tuning workloads
+  contacts:
+    - droctothorpe
 - name: Cisco
   url: https://www.cisco.com/
   type: End User
