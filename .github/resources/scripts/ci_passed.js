@@ -163,7 +163,7 @@ async function prepare({github, context, core, recovery, root = process.env.GITH
   core.setOutput('ready', String(result.passed));
 }
 
-async function finalize({github, context, core, number, head, before, pollPassed,
+async function finalize({github, context, core, number, head, before, ready = false,
   root = process.env.GITHUB_WORKSPACE}) {
   if (!number || !head) return;
   const pr = await readPR(github, context, Number(number));
@@ -171,7 +171,7 @@ async function finalize({github, context, core, number, head, before, pollPassed
   let passed = false;
   let reason = 'CI did not pass; complete current-head CI and retry.';
   try {
-    if (pr.head.sha === head && pr.state === 'open' && snapshot(pr) === before && eligible(pr) && pollPassed) {
+    if (pr.head.sha === head && pr.state === 'open' && snapshot(pr) === before && eligible(pr) && ready) {
       const result = await evidence(github, context, pr, loadLocalInventory(root));
       core.info(JSON.stringify(result));
       passed = result.passed;

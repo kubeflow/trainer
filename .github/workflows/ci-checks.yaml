@@ -98,24 +98,7 @@ jobs:
               number: Number(process.env.CI_RECOVERY_NUMBER),
               head: process.env.CI_RECOVERY_HEAD}});
 
-      - name: Check all current CI results
-        id: poll
-        if: steps.prepare.outputs.ready == 'true'
-        continue-on-error: true
-        uses: wechuli/allcheckspassed@e4240aa9cc76fd6828ce27a71ad16c406c25adb3
-        with:
-          commit_sha: ${{ steps.prepare.outputs.head_sha }}
-          # Completion events and scheduled sweeps drive recovery. Never hold
-          # the shared writer while waiting for external checks.
-          poll: 'false'
-          # The pinned action waits one minute before its first API call even
-          # with polling disabled, holding the shared writer lock (#14552 P3).
-          delay: '0'
-          ignore_superseded_runs: 'true'
-          # Expected workflow completion is verified independently; these
-          # exclusions cannot hide a failing constituent workflow.
-          checks_exclude: '^check_ci_status( \(.*\))?$,^Cleanup artifacts$,^Upload results$,^Agent$,^Prepare$'
-          token: ${{ github.token }}
+
 
       - name: Reconcile status and informational label
         if: always() && steps.prepare.outputs.pr_number != ''
@@ -124,7 +107,7 @@ jobs:
           CI_PR_NUMBER: ${{ steps.prepare.outputs.pr_number }}
           CI_HEAD_SHA: ${{ steps.prepare.outputs.head_sha }}
           CI_PR_SNAPSHOT: ${{ steps.prepare.outputs.snapshot }}
-          CI_POLL_PASSED: ${{ steps.poll.outcome == 'success' }}
+          CI_READY: ${{ steps.prepare.outputs.ready }}
         with:
           script: |
             const {finalize} = require('./.github/resources/scripts/ci_passed.js');
@@ -132,4 +115,4 @@ jobs:
               number: process.env.CI_PR_NUMBER,
               head: process.env.CI_HEAD_SHA,
               before: process.env.CI_PR_SNAPSHOT,
-              pollPassed: process.env.CI_POLL_PASSED === 'true'});
+              ready: process.env.CI_READY === 'true'});
