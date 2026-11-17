@@ -59,6 +59,22 @@ from pkg.initializers.dataset.s3 import S3
                 "role_arn": None,
             },
         ),
+        (
+            "Config with ignore patterns",
+            {
+                "storage_uri": "s3://dataset/path",
+                "ignore_patterns": ["*.log", "*.tmp"],
+            },
+            {
+                "storage_uri": "s3://dataset/path",
+                "ignore_patterns": ["*.log", "*.tmp"],
+                "endpoint": None,
+                "access_key_id": None,
+                "secret_access_key": None,
+                "region": None,
+                "role_arn": None,
+            },
+        ),
     ],
 )
 def test_load_config(test_name, test_config, expected):
@@ -109,6 +125,22 @@ def test_load_config(test_name, test_config, expected):
                 "expected_prefix": "path",
             },
         ),
+        (
+            "Successful download with ignore patterns and root prefix",
+            {
+                "config": {
+                    "storage_uri": "s3://dataset/",
+                    "endpoint": None,
+                    "access_key_id": None,
+                    "secret_access_key": None,
+                    "region": None,
+                    "role_arn": None,
+                    "ignore_patterns": ["*.tmp", "*.log"],
+                },
+                "expected_bucket": "dataset",
+                "expected_prefix": "",
+            },
+        ),
     ],
 )
 def test_download_dataset(test_name, test_case):
@@ -154,3 +186,27 @@ def test_download_dataset(test_name, test_case):
             )
 
     print("Test execution completed")
+
+
+def test_download_dataset_error():
+    """Test that storage download errors propagate."""
+    s3_dataset_instance = S3()
+    s3_dataset_instance.config = MagicMock(
+        storage_uri="s3://dataset/path",
+        endpoint=None,
+        access_key_id=None,
+        secret_access_key=None,
+        region=None,
+        role_arn=None,
+        ignore_patterns=None,
+    )
+
+    mock_storage = MagicMock()
+    mock_storage.download.side_effect = RuntimeError("Storage download failed")
+
+    with (
+        patch("pkg.initializers.utils.opendal.S3Storage", return_value=mock_storage),
+        patch.object(utils, "DATASET_PATH", "/tmp/dataset"),
+    ):
+        with pytest.raises(RuntimeError, match="Storage download failed"):
+            s3_dataset_instance.download_dataset()
