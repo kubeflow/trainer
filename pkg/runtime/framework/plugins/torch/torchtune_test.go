@@ -84,6 +84,18 @@ func TestIsLoraConfigEnabled(t *testing.T) {
 			args: nil,
 			want: false,
 		},
+		"unrelated arg value contains lora attn modules": {
+			args: []string{"batch_size=32", "output_dir=/tmp/" + constants.TorchTuneLoraAttnModules},
+			want: false,
+		},
+		"arg without equals": {
+			args: []string{"--some-flag", constants.TorchTuneLoraAttnModules},
+			want: false,
+		},
+		"prefixed lora attn modules flag": {
+			args: []string{"--" + constants.TorchTuneLoraAttnModules + "=['q_proj']"},
+			want: true,
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
