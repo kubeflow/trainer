@@ -185,27 +185,7 @@ func TestVolcano(t *testing.T) {
 		"networkTopology with nil HighestTierAllowed defaults to 1": {
 			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "job-nta-default", Namespace: "test-ns", UID: "4"}},
 			info: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: jobSetSpecApply,
-					PodSets: []runtime.PodSet{
-						{
-							Name:  "launcher",
-							Count: ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("300m"),
-								corev1.ResourceMemory: resource.MustParse("1Gi"),
-							},
-						},
-						{
-							Name:  "worker",
-							Count: ptr.To[int32](4),
-							SinglePodRequests: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("500m"),
-								corev1.ResourceMemory: resource.MustParse("0.5Gi"),
-							},
-						},
-					},
-				},
+				TemplateSpec: newBaseInfo().TemplateSpec,
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
@@ -220,27 +200,7 @@ func TestVolcano(t *testing.T) {
 				Scheduler: &runtime.Scheduler{},
 			},
 			expectInfo: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: jobSetSpecApply,
-					PodSets: []runtime.PodSet{
-						{
-							Name:  "launcher",
-							Count: ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("300m"),
-								corev1.ResourceMemory: resource.MustParse("1Gi"),
-							},
-						},
-						{
-							Name:  "worker",
-							Count: ptr.To[int32](4),
-							SinglePodRequests: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("500m"),
-								corev1.ResourceMemory: resource.MustParse("0.5Gi"),
-							},
-						},
-					},
-				},
+				TemplateSpec: newBaseInfo().TemplateSpec,
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
