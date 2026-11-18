@@ -131,6 +131,14 @@ func (w *TrainJobValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *
 	log := ctrl.LoggerFrom(ctx).WithName("trainJob-webhook")
 	log.V(5).Info("Validating update", "TrainJob", klog.KObj(newObj))
 
+	// Skip validation when the spec is unchanged, e.g. finalizer, ownerReference, label or
+	// annotation updates. These must not depend on the referenced runtime or its snapshot,
+	// otherwise the garbage collector cannot remove the deletion finalizers and the TrainJob
+	// gets stuck in Terminating once the runtime is deleted or the snapshot is orphaned.
+	if equality.Semantic.DeepEqual(oldObj.Spec, newObj.Spec) {
+		return nil, nil
+	}
+
 	// spec.trainer is immutable, but spec.runtimePatches entries can still be appended on update,
 	// so only reject an update that introduces DRA fields; a TrainJob created with them while the
 	// gate was enabled stays updatable (e.g. suspend) after the gate is disabled.
