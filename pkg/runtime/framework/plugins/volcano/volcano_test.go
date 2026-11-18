@@ -1014,6 +1014,7 @@ func TestPriorityClassNamePropagation(t *testing.T) {
 			}
 
 			info := &runtime.Info{
+				Scheduler: &runtime.Scheduler{},
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{Volcano: &trainer.VolcanoPodGroupPolicySource{}},
