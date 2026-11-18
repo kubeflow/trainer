@@ -33,17 +33,19 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow_trainer_api.models.trainer_v1alpha1_objective_metric_value import TrainerV1alpha1ObjectiveMetricValue
 from kubeflow_trainer_api.models.trainer_v1alpha1_parameter_assignment import TrainerV1alpha1ParameterAssignment
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1Result(BaseModel):
+class TrainerV1alpha1OptimalTrial(BaseModel):
     """
-    Result tracks the parameters of the highest performing trial.
+    OptimalTrial represents a trial on the optimal Pareto front (supporting single and multi-objective optimization).
     """ # noqa: E501
-    parameters: Optional[List[TrainerV1alpha1ParameterAssignment]] = Field(default=None, description="parameters is the list of parameters for the result.")
+    metrics: Optional[List[TrainerV1alpha1ObjectiveMetricValue]] = Field(default=None, description="metrics achieved by this optimal trial (multi-metric support).")
+    parameters: Optional[List[TrainerV1alpha1ParameterAssignment]] = Field(default=None, description="parameters assigned to this trial.")
     train_job_name: StrictStr = Field(description="trainJobName is the name of the underlying TrainJob that achieved this result.", alias="trainJobName")
-    __properties: ClassVar[List[str]] = ["parameters", "trainJobName"]
+    __properties: ClassVar[List[str]] = ["metrics", "parameters", "trainJobName"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -63,7 +65,7 @@ class TrainerV1alpha1Result(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1Result from a JSON string"""
+        """Create an instance of TrainerV1alpha1OptimalTrial from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -84,6 +86,13 @@ class TrainerV1alpha1Result(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of each item in metrics (list)
+        _items = []
+        if self.metrics:
+            for _item_metrics in self.metrics:
+                if _item_metrics:
+                    _items.append(_item_metrics.to_dict())
+            _dict['metrics'] = _items
         # override the default output from pydantic by calling `to_dict()` of each item in parameters (list)
         _items = []
         if self.parameters:
@@ -95,7 +104,7 @@ class TrainerV1alpha1Result(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1Result from a dict"""
+        """Create an instance of TrainerV1alpha1OptimalTrial from a dict"""
         if obj is None:
             return None
 
@@ -103,9 +112,8 @@ class TrainerV1alpha1Result(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
+            "metrics": [TrainerV1alpha1ObjectiveMetricValue.from_dict(_item) for _item in obj["metrics"]] if obj.get("metrics") is not None else None,
             "parameters": [TrainerV1alpha1ParameterAssignment.from_dict(_item) for _item in obj["parameters"]] if obj.get("parameters") is not None else None,
             "trainJobName": obj.get("trainJobName")
         })
         return _obj
-
-

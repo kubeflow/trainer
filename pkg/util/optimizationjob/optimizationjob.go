@@ -90,58 +90,143 @@ func GetFinalObjectiveMetric(tj *trainer.TrainJob, metricName string) (*trainer.
 	return nil, 0, fmt.Errorf("%w: %q", ErrObjectiveMetricMissing, metricName)
 }
 
-func ExtractBestResult(optJob *trainer.OptimizationJob, trainJobs []trainer.TrainJob) *trainer.Result {
-	if len(optJob.Spec.Objectives) == 0 || optJob.Spec.Objectives[0].Metric == "" {
+type candidateTrial struct {
+	job          *trainer.TrainJob
+	metricFloats []float64
+	metricValues []trainer.ObjectiveMetricValue
+}
+
+func ExtractOptimalTrials(optJob *trainer.OptimizationJob, trainJobs []trainer.TrainJob) []trainer.OptimalTrial {
+	if optJob == nil || len(optJob.Spec.Objectives) == 0 || len(trainJobs) == 0 {
 		return nil
 	}
 
-	targetMetric := optJob.Spec.Objectives[0].Metric
+	var candidates []candidateTrial
+	for i := range trainJobs {
+		tj := &trainJobs[i]
+		valid := true
+		floats := make([]float64, len(optJob.Spec.Objectives))
+		vals := make([]trainer.ObjectiveMetricValue, len(optJob.Spec.Objectives))
 
-	var bestJob *trainer.TrainJob
-	var bestVal float64
-
-	for i, tj := range trainJobs {
-		_, val, err := GetFinalObjectiveMetric(&tj, targetMetric)
-		if err != nil {
-			continue
-		}
-
-		if bestJob == nil {
-			bestJob = &trainJobs[i]
-			bestVal = val
-		} else if val == bestVal {
-			// Break ties by creation time, then by name, so the result does not
-			// depend on the order of trainJobs.
-			if trainJobs[i].CreationTimestamp.Before(&bestJob.CreationTimestamp) {
-				bestJob = &trainJobs[i]
-			} else if trainJobs[i].CreationTimestamp.Equal(&bestJob.CreationTimestamp) {
-				if trainJobs[i].Name < bestJob.Name {
-					bestJob = &trainJobs[i]
-				}
+		for j, obj := range optJob.Spec.Objectives {
+			if obj.Metric == "" {
+				valid = false
+				break
 			}
-		} else if optJob.Spec.Objectives[0].Direction == trainer.ObjectiveDirectionMaximize && val > bestVal {
-			bestJob = &trainJobs[i]
-			bestVal = val
-		} else if optJob.Spec.Objectives[0].Direction == trainer.ObjectiveDirectionMinimize && val < bestVal {
-			bestJob = &trainJobs[i]
-			bestVal = val
+			metric, floatVal, err := GetFinalObjectiveMetric(tj, obj.Metric)
+			if err != nil {
+				valid = false
+				break
+			}
+			floats[j] = floatVal
+			vals[j] = trainer.ObjectiveMetricValue{
+				Metric: obj.Metric,
+				Value:  metric.Value,
+			}
+		}
+
+		if valid {
+			candidates = append(candidates, candidateTrial{
+				job:          tj,
+				metricFloats: floats,
+				metricValues: vals,
+			})
 		}
 	}
 
-	if bestJob == nil {
+	if len(candidates) == 0 {
 		return nil
 	}
 
-	res := &trainer.Result{
-		TrainJobName: bestJob.Name,
+	// Single-objective optimization: return the single best trial.
+	if len(optJob.Spec.Objectives) == 1 {
+		bestIdx := 0
+		dir := optJob.Spec.Objectives[0].Direction
+		for i := 1; i < len(candidates); i++ {
+			val := candidates[i].metricFloats[0]
+			bestVal := candidates[bestIdx].metricFloats[0]
+			if val == bestVal {
+				// Break ties by creation time, then by name, so the result does not
+				// depend on the order of trainJobs.
+				if candidates[i].job.CreationTimestamp.Before(&candidates[bestIdx].job.CreationTimestamp) {
+					bestIdx = i
+				} else if candidates[i].job.CreationTimestamp.Equal(&candidates[bestIdx].job.CreationTimestamp) {
+					if candidates[i].job.Name < candidates[bestIdx].job.Name {
+						bestIdx = i
+					}
+				}
+			} else if dir == trainer.ObjectiveDirectionMaximize && val > bestVal {
+				bestIdx = i
+			} else if dir == trainer.ObjectiveDirectionMinimize && val < bestVal {
+				bestIdx = i
+			}
+		}
+		return []trainer.OptimalTrial{buildOptimalTrial(candidates[bestIdx])}
+	}
+
+	// Multi-objective optimization: Pareto front (non-dominated trials).
+	var optimalTrials []trainer.OptimalTrial
+	for i := range candidates {
+		dominated := false
+		for j := range candidates {
+			if i == j {
+				continue
+			}
+			if dominates(candidates[j], candidates[i], optJob.Spec.Objectives) {
+				dominated = true
+				break
+			}
+		}
+		if !dominated {
+			optimalTrials = append(optimalTrials, buildOptimalTrial(candidates[i]))
+		}
+	}
+
+	// Sort deterministically by TrainJobName
+	sort.Slice(optimalTrials, func(i, j int) bool {
+		return optimalTrials[i].TrainJobName < optimalTrials[j].TrainJobName
+	})
+
+	return optimalTrials
+}
+
+func dominates(a, b candidateTrial, objectives []trainer.Objective) bool {
+	strictlyBetter := false
+	for k, obj := range objectives {
+		valA := a.metricFloats[k]
+		valB := b.metricFloats[k]
+
+		if obj.Direction == trainer.ObjectiveDirectionMaximize {
+			if valA < valB {
+				return false
+			}
+			if valA > valB {
+				strictlyBetter = true
+			}
+		} else { // Minimize
+			if valA > valB {
+				return false
+			}
+			if valA < valB {
+				strictlyBetter = true
+			}
+		}
+	}
+	return strictlyBetter
+}
+
+func buildOptimalTrial(c candidateTrial) trainer.OptimalTrial {
+	res := trainer.OptimalTrial{
+		TrainJobName: c.job.Name,
+		Metrics:      c.metricValues,
 	}
 
 	// Sort parameters alphabetically to avoid non-deterministic status updates
 	paramMap := make(map[string]string)
 	var paramNames []string
 
-	if bestJob.Spec.Trainer != nil {
-		for _, env := range bestJob.Spec.Trainer.Env {
+	if c.job.Spec.Trainer != nil {
+		for _, env := range c.job.Spec.Trainer.Env {
 			if strings.HasPrefix(env.Name, constants.EnvVarPrefix) {
 				paramName := strings.TrimPrefix(env.Name, constants.EnvVarPrefix)
 				paramNames = append(paramNames, paramName)
@@ -167,6 +252,9 @@ func BuildSuggestionRequest(optJob *trainer.OptimizationJob, trainJobs []trainer
 		return nil, fmt.Errorf("unsupported or missing search algorithm: only 'random' is supported")
 	}
 
+	// Note: In Phase 1, the legacy Katib gRPC adapter only supports a single objective direction
+	// in ObjectiveSpec. Multi-objective study wiring in the sampler is deferred to Phase 2 when
+	// the gRPC contract is refactored, while multi-objective Pareto front tracking is handled in Status.Results.
 	var targetMetric string
 	var objectiveType katibapi.ObjectiveType
 	if len(optJob.Spec.Objectives) > 0 && optJob.Spec.Objectives[0].Metric != "" {

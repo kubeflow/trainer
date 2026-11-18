@@ -27,16 +27,14 @@ import (
 // OptimizationJobApplyConfiguration represents a declarative configuration of the OptimizationJob type for use
 // with apply.
 //
-// OptimizationJob is the Schema for the optimizationjobs API.
-// OptimizationJob is the Schema for the optimizationjobs API.
+// OptimizationJob represents configuration of a hyperparameter optimization job.
 type OptimizationJobApplyConfiguration struct {
-	// typeMeta is the type meta for the optimization job.
 	v1.TypeMetaApplyConfiguration `json:""`
-	// metadata is the object meta for the optimization job.
+	// metadata of the OptimizationJob.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// spec is the spec for the optimization job.
+	// spec of the OptimizationJob.
 	Spec *OptimizationJobSpecApplyConfiguration `json:"spec,omitempty"`
-	// status is the status for the optimization job.
+	// status of OptimizationJob.
 	Status *OptimizationJobStatusApplyConfiguration `json:"status,omitempty"`
 }
 

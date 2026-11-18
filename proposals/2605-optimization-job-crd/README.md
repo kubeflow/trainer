@@ -154,7 +154,7 @@ type OptimizationJobSpec struct {
 	// +listType=map
         // +listMapKey=metric
         // +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=1
+	// +kubebuilder:validation:MaxItems=10
         // +required
 	Objectives []Objective `json:"objectives"`
 
@@ -299,28 +299,55 @@ type TrainJobTemplateSpec struct {
 	Spec TrainJobSpec `json:"spec,omitzero"`
 }
 
+// ObjectiveMetricValue represents a single objective metric and its value.
+type ObjectiveMetricValue struct {
+	// metric is the name of the objective metric.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=64
+	// +required
+	Metric string `json:"metric,omitempty"`
+
+	// value is the reported value for the objective metric.
+	// +required
+	Value string `json:"value,omitempty"`
+}
+
+// OptimalTrial represents a trial on the optimal Pareto front (supporting single and multi-objective optimization).
+type OptimalTrial struct {
+	// trainJobName is the name of the underlying TrainJob that achieved this result.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +required
+	TrainJobName string `json:"trainJobName,omitempty"`
+
+	// metrics achieved by this optimal trial (multi-metric support).
+	// +listType=map
+	// +listMapKey=metric
+	// +kubebuilder:validation:MaxItems=10
+	// +optional
+	Metrics []ObjectiveMetricValue `json:"metrics,omitempty"`
+
+	// parameters assigned to this trial.
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=100
+	// +optional
+	Parameters []ParameterAssignment `json:"parameters,omitempty"`
+}
+
 type OptimizationJobStatus struct {
 	// +listType=map
 	// +listMapKey=type
-        // +optional
+	// +kubebuilder:validation:MaxItems=100
+	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-        // +optional
-	Result *Result `json:"result,omitempty"`
-}
-
-// Result tracks the parameters of the highest performing trial.
-type Result struct {
-	// TrainJobName is the name of the underlying TrainJob that achieved this result.
-        // +kubebuilder:validation:MinLength=1
-        // +required
-        TrainJobName string `json:"trainJobName"`
-
+	// results tracks optimal trials (Pareto front for multi-objective optimization).
 	// +listType=map
-	// +listMapKey=name
-        // +kubebuilder:validation:MaxItems=100
+	// +listMapKey=trainJobName
+	// +kubebuilder:validation:MaxItems=100
 	// +optional
-	Parameters []ParameterAssignment `json:"parameters,omitempty"`
+	Results []OptimalTrial `json:"results,omitempty"`
 }
 ```
 
@@ -336,7 +363,7 @@ metadata:
 spec:
   objectives:
     - metric: "val_loss"
-      direction: "minimize"
+      direction: "Minimize"
 
   searchAlgorithm:
     random: {}
@@ -373,14 +400,17 @@ status:
   conditions:
     - type: "Complete"
       status: "True"
-      reason: "MaxTrialsReached"
-  result:
-    trainJobName: "random-tuning-mvp-trial-ab12c"
-    parameters:
-      - name: "learning_rate"
-        value: "0.0021"
-      - name: "batch_size"
-        value: "32"
+      reason: "OptimizationJobCompleted"
+  results:
+    - trainJobName: "random-tuning-mvp-trial-ab12c"
+      metrics:
+        - metric: "val_loss"
+          value: "0.142"
+      parameters:
+        - name: "learning_rate"
+          value: "0.0021"
+        - name: "batch_size"
+          value: "32"
 ```
 
 ## 7. Reconciliation & Architecture (Phase 1)
@@ -399,9 +429,10 @@ For the initial v1alpha1 release, we will use the **existing Katib gRPC API desi
 - The controller will act as a translation adapter. It will map the new, strictly typed `OptimizationJob` structs (e.g., `SearchSpace`, `RandomAlgorithm`) into the legacy `Experiment` and `Trial` protobuf messages.
 - This allows us to natively reuse the existing, Python suggestion images (e.g., `ghcr.io/kubeflow/katib/suggestion-optuna:latest`) without requiring any immediate modifications to the Python microservices.
 - The controller remains stateless: it reconstructs the trial history by reading `TrainJob` annotations and passes the full history via the `GetSuggestionsRequest` on demand.
+- While `OptimizationJobSpec.Objectives` and `OptimizationJobStatus.Results` (computing the Pareto front across all objectives) are supported in the API and controller status tracking in Phase 1, Katib's legacy `api.v1.beta1` `ObjectiveSpec` only supports a single objective direction (`objectives[0]`) for the study. Wiring multi-objective directions (`directions=[...]`) into the suggestion sampler is deferred to Phase 2 alongside the gRPC contract and Optuna service refactoring.
 
 **Phase 2: gRPC Contract Refactoring (Post-Release)**
-After the core orchestration loop is stabilized in the first release, the gRPC contract will be refactored. The legacy `Experiment` protobuf dependency will be removed. The KEP will be updated at that time to align with the new structure.
+After the core orchestration loop is stabilized in the first release, the gRPC contract will be refactored (including native multi-objective study directions). The legacy `Experiment` protobuf dependency will be removed. The KEP will be updated at that time to align with the new structure.
 
 ### 7.3 The Suggestion Service Architecture
 

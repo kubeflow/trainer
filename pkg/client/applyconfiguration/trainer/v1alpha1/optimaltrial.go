@@ -18,35 +18,50 @@ limitations under the License.
 
 package v1alpha1
 
-// ResultApplyConfiguration represents a declarative configuration of the Result type for use
+// OptimalTrialApplyConfiguration represents a declarative configuration of the OptimalTrial type for use
 // with apply.
 //
-// Result tracks the parameters of the highest performing trial.
-type ResultApplyConfiguration struct {
+// OptimalTrial represents a trial on the optimal Pareto front (supporting single and multi-objective optimization).
+type OptimalTrialApplyConfiguration struct {
 	// trainJobName is the name of the underlying TrainJob that achieved this result.
 	TrainJobName *string `json:"trainJobName,omitempty"`
-	// parameters is the list of parameters for the result.
+	// metrics achieved by this optimal trial (multi-metric support).
+	Metrics []ObjectiveMetricValueApplyConfiguration `json:"metrics,omitempty"`
+	// parameters assigned to this trial.
 	Parameters []ParameterAssignmentApplyConfiguration `json:"parameters,omitempty"`
 }
 
-// ResultApplyConfiguration constructs a declarative configuration of the Result type for use with
+// OptimalTrialApplyConfiguration constructs a declarative configuration of the OptimalTrial type for use with
 // apply.
-func Result() *ResultApplyConfiguration {
-	return &ResultApplyConfiguration{}
+func OptimalTrial() *OptimalTrialApplyConfiguration {
+	return &OptimalTrialApplyConfiguration{}
 }
 
 // WithTrainJobName sets the TrainJobName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the TrainJobName field is set to the value of the last call.
-func (b *ResultApplyConfiguration) WithTrainJobName(value string) *ResultApplyConfiguration {
+func (b *OptimalTrialApplyConfiguration) WithTrainJobName(value string) *OptimalTrialApplyConfiguration {
 	b.TrainJobName = &value
+	return b
+}
+
+// WithMetrics adds the given value to the Metrics field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Metrics field.
+func (b *OptimalTrialApplyConfiguration) WithMetrics(values ...*ObjectiveMetricValueApplyConfiguration) *OptimalTrialApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithMetrics")
+		}
+		b.Metrics = append(b.Metrics, *values[i])
+	}
 	return b
 }
 
 // WithParameters adds the given value to the Parameters field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Parameters field.
-func (b *ResultApplyConfiguration) WithParameters(values ...*ParameterAssignmentApplyConfiguration) *ResultApplyConfiguration {
+func (b *OptimalTrialApplyConfiguration) WithParameters(values ...*ParameterAssignmentApplyConfiguration) *OptimalTrialApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithParameters")

@@ -76,6 +76,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.MPIMLPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Objective"):
 		return &trainerv1alpha1.ObjectiveApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ObjectiveMetricValue"):
+		return &trainerv1alpha1.ObjectiveMetricValueApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("OptimalTrial"):
+		return &trainerv1alpha1.OptimalTrialApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("OptimizationJob"):
 		return &trainerv1alpha1.OptimizationJobApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("OptimizationJobSpec"):
@@ -98,8 +102,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.RandomAlgorithmApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ReplicatedJobPatch"):
 		return &trainerv1alpha1.ReplicatedJobPatchApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("Result"):
-		return &trainerv1alpha1.ResultApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimePatch"):
 		return &trainerv1alpha1.RuntimePatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimeRef"):

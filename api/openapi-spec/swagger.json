@@ -15238,12 +15238,62 @@
           }
         }
       },
-      "trainer.v1alpha1.OptimizationJob": {
-        "description": "OptimizationJob is the Schema for the optimizationjobs API. OptimizationJob is the Schema for the optimizationjobs API.",
+      "trainer.v1alpha1.ObjectiveMetricValue": {
+        "description": "ObjectiveMetricValue represents a single objective metric and its value.",
         "type": "object",
         "required": [
-          "spec"
+          "metric",
+          "value"
         ],
+        "properties": {
+          "metric": {
+            "description": "metric is the name of the objective metric.",
+            "type": "string"
+          },
+          "value": {
+            "description": "value is the reported value for the objective metric.",
+            "type": "string"
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimalTrial": {
+        "description": "OptimalTrial represents a trial on the optimal Pareto front (supporting single and multi-objective optimization).",
+        "type": "object",
+        "required": [
+          "trainJobName"
+        ],
+        "properties": {
+          "metrics": {
+            "description": "metrics achieved by this optimal trial (multi-metric support).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/trainer.v1alpha1.ObjectiveMetricValue"
+            },
+            "x-kubernetes-list-map-keys": [
+              "metric"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "parameters": {
+            "description": "parameters assigned to this trial.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/trainer.v1alpha1.ParameterAssignment"
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "trainJobName": {
+            "description": "trainJobName is the name of the underlying TrainJob that achieved this result.",
+            "type": "string"
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJob": {
+        "description": "OptimizationJob represents configuration of a hyperparameter optimization job.",
+        "type": "object",
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -15254,7 +15304,7 @@
             "type": "string"
           },
           "metadata": {
-            "description": "metadata is the object meta for the optimization job.",
+            "description": "metadata of the OptimizationJob.",
             "default": {},
             "allOf": [
               {
@@ -15263,7 +15313,7 @@
             ]
           },
           "spec": {
-            "description": "spec is the spec for the optimization job.",
+            "description": "spec of the OptimizationJob.",
             "default": {},
             "allOf": [
               {
@@ -15272,7 +15322,8 @@
             ]
           },
           "status": {
-            "description": "status is the status for the optimization job.",
+            "description": "status of OptimizationJob.",
+            "default": {},
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJobStatus"
@@ -15282,7 +15333,7 @@
         }
       },
       "trainer.v1alpha1.OptimizationJobList": {
-        "description": "OptimizationJobList contains a list of OptimizationJob.",
+        "description": "OptimizationJobList is a list of OptimizationJobs.",
         "type": "object",
         "required": [
           "items"
@@ -15293,7 +15344,6 @@
             "type": "string"
           },
           "items": {
-            "description": "items is the list of optimization jobs.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJob"
@@ -15304,7 +15354,6 @@
             "type": "string"
           },
           "metadata": {
-            "description": "listMeta is the list meta for the optimization job list.",
             "default": {},
             "allOf": [
               {
@@ -15389,14 +15438,16 @@
             ],
             "x-kubernetes-list-type": "map"
           },
-          "result": {
-            "description": "result is the result of the optimization job.",
-            "default": {},
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.Result"
-              }
-            ]
+          "results": {
+            "description": "results tracks optimal trials (Pareto front for multi-objective optimization).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/trainer.v1alpha1.OptimalTrial"
+            },
+            "x-kubernetes-list-map-keys": [
+              "trainJobName"
+            ],
+            "x-kubernetes-list-type": "map"
           }
         }
       },
@@ -15646,30 +15697,6 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobTemplatePatch"
               }
             ]
-          }
-        }
-      },
-      "trainer.v1alpha1.Result": {
-        "description": "Result tracks the parameters of the highest performing trial.",
-        "type": "object",
-        "required": [
-          "trainJobName"
-        ],
-        "properties": {
-          "parameters": {
-            "description": "parameters is the list of parameters for the result.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/trainer.v1alpha1.ParameterAssignment"
-            },
-            "x-kubernetes-list-map-keys": [
-              "name"
-            ],
-            "x-kubernetes-list-type": "map"
-          },
-          "trainJobName": {
-            "description": "trainJobName is the name of the underlying TrainJob that achieved this result.",
-            "type": "string"
           }
         }
       },

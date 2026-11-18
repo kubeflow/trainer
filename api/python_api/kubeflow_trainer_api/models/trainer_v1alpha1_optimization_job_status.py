@@ -34,7 +34,7 @@ import json
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_apis_meta_v1_condition import IoK8sApimachineryPkgApisMetaV1Condition
-from kubeflow_trainer_api.models.trainer_v1alpha1_result import TrainerV1alpha1Result
+from kubeflow_trainer_api.models.trainer_v1alpha1_optimal_trial import TrainerV1alpha1OptimalTrial
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -43,8 +43,8 @@ class TrainerV1alpha1OptimizationJobStatus(BaseModel):
     OptimizationJobStatus is the status of the optimization job.
     """ # noqa: E501
     conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = Field(default=None, description="conditions is the list of conditions for the optimization job.")
-    result: Optional[TrainerV1alpha1Result] = Field(default=None, description="result is the result of the optimization job.")
-    __properties: ClassVar[List[str]] = ["conditions", "result"]
+    results: Optional[List[TrainerV1alpha1OptimalTrial]] = Field(default=None, description="results tracks optimal trials (Pareto front for multi-objective optimization).")
+    __properties: ClassVar[List[str]] = ["conditions", "results"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -92,9 +92,13 @@ class TrainerV1alpha1OptimizationJobStatus(BaseModel):
                 if _item_conditions:
                     _items.append(_item_conditions.to_dict())
             _dict['conditions'] = _items
-        # override the default output from pydantic by calling `to_dict()` of result
-        if self.result:
-            _dict['result'] = self.result.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of each item in results (list)
+        _items = []
+        if self.results:
+            for _item_results in self.results:
+                if _item_results:
+                    _items.append(_item_results.to_dict())
+            _dict['results'] = _items
         return _dict
 
     @classmethod
@@ -108,7 +112,7 @@ class TrainerV1alpha1OptimizationJobStatus(BaseModel):
 
         _obj = cls.model_validate({
             "conditions": [IoK8sApimachineryPkgApisMetaV1Condition.from_dict(_item) for _item in obj["conditions"]] if obj.get("conditions") is not None else None,
-            "result": TrainerV1alpha1Result.from_dict(obj["result"]) if obj.get("result") is not None else None
+            "results": [TrainerV1alpha1OptimalTrial.from_dict(_item) for _item in obj["results"]] if obj.get("results") is not None else None
         })
         return _obj
 

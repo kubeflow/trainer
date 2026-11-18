@@ -61,6 +61,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Metric":                           schema_pkg_apis_trainer_v1alpha1_Metric(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ModelInitializer":                 schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Objective":                        schema_pkg_apis_trainer_v1alpha1_Objective(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ObjectiveMetricValue":             schema_pkg_apis_trainer_v1alpha1_ObjectiveMetricValue(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimalTrial":                     schema_pkg_apis_trainer_v1alpha1_OptimalTrial(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJob":                  schema_pkg_apis_trainer_v1alpha1_OptimizationJob(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJobList":              schema_pkg_apis_trainer_v1alpha1_OptimizationJobList(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJobSpec":              schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref),
@@ -73,7 +75,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplatePatch":                 schema_pkg_apis_trainer_v1alpha1_PodTemplatePatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RandomAlgorithm":                  schema_pkg_apis_trainer_v1alpha1_RandomAlgorithm(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ReplicatedJobPatch":               schema_pkg_apis_trainer_v1alpha1_ReplicatedJobPatch(ref),
-		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Result":                           schema_pkg_apis_trainer_v1alpha1_Result(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimePatch":                     schema_pkg_apis_trainer_v1alpha1_RuntimePatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimeRef":                       schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SearchAlgorithm":                  schema_pkg_apis_trainer_v1alpha1_SearchAlgorithm(ref),
@@ -1410,11 +1411,104 @@ func schema_pkg_apis_trainer_v1alpha1_Objective(ref common.ReferenceCallback) co
 	}
 }
 
+func schema_pkg_apis_trainer_v1alpha1_ObjectiveMetricValue(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ObjectiveMetricValue represents a single objective metric and its value.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"metric": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metric is the name of the objective metric.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "value is the reported value for the objective metric.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"metric", "value"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_OptimalTrial(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "OptimalTrial represents a trial on the optimal Pareto front (supporting single and multi-objective optimization).",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"trainJobName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "trainJobName is the name of the underlying TrainJob that achieved this result.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metrics": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"metric",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "metrics achieved by this optimal trial (multi-metric support).",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ObjectiveMetricValue"),
+									},
+								},
+							},
+						},
+					},
+					"parameters": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "parameters assigned to this trial.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ParameterAssignment"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"trainJobName"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ObjectiveMetricValue", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ParameterAssignment"},
+	}
+}
+
 func schema_pkg_apis_trainer_v1alpha1_OptimizationJob(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "OptimizationJob is the Schema for the optimizationjobs API. OptimizationJob is the Schema for the optimizationjobs API.",
+				Description: "OptimizationJob represents configuration of a hyperparameter optimization job.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -1433,26 +1527,26 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJob(ref common.ReferenceCallba
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "metadata is the object meta for the optimization job.",
+							Description: "metadata of the OptimizationJob.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "spec is the spec for the optimization job.",
+							Description: "spec of the OptimizationJob.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJobSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "status is the status for the optimization job.",
+							Description: "status of OptimizationJob.",
+							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJobStatus"),
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -1464,7 +1558,7 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobList(ref common.ReferenceCa
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "OptimizationJobList contains a list of OptimizationJob.",
+				Description: "OptimizationJobList is a list of OptimizationJobs.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -1483,15 +1577,13 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobList(ref common.ReferenceCa
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "listMeta is the list meta for the optimization job list.",
-							Default:     map[string]interface{}{},
-							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+							Default: map[string]interface{}{},
+							Ref:     ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
 						SchemaProps: spec.SchemaProps{
-							Description: "items is the list of optimization jobs.",
-							Type:        []string{"array"},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -1623,18 +1715,32 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobStatus(ref common.Reference
 							},
 						},
 					},
-					"result": {
+					"results": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"trainJobName",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
-							Description: "result is the result of the optimization job.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Result"),
+							Description: "results tracks optimal trials (Pareto front for multi-objective optimization).",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimalTrial"),
+									},
+								},
+							},
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Result", metav1.Condition{}.OpenAPIModelName()},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimalTrial", metav1.Condition{}.OpenAPIModelName()},
 	}
 }
 
@@ -2021,50 +2127,6 @@ func schema_pkg_apis_trainer_v1alpha1_ReplicatedJobPatch(ref common.ReferenceCal
 		},
 		Dependencies: []string{
 			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobTemplatePatch"},
-	}
-}
-
-func schema_pkg_apis_trainer_v1alpha1_Result(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Result tracks the parameters of the highest performing trial.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"trainJobName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "trainJobName is the name of the underlying TrainJob that achieved this result.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"parameters": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type": "map",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "parameters is the list of parameters for the result.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ParameterAssignment"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"trainJobName"},
-			},
-		},
-		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ParameterAssignment"},
 	}
 }
 

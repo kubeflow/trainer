@@ -29,8 +29,8 @@ import (
 type OptimizationJobStatusApplyConfiguration struct {
 	// conditions is the list of conditions for the optimization job.
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	// result is the result of the optimization job.
-	Result *ResultApplyConfiguration `json:"result,omitempty"`
+	// results tracks optimal trials (Pareto front for multi-objective optimization).
+	Results []OptimalTrialApplyConfiguration `json:"results,omitempty"`
 }
 
 // OptimizationJobStatusApplyConfiguration constructs a declarative configuration of the OptimizationJobStatus type for use with
@@ -52,10 +52,15 @@ func (b *OptimizationJobStatusApplyConfiguration) WithConditions(values ...*v1.C
 	return b
 }
 
-// WithResult sets the Result field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Result field is set to the value of the last call.
-func (b *OptimizationJobStatusApplyConfiguration) WithResult(value *ResultApplyConfiguration) *OptimizationJobStatusApplyConfiguration {
-	b.Result = value
+// WithResults adds the given value to the Results field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Results field.
+func (b *OptimizationJobStatusApplyConfiguration) WithResults(values ...*OptimalTrialApplyConfiguration) *OptimizationJobStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithResults")
+		}
+		b.Results = append(b.Results, *values[i])
+	}
 	return b
 }
