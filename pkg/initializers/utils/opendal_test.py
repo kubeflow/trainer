@@ -15,14 +15,92 @@
 """Tests for OpenDAL utilities."""
 
 import fnmatch
+import hashlib
 import os
+import stat
 import tempfile
+from typing import Optional
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from opendal.exceptions import NotFound
 
+import pkg.initializers.utils.opendal as opendal_utils
 from pkg.initializers.utils.opendal import S3Storage
+
+
+class FakeReader:
+    """A file object like the one returned by OpenDAL's Operator.open(key, "rb").
+
+    It returns at most ``max_read`` bytes per call, to simulate reads that are
+    shorter than requested before the end of the object, and raises ``error`` once
+    ``fail_after`` bytes have been returned. Every call is recorded in ``events``.
+    """
+
+    def __init__(
+        self,
+        data: bytes,
+        max_read: Optional[int] = None,
+        fail_after: Optional[int] = None,
+        error: Optional[Exception] = None,
+        events: Optional[list] = None,
+    ):
+        self.data = data
+        self.max_read = max_read
+        self.fail_after = fail_after
+        self.error = error
+        self.events = events if events is not None else []
+        self.offset = 0
+        self.closed = False
+
+    def read(self, size: int) -> bytes:
+        if self.closed:
+            raise OSError("I/O operation on closed file.")
+        if self.fail_after is not None and self.offset >= self.fail_after:
+            raise self.error
+        if self.max_read is not None:
+            size = min(size, self.max_read)
+        chunk = self.data[self.offset : self.offset + size]
+        self.offset += len(chunk)
+        self.events.append(("read", size, len(chunk)))
+        return chunk
+
+    def close(self):
+        self.closed = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        self.close()
+
+
+class RecordingWriter:
+    """Wraps the temporary file to record writes and to fail on close."""
+
+    def __init__(self, file, events: list, close_error: Optional[Exception] = None):
+        self.file = file
+        self.events = events
+        self.close_error = close_error
+
+    def write(self, data: bytes) -> int:
+        self.events.append(("write", len(data)))
+        return self.file.write(data)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        self.file.close()
+        if self.close_error:
+            raise self.close_error
+
+
+def recording_fdopen(events: list, close_error: Optional[Exception] = None):
+    real_fdopen = os.fdopen
+    return lambda fd, *args, **kwargs: RecordingWriter(
+        real_fdopen(fd, *args, **kwargs), events, close_error
+    )
 
 
 class TestS3Storage:
@@ -127,8 +205,13 @@ class TestS3Storage:
             mock_entries = [self._create_mock_entry(path) for path in files.keys()]
             mock_operator.list.return_value = mock_entries
 
-            # Setup read side effect
-            mock_operator.read.side_effect = list(files.values())
+            readers = {}
+
+            def open_object(key, mode):
+                readers[key] = FakeReader(files[key])
+                return readers[key]
+
+            mock_operator.open.side_effect = open_object
 
             storage = S3Storage(bucket="test-bucket")
 
@@ -164,6 +247,14 @@ class TestS3Storage:
                                 actual_content == expected_content
                             ), f"Content mismatch for {relative_path}"
 
+                assert not [
+                    name for name in os.listdir(tmpdir) if name.endswith(".part")
+                ]
+
+            # Objects are streamed, never read whole.
+            mock_operator.read.assert_not_called()
+            assert all(reader.closed for reader in readers.values())
+
     def _mock_bucket(self, mock_operator: MagicMock, objects: dict[str, bytes]):
         """Make the mock operator behave like OpenDAL over a bucket of objects.
 
@@ -186,7 +277,7 @@ class TestS3Storage:
 
         mock_operator.list.side_effect = list_objects
         mock_operator.stat.side_effect = stat
-        mock_operator.read.side_effect = lambda key: objects[key]
+        mock_operator.open.side_effect = lambda key, mode: FakeReader(objects[key])
 
     def _downloaded_files(self, directory: str) -> list[str]:
         return sorted(
@@ -222,11 +313,9 @@ class TestS3Storage:
             # The directory is listed with a trailing slash, so the siblings are
             # never returned by the storage, let alone read.
             mock_operator.list.assert_called_once_with("models/llama/", recursive=True)
-            assert sorted(
-                call.args[0] for call in mock_operator.read.call_args_list
-            ) == [
-                "models/llama/config.json",
-                "models/llama/weights/model.safetensors",
+            assert sorted(call.args for call in mock_operator.open.call_args_list) == [
+                ("models/llama/config.json", "rb"),
+                ("models/llama/weights/model.safetensors", "rb"),
             ]
 
     def test_download_single_object(self):
@@ -256,7 +345,7 @@ class TestS3Storage:
 
             # The exact key is read directly, nothing is listed.
             mock_operator.list.assert_not_called()
-            mock_operator.read.assert_called_once_with("datasets/train.parquet")
+            mock_operator.open.assert_called_once_with("datasets/train.parquet", "rb")
 
     def test_download_exact_object_takes_precedence(self):
         """When both an object and a directory have the name, the object wins."""
@@ -341,7 +430,7 @@ class TestS3Storage:
                     storage.download(prefix=prefix, destination_path=tmpdir)
                 assert os.listdir(tmpdir) == []
 
-            mock_operator.read.assert_not_called()
+            mock_operator.open.assert_not_called()
 
     def test_download_all_objects_ignored_warns(self, caplog):
         """Ignore patterns that skip every object log a warning but do not fail."""
@@ -363,4 +452,242 @@ class TestS3Storage:
                 assert os.listdir(tmpdir) == []
 
             assert "skipped by the ignore patterns" in caplog.text
-            mock_operator.read.assert_not_called()
+            mock_operator.open.assert_not_called()
+
+    def _storage(self, mock_opendal, objects: dict[str, bytes]) -> S3Storage:
+        mock_operator = MagicMock()
+        mock_opendal.Operator.return_value = mock_operator
+        mock_operator.layer.return_value = mock_operator
+        self._mock_bucket(mock_operator, objects)
+        return S3Storage(bucket="test-bucket", region="us-east-1")
+
+    @pytest.mark.parametrize(
+        "size,max_read",
+        [
+            (0, None),
+            (3, None),
+            (8, None),
+            (21, None),
+            # Every read returns less than requested before the end of the object.
+            (21, 3),
+        ],
+        ids=["empty", "smaller", "exact", "multiple", "short-reads"],
+    )
+    def test_download_streams_in_chunks(self, size, max_read):
+        """Objects are streamed in bounded chunks and each chunk is written at once."""
+        data = bytes(i % 251 for i in range(size))
+        events = []
+        with (
+            patch("pkg.initializers.utils.opendal.opendal") as mock_opendal,
+            patch.object(opendal_utils, "DOWNLOAD_CHUNK_SIZE", 8),
+            patch.object(opendal_utils.os, "fdopen", recording_fdopen(events)),
+        ):
+            storage = self._storage(mock_opendal, {})
+            reader = FakeReader(data, max_read=max_read, events=events)
+            storage.op.open.side_effect = None
+            storage.op.open.return_value = reader
+            storage.op.stat.side_effect = None
+            storage.op.stat.return_value = Mock(is_file=True)
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(prefix="data/object.bin", destination_path=tmpdir)
+
+                with open(os.path.join(tmpdir, "object.bin"), "rb") as f:
+                    content = f.read()
+                assert hashlib.sha256(content).digest() == hashlib.sha256(data).digest()
+                assert os.listdir(tmpdir) == ["object.bin"]
+
+        storage.op.open.assert_called_once_with("data/object.bin", "rb")
+        storage.op.read.assert_not_called()
+        assert reader.closed
+        reads = [event for event in events if event[0] == "read"]
+        assert all(0 < requested <= 8 for _, requested, _ in reads)
+        # Every non-empty read is written before the next read, and the last read
+        # is the empty one that marks the end of the object.
+        expected = []
+        for _, requested, returned in reads[:-1]:
+            expected += [("read", requested, returned), ("write", returned)]
+        expected.append(reads[-1])
+        assert events == expected
+        assert reads[-1][2] == 0
+
+    @pytest.mark.parametrize("existing", [None, b"old content"])
+    @pytest.mark.parametrize("failure", ["open", "read", "close", "replace"])
+    def test_download_failure_keeps_destination(self, failure, existing):
+        """A failed download removes its temporary file and keeps the destination."""
+        error = OSError(f"{failure} failed")
+        reader = FakeReader(b"new content", fail_after=4, error=error)
+        if failure != "read":
+            reader.fail_after = None
+
+        events = []
+        with tempfile.TemporaryDirectory() as tmpdir:
+            destination = os.path.join(tmpdir, "object.bin")
+            if existing is not None:
+                with open(destination, "wb") as f:
+                    f.write(existing)
+
+            with (
+                patch("pkg.initializers.utils.opendal.opendal") as mock_opendal,
+                patch.object(opendal_utils, "DOWNLOAD_CHUNK_SIZE", 4),
+                patch.object(
+                    opendal_utils.os,
+                    "fdopen",
+                    recording_fdopen(events, error if failure == "close" else None),
+                ),
+                patch.object(
+                    opendal_utils.os,
+                    "replace",
+                    side_effect=error if failure == "replace" else os.replace,
+                ),
+            ):
+                storage = self._storage(mock_opendal, {"data/object.bin": b""})
+                storage.op.open.side_effect = (
+                    error if failure == "open" else lambda key, mode: reader
+                )
+
+                with pytest.raises(OSError, match=f"{failure} failed"):
+                    storage.download(prefix="data/", destination_path=tmpdir)
+
+            if existing is None:
+                assert os.listdir(tmpdir) == []
+            else:
+                assert os.listdir(tmpdir) == ["object.bin"]
+                with open(destination, "rb") as f:
+                    assert f.read() == existing
+
+        if failure != "open":
+            assert reader.closed
+
+    def test_download_failure_logs_cleanup_error(self, caplog):
+        """A failure to remove the temporary file does not hide the download error."""
+        with (
+            patch("pkg.initializers.utils.opendal.opendal") as mock_opendal,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
+            storage = self._storage(mock_opendal, {"data/object.bin": b""})
+            storage.op.open.side_effect = OSError("open failed")
+
+            with (
+                patch.object(
+                    opendal_utils.os,
+                    "remove",
+                    side_effect=PermissionError("remove failed"),
+                ),
+                caplog.at_level("ERROR"),
+                pytest.raises(OSError, match="open failed"),
+            ):
+                storage.download(prefix="data/", destination_path=tmpdir)
+
+        assert "Failed to remove temporary file" in caplog.text
+        assert "remove failed" in caplog.text
+
+    def test_download_replaces_existing_file(self):
+        """A successful download replaces an existing file and keeps its mode."""
+        with (
+            patch("pkg.initializers.utils.opendal.opendal") as mock_opendal,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
+            storage = self._storage(mock_opendal, {"data/object.bin": b"new content"})
+            destination = os.path.join(tmpdir, "object.bin")
+            with open(destination, "wb") as f:
+                f.write(b"old content that is longer")
+            os.chmod(destination, 0o640)
+
+            storage.download(prefix="data/", destination_path=tmpdir)
+
+            with open(destination, "rb") as f:
+                assert f.read() == b"new content"
+            assert stat.S_IMODE(os.stat(destination).st_mode) == 0o640
+            assert os.listdir(tmpdir) == ["object.bin"]
+
+    def test_download_new_file_mode_follows_umask(self):
+        """A new file gets the mode open() would give it, not the temporary 0600."""
+        previous_umask = os.umask(0o027)
+        try:
+            with (
+                patch("pkg.initializers.utils.opendal.opendal") as mock_opendal,
+                tempfile.TemporaryDirectory() as tmpdir,
+            ):
+                storage = self._storage(mock_opendal, {"data/object.bin": b"content"})
+
+                storage.download(prefix="data/", destination_path=tmpdir)
+
+                mode = os.stat(os.path.join(tmpdir, "object.bin")).st_mode
+                assert stat.S_IMODE(mode) == 0o640
+        finally:
+            os.umask(previous_umask)
+
+    def test_download_long_file_name(self):
+        """The temporary file name does not grow with the destination file name."""
+        name = "a" * 255
+        with (
+            patch("pkg.initializers.utils.opendal.opendal") as mock_opendal,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
+            storage = self._storage(mock_opendal, {f"data/{name}": b"content"})
+
+            storage.download(prefix="data/", destination_path=tmpdir)
+
+            assert os.listdir(tmpdir) == [name]
+
+    def test_download_failure_keeps_earlier_objects(self):
+        """When an object fails, the objects downloaded before it are kept."""
+        objects = {"data/a.bin": b"first", "data/b.bin": b"second"}
+        with (
+            patch("pkg.initializers.utils.opendal.opendal") as mock_opendal,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
+            storage = self._storage(mock_opendal, objects)
+            error = OSError("connection reset")
+            storage.op.open.side_effect = lambda key, mode: FakeReader(
+                objects[key],
+                fail_after=0 if key == "data/b.bin" else None,
+                error=error,
+            )
+
+            with pytest.raises(OSError, match="connection reset"):
+                storage.download(prefix="data/", destination_path=tmpdir)
+
+            assert os.listdir(tmpdir) == ["a.bin"]
+            with open(os.path.join(tmpdir, "a.bin"), "rb") as f:
+                assert f.read() == b"first"
+
+    @pytest.mark.parametrize(
+        "entries,expected",
+        [
+            (
+                [
+                    ("data/", True),
+                    ("data/train/", True),
+                    ("data/train/rows.parquet", False),
+                    ("data/README.md", False),
+                ],
+                ["README.md", "train/rows.parquet"],
+            ),
+            ([("data/", True), ("data/train/", True)], None),
+        ],
+        ids=["mixed", "directories-only"],
+    )
+    def test_download_skips_directory_entries(self, entries, expected):
+        """Directory entries in the listing are never downloaded."""
+        with (
+            patch("pkg.initializers.utils.opendal.opendal") as mock_opendal,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
+            storage = self._storage(mock_opendal, {})
+            storage.op.list.side_effect = None
+            storage.op.list.return_value = [
+                self._create_mock_entry(path, is_dir) for path, is_dir in entries
+            ]
+            storage.op.open.side_effect = lambda key, mode: FakeReader(key.encode())
+
+            if expected is None:
+                with pytest.raises(FileNotFoundError, match="No objects under"):
+                    storage.download(prefix="data/", destination_path=tmpdir)
+                storage.op.open.assert_not_called()
+            else:
+                storage.download(prefix="data/", destination_path=tmpdir)
+                assert self._downloaded_files(tmpdir) == expected
+                opened = sorted(call.args[0] for call in storage.op.open.call_args_list)
+                assert opened == ["data/README.md", "data/train/rows.parquet"]
