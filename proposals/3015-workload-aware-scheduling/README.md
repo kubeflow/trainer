@@ -24,7 +24,7 @@ without workload-aware scheduling constraints unless the user opts into an exter
 
 The Kubernetes community has converged on the `Workload`/`PodGroup` APIs as the standard
 expression of gang scheduling and other workload-aware scheduling primitives. With native
-integration planned for [the Job controller](https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/5547-workload-job-integration)
+integration planned for [the Job controller](https://github.com/kubernetes/enhancements/tree/master/keps/sig-apps/5547-integrate-workload-with-job)
 and JobSet [kubernetes-sigs/jobset#1253](https://github.com/kubernetes-sigs/jobset/pull/1253),
 TrainJob is the highest-level controller that must own the `Workload` creation.
 
