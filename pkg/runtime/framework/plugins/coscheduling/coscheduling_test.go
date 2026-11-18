@@ -20,14 +20,17 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -583,5 +586,22 @@ func TestCoScheduling(t *testing.T) {
 				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
 			}
 		})
+	}
+}
+
+func TestReconcilerBuildersLogsMissingPodGroupCRD(t *testing.T) {
+	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
+	ctx := klog.NewContext(context.Background(), logger)
+	cli := utiltesting.NewClientBuilder().WithRESTMapper(meta.NewDefaultRESTMapper(nil)).Build()
+	plugin, err := New(ctx, cli, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if builders := plugin.(*CoScheduling).ReconcilerBuilders(); builders != nil {
+		t.Errorf("ReconcilerBuilders() = %v, want nil", builders)
+	}
+	logs := logger.GetSink().(ktesting.Underlier).GetBuffer().String()
+	if !strings.Contains(logs, "PodGroup CRDs must be installed in advance") {
+		t.Errorf("expected the missing PodGroup CRD error to be logged, got logs: %q", logs)
 	}
 }

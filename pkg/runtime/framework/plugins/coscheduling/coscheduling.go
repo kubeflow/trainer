@@ -66,11 +66,12 @@ const Name = "CoScheduling"
 // +kubebuilder:rbac:groups=node.k8s.io,resources=runtimeclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=limitranges,verbs=get;list;watch
 
-func New(_ context.Context, client client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
+func New(ctx context.Context, client client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
 	return &CoScheduling{
 		client:     client,
 		restMapper: client.RESTMapper(),
 		scheme:     client.Scheme(),
+		logger:     ctrl.LoggerFrom(ctx).WithValues("pluginName", Name),
 	}, nil
 }
 
