@@ -1,0 +1,145 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Reusable workflow to build a Kubeflow Trainer image on a single runner architecture.
+name: Build Container Image
+
+on:
+  workflow_call:
+    inputs:
+      component-name:
+        required: true
+        type: string
+        description: name of the component to build, e.g. trainer-controller-manager
+      dockerfile:
+        required: true
+        type: string
+        description: path for Dockerfile
+      platforms:
+        required: true
+        type: string
+        description: platforms to build on this runner, e.g. linux/amd64
+      arch:
+        required: true
+        type: string
+        description: runner architecture name, e.g. x86 or arm64
+      runs-on:
+        required: true
+        type: string
+        description: runner label to execute the build on
+      context:
+        required: false
+        type: string
+        default: .
+        description: e.g, examples/xgboost/xgboost-dist
+      ref:
+        required: false
+        type: string
+        default: ""
+        description: git ref (tag, branch, or SHA) to check out and build the image from
+      publish:
+        required: false
+        type: boolean
+        default: false
+        description: whether to push the built image digest to the registry
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Build ${{ inputs.component-name }} (${{ inputs.arch }})
+    runs-on: ${{ inputs.runs-on }}
+    env:
+      # Images are never pushed on pull requests.
+      SHOULD_PUBLISH: ${{ inputs.publish }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: GHCR Login
+        if: env.SHOULD_PUBLISH == 'true'
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Authenticate to Docker Hub to avoid the rate limits for the base images.
+      - name: Docker Hub Login
+        if: env.SHOULD_PUBLISH == 'true'
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # QEMU is only required for the platforms without native runners.
+      - name: Setup QEMU
+        if: contains(inputs.platforms, 'ppc64le')
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        with:
+          platforms: ppc64le
+
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # Push by digest only, the tags are created once the images for all architectures are built.
+      - name: Build and Push By Digest
+        if: env.SHOULD_PUBLISH == 'true'
+        id: build
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          platforms: ${{ inputs.platforms }}
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          outputs: type=image,name=ghcr.io/kubeflow/trainer/${{ inputs.component-name }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ inputs.component-name }}-${{ inputs.arch }}
+          cache-to: type=gha,scope=${{ inputs.component-name }}-${{ inputs.arch }},ignore-error=true
+
+      - name: Test Build
+        if: env.SHOULD_PUBLISH != 'true'
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          platforms: ${{ inputs.platforms }}
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          push: false
+          cache-from: type=gha,scope=${{ inputs.component-name }}-${{ inputs.arch }}
+          cache-to: type=gha,scope=${{ inputs.component-name }}-${{ inputs.arch }},ignore-error=true
+
+      - name: Export Digest
+        if: env.SHOULD_PUBLISH == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/digests"
+          touch "${RUNNER_TEMP}/digests/${DIGEST#sha256:}"
+
+      - name: Upload Digest
+        if: env.SHOULD_PUBLISH == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: digests-${{ inputs.component-name }}-${{ inputs.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
