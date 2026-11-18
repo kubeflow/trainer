@@ -63,7 +63,7 @@
    <div class="feature-card">
    <div class="feature-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--lp-blue)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
    <h3>Production Ready</h3>
-   <p>Used in production by organizations across the CNCF ecosystem. See <a href="https://github.com/kubeflow/trainer/blob/master/ADOPTERS.md">ADOPTERS.md</a> for adopters. Backed by the Kubeflow community with enterprise support.</p>
+   <p>Used in production by organizations across the CNCF ecosystem. See <a href="community/adopters.html">the adopters directory</a>. Backed by the Kubeflow community with enterprise support.</p>
    </div>
 
    </div>
@@ -103,8 +103,8 @@
    <strong>Operator Guides</strong>
    <p>Documentation for platform administrators deploying and managing Kubeflow Trainer</p>
    </a>
-   <a class="doc-card" href="contributor-guides/index.html">
-   <strong>Contributor Guides</strong>
+   <a class="doc-card" href="contributor-guides/contributing.html">
+   <strong>Contributor Guide</strong>
    <p>Architecture, development workflow, and how to extend Kubeflow Trainer</p>
    </a>
    <a class="doc-card" href="legacy-v1/index.html">
@@ -163,5 +163,6 @@
    getting-started/index
    user-guides/index
    operator-guides/index
-   contributor-guides/index
+   Contributor Guide <contributor-guides/contributing>
+   Community <community/index>
    legacy-v1/index

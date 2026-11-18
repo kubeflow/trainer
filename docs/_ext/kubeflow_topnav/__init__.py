@@ -16,10 +16,23 @@
 
 from pathlib import Path
 
+TOPNAV_HTML = (Path(__file__).parent / "topnav.html").read_text(encoding="utf-8")
+
+
+def render_topnav(app, pagename, templatename, context, doctree):
+    # Resolve internal links relative to the current page, so they work both locally
+    # and on ReadTheDocs, where pages are served under a version prefix (e.g. /en/latest/).
+    pathto = context["pathto"]
+    html = TOPNAV_HTML.replace("__TOPNAV_ROOT_URL__", pathto("index"))
+    html = html.replace("__TOPNAV_OVERVIEW_URL__", pathto("overview/index"))
+    html = html.replace("__TOPNAV_COMMUNITY_URL__", pathto("community/index"))
+    context["theme_announcement"] = html
+
 
 def setup(app):
-    topnav_html = (Path(__file__).parent / "topnav.html").read_text(encoding="utf-8")
-    app.config.html_theme_options["announcement"] = topnav_html
+    # Enable Furo's announcement slot; the per-page HTML is rendered in render_topnav.
+    app.config.html_theme_options["announcement"] = TOPNAV_HTML
+    app.connect("html-page-context", render_topnav)
     return {
         "version": "0.1",
         "parallel_read_safe": True,

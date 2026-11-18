@@ -1,0 +1,96 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# =====================================================================
+# KUBEFLOW TRAINER TALKS, CASE STUDIES, TUTORIALS, AND BLOG POSTS
+# =====================================================================
+# This file is rendered on the website:
+#  - Talks, case studies, and tutorials:
+#    https://trainer.kubeflow.org/en/latest/community/talks.html
+#  - Blog posts:
+#    https://trainer.kubeflow.org/en/latest/community/blogs.html
+#  - Entries with "adopters" are also listed on those organizations' cards:
+#    https://trainer.kubeflow.org/en/latest/community/adopters.html
+#
+# How to add an entry:
+# 1. Copy one of the entries below and paste it at the bottom of this file.
+# 2. Fill in the details and submit a pull request.
+#
+# Fields:
+#  - title:    Title of the talk or article (Required)
+#  - url:      URL to the recording, slides, or article (Required)
+#  - date:     Publication date in YYYY-MM format, e.g. 2026-03 (Required)
+#  - type:     One of: talk, case-study, tutorial, blog (Required)
+#  - event:    Conference or publication, e.g. "KubeCon EU 2026" or "Kubeflow Blog" (Optional)
+#  - adopters: Names of organizations from adopters.yaml this entry is about (Optional)
+#
+# Wrap values in double quotes if they contain a colon followed by a space.
+# Entries are sorted by date on the website, so the order here does not matter.
+# =====================================================================
+
+# Talks
+
+- title: "Kubeflow Trainer Observability: Real-Time Progress Tracking for Reliable ML Training on Kubernetes"
+  url: https://youtu.be/2PkIZPJk6I0
+  date: 2026-04
+  type: talk
+  adopters:
+    - Red Hat
+
+- title: Streamline LLM Fine-tuning on Kubernetes With Kubeflow LLM Trainer
+  url: https://youtu.be/O7cNlaz3Hqs
+  date: 2025-11
+  type: talk
+
+- title: "From High Performance Computing To AI Workloads on Kubernetes: MPI Runtime in Kubeflow TrainJob"
+  url: https://youtu.be/Fnb1a5Kaxgo
+  date: 2025-04
+  type: talk
+
+- title: Democratizing AI Model Training on Kubernetes with Kubeflow TrainJob and JobSet
+  url: https://www.youtube.com/watch?v=Lgy4ir1AhYw
+  date: 2024-11
+  type: talk
+
+# Blog Posts
+
+- title: "Kubeflow Trainer v2.4: Bringing Workload-Aware Scheduling to TrainJob"
+  url: https://blog.kubeflow.org/kubeflow-trainer-v2.4-release/
+  date: 2026-11
+  type: blog
+  event: Kubeflow Blog
+
+- title: "Kubeflow Trainer v2.2: JAX & XGBoost Runtimes, Flux for HPC Support, and TrainJob progress and metrics observability"
+  url: https://blog.kubeflow.org/kubeflow-trainer-v2.2-release/
+  date: 2026-03
+  type: blog
+  event: Kubeflow Blog
+
+- title: "Introducing the Kubeflow SDK: A Pythonic API to Run AI Workloads at Scale"
+  url: https://blog.kubeflow.org/sdk/intro/
+  date: 2025-11
+  type: blog
+  event: Kubeflow Blog
+
+- title: "Democratizing AI Model Training on Kubernetes: Introducing Kubeflow Trainer V2"
+  url: https://blog.kubeflow.org/trainer/intro/
+  date: 2025-07
+  type: blog
+  event: Kubeflow Blog
+
+- title: "PyTorch on Kubernetes: Kubeflow Trainer Joins the PyTorch Ecosystem"
+  url: https://pytorch.org/blog/pytorch-on-kubernetes-kubeflow-trainer-joins-the-pytorch-ecosystem/
+  date: 2025-07
+  type: blog
+  event: PyTorch Blog

@@ -1,0 +1,24 @@
+{#- Render the talks, case studies, and tutorials from talks.yaml, newest first. -#}
+{%- import "community/macros.tmpl" as m -%}
+{%- set entries = data | rejectattr("type", "equalto", "blog") | sort(attribute="date", reverse=True) | list -%}
+```{raw} html
+{% call m.directory(entries | length, "entries", "Search by title, event, type, or adopter...") -%}
+{%- for talk in entries %}
+{%- set adopters = talk.adopters or [] %}
+{%- set search = ([talk.title, talk.event, m.talk_types[talk.type]] + adopters) | select | join(" ") | lower %}
+<div class="talk-card" data-search="{{ search | e }}">
+<div class="talk-card-header">
+<span class="talk-type talk-type-{{ talk.type | e }}">{{ m.type_icon(talk.type) }}{{ m.talk_types[talk.type] }}</span>
+<span class="talk-date">{{ m.month(talk.date) }}</span>
+</div>
+<p class="talk-title"><a href="{{ talk.url | e }}">{{ talk.title | e }}</a></p>
+{%- if talk.event %}
+<p class="talk-event">{{ talk.event | e }}</p>
+{%- endif %}
+{%- if adopters %}
+<p class="talk-adopters"><span class="adopter-label">Adopter{{ "s" if adopters | length > 1 }}:</span> {{ adopters | join(", ") | e }}</p>
+{%- endif %}
+</div>
+{%- endfor %}
+{%- endcall %}
+```

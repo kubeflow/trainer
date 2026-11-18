@@ -38,7 +38,9 @@ extensions = [
     # "autoapi.extension",  # Auto-generate Python API reference (disabled until SDK integration)
     "sphinx_copybutton",  # Copy button on code blocks
     "sphinx_design",  # Grid layouts and card components
+    "sphinx_reredirects",  # Redirects for moved pages
     "kubeflow_topnav",  # Top navigation bar (see docs/_ext/kubeflow_topnav/)
+    "sphinxcontrib.datatemplates",  # Community pages from YAML (see docs/_templates/community/)
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -63,7 +65,12 @@ html_title = "Kubeflow Trainer"
 html_static_path = ["_static"]
 html_favicon = "_static/img/kubeflow-trainer-icon.png"
 html_css_files = ["css/custom.css"]
-html_js_files = ["js/external-links.js", "js/sidebar-toggle.js", "js/landing-page.js"]
+html_js_files = [
+    "js/external-links.js",
+    "js/sidebar-toggle.js",
+    "js/landing-page.js",
+    "js/directory-search.js",
+]
 
 # Furo theme options
 html_theme_options = {
@@ -99,6 +106,13 @@ html_context = {
     "github_repo": "trainer",
     "github_version": "master",
     "conf_py_path": "/docs/",
+}
+
+# -- Redirects configuration -------------------------------------------------
+# Keys are the old document names, values are the new URLs relative to the old page.
+redirects = {
+    "contributor-guides/index": "contributing.html",
+    "contributor-guides/community": "../community/community-guide.html",
 }
 
 # -- MyST Parser configuration -----------------------------------------------

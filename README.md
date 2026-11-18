@@ -1,19 +1,27 @@
+<div align="center">
+
+<p align="center">
+  <img src="./docs/images/trainer-logo.svg" alt="logo" width="200">
+</p>
+
 # Kubeflow Trainer
 
+**Distributed AI Platform on Kubernetes.**
+
+[![Release](https://img.shields.io/github/v/release/kubeflow/trainer)](https://github.com/kubeflow/trainer/releases)
 [![Join Slack](https://img.shields.io/badge/Join_Slack-blue?logo=slack)](https://www.kubeflow.org/docs/about/community/#kubeflow-slack-channels)
 [![Coverage Status](https://coveralls.io/repos/github/kubeflow/trainer/badge.svg?branch=master)](https://coveralls.io/github/kubeflow/trainer?branch=master)
-[![Go Report Card](https://goreportcard.com/badge/github.com/kubeflow/trainer)](https://goreportcard.com/report/github.com/kubeflow/trainer)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10435/badge)](https://www.bestpractices.dev/projects/10435)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/kubeflow/trainer)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fkubeflow%2Ftrainer.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fkubeflow%2Ftrainer?ref=badge_shield)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/kubeflow/trainer)
 
-<h1 align="center">
-    <img src="./docs/images/trainer-logo.svg" alt="logo" width="200">
-  <br>
-</h1>
+</div>
 
 Latest News 🔥
 
+- [2026/11] Kubeflow Trainer v2.4.0 is here, bringing Workload-Aware Scheduling, OptimizationJob, and
+  Dynamic Resource Allocation to the Trainer project. Check out
+  [the blog post announcement](https://blog.kubeflow.org/kubeflow-trainer-v2.4-release/)
 - [2026/08] Kubeflow Trainer v2.3.0 is officially released with the runtime snapshot mechanism for
   decoupled runtime lifecycle, enhanced MPI support, and proposal Megatron-LM examples. Check out
   [the GitHub release notes](https://github.com/kubeflow/trainer/releases/tag/v2.3.0).
@@ -25,15 +33,15 @@ Latest News 🔥
   [Distributed Data Cache](https://trainer.kubeflow.org/en/latest/user-guides/data-cache.html),
   topology aware scheduling with Kueue and Volcano, and LLM post-training enhancements. Check out
   [the GitHub release notes](https://github.com/kubeflow/trainer/releases/tag/v2.1.0).
+
+<details>
+<summary>More</summary>
+
 - [2025/09] Kubeflow SDK v0.1 is officially released with support for CustomTrainer,
   BuiltinTrainer, and local PyTorch execution. Check out
   [the GitHub release notes](https://github.com/kubeflow/sdk/releases/tag/0.1.0).
 - [2025/07] PyTorch on Kubernetes: Kubeflow Trainer Joins the PyTorch Ecosystem. Find the
   announcement in [the PyTorch blog post](https://pytorch.org/blog/pytorch-on-kubernetes-kubeflow-trainer-joins-the-pytorch-ecosystem/).
-
-<details>
-<summary>More</summary>
-
 - [2025/07] Kubeflow Trainer v2.0 has been officially released. Check out
   [the blog post announcement](https://blog.kubeflow.org/trainer/intro/) and [the
   release notes](https://github.com/kubeflow/trainer/releases/tag/v2.0.0).
@@ -95,6 +103,15 @@ Additional talks:
 Please check [the official Kubeflow Trainer documentation](https://trainer.kubeflow.org/en/latest/getting-started/index.html)
 to install and get started with Kubeflow Trainer.
 
+To deploy the latest stable release run:
+
+```bash
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+    --namespace kubeflow-system \
+    --create-namespace \
+    --set runtimes.defaultEnabled=true
+```
+
 ## Community
 
 <!-- community-start -->
@@ -103,10 +120,26 @@ The following links provide information on how to get involved with the Kubeflow
 
 - Join our [`#kubeflow-trainer` Slack channel](https://www.kubeflow.org/docs/about/community/#kubeflow-slack).
 - Attend [the bi-weekly Kubeflow Trainer and Katib call](https://bit.ly/kf-trainer-meeting).
-- If you use Kubeflow Trainer, add yourself to [the ADOPTERS file](https://github.com/kubeflow/trainer/blob/master/ADOPTERS.md).
 
-Kubeflow Trainer is a Kubeflow subproject. Refer to
-[the Kubeflow community page](https://www.kubeflow.org/docs/about/community/) for more information.
+### Help Trainer Grow
+
+Sharing how you use and value Kubeflow Trainer helps keep the project well supported and growing:
+
+- **[Star Kubeflow Trainer](https://github.com/kubeflow/trainer)** on GitHub if you like the project.
+- **[Add your organization](https://github.com/kubeflow/trainer/edit/master/docs/community/adopters.yaml)**
+  to [the adopters directory](https://trainer.kubeflow.org/en/latest/community/adopters.html) if you
+  use Kubeflow Trainer, by submitting a pull request that edits the `adopters.yaml` file.
+- **[Share your experience](https://github.com/kubeflow/blog)** on [the Kubeflow blog](https://blog.kubeflow.org/)
+  by submitting a pull request with your story.
+
+### Star History
+
+<a href="https://www.star-history.com/?repos=kubeflow%2Ftrainer&type=date&legend=top-left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=kubeflow/trainer&type=date&theme=dark&legend=top-left">
+    <img alt="Star history chart for kubeflow/trainer" src="https://api.star-history.com/svg?repos=kubeflow/trainer&type=date&legend=top-left">
+  </picture>
+</a>
 
 <!-- community-end -->
 

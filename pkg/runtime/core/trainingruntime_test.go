@@ -2716,10 +2716,26 @@ func TestTrainingRuntimeValidateObjects(t *testing.T) {
 	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
 	validRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj()
+	staleSnapshot := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job-runtime-snapshot",
+			Namespace: metav1.NamespaceDefault,
+			OwnerReferences: []metav1.OwnerReference{{
+				UID:        "uid-deleted-test-job",
+				Controller: ptr.To(true),
+			}},
+		},
+	}
+	recreatedTrainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+		UID("uid-test-job").
+		RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+		Obj()
 
 	cases := map[string]struct {
 		trainJob        *trainer.TrainJob
+		oldTrainJob     *trainer.TrainJob
 		existingRuntime *trainer.TrainingRuntime
+		existingObjects []client.Object
 		wantErrs        field.ErrorList
 	}{
 		"succeeds when runtime exists and is valid": {
@@ -2832,6 +2848,21 @@ func TestTrainingRuntimeValidateObjects(t *testing.T) {
 				field.Forbidden(field.NewPath("spec", "trainer", "resourceClaimsPerNode"), ""),
 			},
 		},
+		"succeeds on create when the snapshot of a deleted TrainJob still exists": {
+			trainJob:        recreatedTrainJob,
+			existingRuntime: validRuntime,
+			existingObjects: []client.Object{staleSnapshot},
+			wantErrs:        nil,
+		},
+		"returns internal error on update when the snapshot belongs to another TrainJob": {
+			trainJob:        recreatedTrainJob,
+			oldTrainJob:     recreatedTrainJob,
+			existingRuntime: validRuntime,
+			existingObjects: []client.Object{staleSnapshot},
+			wantErrs: field.ErrorList{
+				field.InternalError(field.NewPath("spec", "runtimeRef"), errors.New("unable to get runtime snapshot: invalid runtime snapshot: a snapshot configmap exists but is owned by another object")),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -2843,6 +2874,7 @@ func TestTrainingRuntimeValidateObjects(t *testing.T) {
 			if tc.existingRuntime != nil {
 				clientBuilder = clientBuilder.WithObjects(tc.existingRuntime)
 			}
+			clientBuilder = clientBuilder.WithObjects(tc.existingObjects...)
 			c := clientBuilder.Build()
 
 			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
@@ -2850,9 +2882,19 @@ func TestTrainingRuntimeValidateObjects(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, fieldErrors := trainingRuntime.ValidateObjects(ctx, nil, tc.trainJob)
+			_, fieldErrors := trainingRuntime.ValidateObjects(ctx, tc.oldTrainJob, tc.trainJob)
 
-			if diff := cmp.Diff(tc.wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail")); diff != "" {
+			if diff := cmp.Diff(tc.wantErrs, fieldErrors,
+				cmpopts.IgnoreFields(field.Error{}, "Detail"),
+				cmp.FilterPath(func(p cmp.Path) bool {
+					sf, ok := p.Last().(cmp.StructField)
+					return ok && sf.Name() == "BadValue"
+				}, cmp.Transformer("ErrorString", func(v any) any {
+					if err, ok := v.(error); ok {
+						return err.Error()
+					}
+					return v
+				}))); diff != "" {
 				t.Errorf("Unexpected field errors (-want,+got):\n%s", diff)
 			}
 		})
