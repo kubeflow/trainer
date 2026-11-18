@@ -557,8 +557,14 @@ func TestValidateVolcanoPriorityClassName(t *testing.T) {
 		}
 	}
 
+	noTrainer := func() *testingutil.JobSetWrapper {
+		return testingutil.MakeJobSetWrapper("ns", "valid").
+			ReplicatedJobLabel(constants.LabelTrainJobAncestor, "", constants.Node)
+	}
+
 	cases := map[string]struct {
 		spec      *trainer.TrainingRuntimeSpec
+		oldSpec   *trainer.TrainingRuntimeSpec
 		wantError field.ErrorList
 	}{
 		"volcano, no priorityClassName anywhere": {
@@ -601,6 +607,40 @@ func TestValidateVolcanoPriorityClassName(t *testing.T) {
 				field.Invalid(priorityClassNamePath(1), "high-priority", ""),
 			},
 		},
+		"volcano, no trainer ancestor, the same priorityClassName on every job": {
+			spec: specWith(volcano, noTrainer().PodPriorityClassName("high-priority")),
+		},
+		"volcano, no trainer ancestor, different priorityClassNames": {
+			spec: specWith(volcano, noTrainer().
+				PodPriorityClassName("high-priority").
+				PodPriorityClassNameForJobs("low-priority", constants.Node)),
+			wantError: field.ErrorList{
+				field.Invalid(priorityClassNamePath(2), "low-priority", ""),
+			},
+		},
+		"update keeps an existing priorityClassName on a non-trainer job": {
+			spec: specWith(volcano, testingutil.MakeJobSetWrapper("ns", "valid").
+				PodPriorityClassNameForJobs("high-priority", constants.DatasetInitializer)),
+			oldSpec: specWith(volcano, testingutil.MakeJobSetWrapper("ns", "valid").
+				PodPriorityClassNameForJobs("high-priority", constants.DatasetInitializer)),
+		},
+		"update changes the priorityClassName on a non-trainer job": {
+			spec: specWith(volcano, testingutil.MakeJobSetWrapper("ns", "valid").
+				PodPriorityClassNameForJobs("low-priority", constants.DatasetInitializer)),
+			oldSpec: specWith(volcano, testingutil.MakeJobSetWrapper("ns", "valid").
+				PodPriorityClassNameForJobs("high-priority", constants.DatasetInitializer)),
+			wantError: field.ErrorList{
+				field.Invalid(priorityClassNamePath(0), "low-priority", ""),
+			},
+		},
+		"update adds a priorityClassName on a non-trainer job": {
+			spec: specWith(volcano, testingutil.MakeJobSetWrapper("ns", "valid").
+				PodPriorityClassNameForJobs("high-priority", constants.DatasetInitializer)),
+			oldSpec: specWith(volcano, testingutil.MakeJobSetWrapper("ns", "valid")),
+			wantError: field.ErrorList{
+				field.Invalid(priorityClassNamePath(0), "high-priority", ""),
+			},
+		},
 		"coscheduling is not covered by this rule": {
 			spec: specWith(coscheduling, testingutil.MakeJobSetWrapper("ns", "valid").
 				PodPriorityClassName("high-priority")),
@@ -612,7 +652,7 @@ func TestValidateVolcanoPriorityClassName(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			gotErr := validateVolcanoPriorityClassName(tc.spec)
+			gotErr := validateVolcanoPriorityClassName(tc.spec, tc.oldSpec)
 			if diff := cmp.Diff(tc.wantError, gotErr, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); len(diff) != 0 {
 				t.Errorf("validateVolcanoPriorityClassName() mismatch (-want,+got):\n%s", diff)
 			}

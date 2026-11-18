@@ -948,13 +948,14 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-// TestBuildPriorityClassNamePropagation covers the deepspeed and mlx shape, where the trainer
+// TestPriorityClassNamePropagation covers the deepspeed and mlx shape, where the trainer
 // ancestor is not the last ReplicatedJob in slice order. Before the fix, the PodGroup took its
 // priority from whichever job happened to be last.
-func TestBuildPriorityClassNamePropagation(t *testing.T) {
+func TestPriorityClassNamePropagation(t *testing.T) {
 	cases := map[string]struct {
 		trainerAncestorJob    string
 		priorityClassNames    map[string]string
+		suspend               bool
 		wantPodGroupPriority  string
 		wantPodTemplatePriors map[string]string
 	}{
@@ -969,6 +970,20 @@ func TestBuildPriorityClassNamePropagation(t *testing.T) {
 			priorityClassNames:    map[string]string{},
 			wantPodGroupPriority:  "",
 			wantPodTemplatePriors: map[string]string{"launcher": "", "node": ""},
+		},
+		// The JobSet of a suspended TrainJob is created with the final templates, so resuming does
+		// not change an immutable field. The PodGroup itself is only built once resumed.
+		"suspended TrainJob still gets the propagated templates": {
+			trainerAncestorJob:    "launcher",
+			priorityClassNames:    map[string]string{"launcher": "high-priority"},
+			suspend:               true,
+			wantPodGroupPriority:  "",
+			wantPodTemplatePriors: map[string]string{"launcher": "high-priority", "node": "high-priority"},
+		},
+		"no trainer ancestor uses the value the jobs declare": {
+			priorityClassNames:    map[string]string{"node": "high-priority"},
+			wantPodGroupPriority:  "high-priority",
+			wantPodTemplatePriors: map[string]string{"launcher": "high-priority", "node": "high-priority"},
 		},
 		"trainer node sets nothing while another job does": {
 			trainerAncestorJob:    "launcher",
@@ -1023,7 +1038,7 @@ func TestBuildPriorityClassNamePropagation(t *testing.T) {
 
 			trainJob := &trainer.TrainJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "job", Namespace: "ns", UID: "1"},
-				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(false)},
+				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(tc.suspend)},
 			}
 
 			clientBuilder := utiltesting.NewClientBuilder()
@@ -1032,6 +1047,10 @@ func TestBuildPriorityClassNamePropagation(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
+			// Same order as the runtime: EnforcePodGroupPolicy runs before any component is built.
+			if err := p.(framework.EnforcePodGroupPolicyPlugin).EnforcePodGroupPolicy(info, trainJob); err != nil {
+				t.Fatalf("unexpected EnforcePodGroupPolicy error: %v", err)
+			}
 			objs, err := p.(framework.ComponentBuilderPlugin).Build(context.Background(), info, trainJob)
 			if err != nil {
 				t.Fatalf("unexpected Build error: %v", err)

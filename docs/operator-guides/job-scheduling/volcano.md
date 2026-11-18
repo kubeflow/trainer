@@ -108,5 +108,7 @@ must exist before the `TrainJob` is created, otherwise the `TrainJob` is rejecte
 
 Kubeflow Trainer propagates this value to the Pod template of every other ReplicatedJob in the
 runtime, so the whole gang runs at the same priority rather than leaving the remaining Pods at the
-cluster default. Setting `priorityClassName` on any other ReplicatedJob is rejected when the
-runtime is created, since a gang has no meaningful way to run at two priorities at once.
+cluster default. Setting `priorityClassName` on any other ReplicatedJob is rejected, since a gang
+has no meaningful way to run at two priorities at once. In a runtime with no ReplicatedJob labelled
+as the trainer ancestor, every ReplicatedJob that sets `priorityClassName` must use the same value.
+Runtimes created before this rule stay updatable as long as their priority classes don't change.
