@@ -463,7 +463,7 @@ func TestCreateRuntimeSnapshot(t *testing.T) {
 	cases := map[string]struct {
 		trainJob   *trainer.TrainJob
 		runtimeObj client.Object
-		existingCM *corev1.ConfigMap // Pre-existing ConfigMap to test idempotency
+		existingCM *corev1.ConfigMap // Pre-existing ConfigMap that must not be overwritten
 	}{
 		"successfully creates snapshot ConfigMap for ClusterTrainingRuntime": {
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
@@ -479,7 +479,7 @@ func TestCreateRuntimeSnapshot(t *testing.T) {
 				Obj(),
 			runtimeObj: namespacedRuntime,
 		},
-		"idempotently updates existing snapshot ConfigMap": {
+		"does not overwrite existing snapshot ConfigMap": {
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
 				UID("test-uid").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
@@ -509,18 +509,27 @@ func TestCreateRuntimeSnapshot(t *testing.T) {
 			c := clientBuilder.Build()
 
 			err := createRuntimeSnapshot(ctx, c, tc.trainJob, tc.runtimeObj)
-			if err != nil {
-				t.Fatalf("Unexpected error creating snapshot: %v", err)
-			}
 
-			// Verify ConfigMap was created/updated
 			cm := &corev1.ConfigMap{}
 			cmKey := client.ObjectKey{
 				Name:      tc.trainJob.Name + runtimeSnapshotSuffix,
 				Namespace: tc.trainJob.Namespace,
 			}
 			if err := c.Get(ctx, cmKey, cm); err != nil {
-				t.Fatalf("Failed to get created ConfigMap: %v", err)
+				t.Fatalf("Failed to get ConfigMap: %v", err)
+			}
+
+			if tc.existingCM != nil {
+				if !apierrors.IsAlreadyExists(err) {
+					t.Fatalf("Expected AlreadyExists error, got: %v", err)
+				}
+				if diff := cmp.Diff(tc.existingCM.Data, cm.Data); diff != "" {
+					t.Errorf("Existing snapshot was modified (-want +got):\n%s", diff)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error creating snapshot: %v", err)
 			}
 
 			// Verify owner reference
