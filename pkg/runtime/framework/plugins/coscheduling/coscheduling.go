@@ -60,7 +60,12 @@ var _ framework.EnforcePodGroupPolicyPlugin = (*CoScheduling)(nil)
 var _ framework.WatchExtensionPlugin = (*CoScheduling)(nil)
 var _ framework.ComponentBuilderPlugin = (*CoScheduling)(nil)
 
-const Name = "CoScheduling"
+const (
+	Name = "CoScheduling"
+	// defaultScheduleTimeoutSeconds duplicates the +kubebuilder:default=60 marker on
+	// ScheduleTimeoutSeconds in pkg/apis/trainer/v1alpha1/trainingruntime_types.go.
+	defaultScheduleTimeoutSeconds = 60
+)
 
 // +kubebuilder:rbac:groups=scheduling.x-k8s.io,resources=podgroups,verbs=create;get;list;watch;update;patch
 // +kubebuilder:rbac:groups=node.k8s.io,resources=runtimeclasses,verbs=get;list;watch
@@ -110,7 +115,7 @@ func (c *CoScheduling) Build(ctx context.Context, info *runtime.Info, trainJob *
 	var totalMembers int32
 	totalResources := make(corev1.ResourceList)
 	for _, ps := range info.TemplateSpec.PodSets {
-		count := *ps.Count
+		count := ptr.Deref(ps.Count, 1)
 		totalMembers += count
 		for resName, quantity := range ps.SinglePodRequests {
 			quantity.Mul(int64(count))
@@ -125,7 +130,7 @@ func (c *CoScheduling) Build(ctx context.Context, info *runtime.Info, trainJob *
 	podGroup.WithSpec(schedulerpluginsv1alpha1ac.PodGroupSpec().
 		WithMinMember(totalMembers).
 		WithMinResources(totalResources).
-		WithScheduleTimeoutSeconds(*info.RuntimePolicy.PodGroupPolicy.Coscheduling.ScheduleTimeoutSeconds))
+		WithScheduleTimeoutSeconds(ptr.Deref(info.RuntimePolicy.PodGroupPolicy.Coscheduling.ScheduleTimeoutSeconds, defaultScheduleTimeoutSeconds)))
 
 	podGroup.WithOwnerReferences(metav1ac.OwnerReference().
 		WithAPIVersion(trainer.GroupVersion.String()).
