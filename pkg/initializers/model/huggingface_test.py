@@ -56,6 +56,28 @@ def test_load_config(test_name, test_config, expected):
     print("Test execution completed")
 
 
+@pytest.mark.parametrize("ignore_patterns", [None, ["*.bin", "private/*"]])
+def test_download_model_fallback_preserves_other_ignores(ignore_patterns):
+    model = HuggingFace()
+    model.config = MagicMock(
+        storage_uri="hf://org/model", access_token=None, ignore_patterns=ignore_patterns
+    )
+
+    with patch(
+        "huggingface_hub.list_repo_files", return_value=["weights/model.pt"]
+    ), patch("huggingface_hub.snapshot_download") as mock_download:
+        model.download_model()
+
+    assert mock_download.call_args.kwargs["ignore_patterns"] == (
+        ["private/*"] if ignore_patterns else []
+    )
+    assert mock_download.call_args.kwargs["allow_patterns"][-3:] == [
+        "*.bin",
+        "*.pt",
+        "*.pth",
+    ]
+
+
 @pytest.mark.parametrize(
     "test_name, test_case",
     [
@@ -69,6 +91,8 @@ def test_load_config(test_name, test_config, expected):
                 },
                 "should_login": True,
                 "expected_repo_id": "username/model-name",
+                "repo_files": ["config.json", "model.safetensors", "pytorch_model.bin"],
+                "fallback": False,
             },
         ),
         (
@@ -81,6 +105,8 @@ def test_load_config(test_name, test_config, expected):
                 },
                 "should_login": False,
                 "expected_repo_id": "org/model-v1",
+                "repo_files": ["config.json", "pytorch_model.bin"],
+                "fallback": True,
             },
         ),
     ],
@@ -94,8 +120,8 @@ def test_download_model(test_name, test_case):
     huggingface_model_instance.config = MagicMock(**test_case["config"])
 
     with patch("huggingface_hub.login") as mock_login, patch(
-        "huggingface_hub.snapshot_download"
-    ) as mock_download:
+        "huggingface_hub.list_repo_files", return_value=test_case["repo_files"]
+    ) as mock_list, patch("huggingface_hub.snapshot_download") as mock_download:
 
         # Execute download
         huggingface_model_instance.download_model()
@@ -106,11 +132,28 @@ def test_download_model(test_name, test_case):
         else:
             mock_login.assert_not_called()
 
+        mock_list.assert_called_once_with(
+            repo_id=test_case["expected_repo_id"],
+            token=test_case["config"]["access_token"],
+        )
+        allow_patterns = ["*.json", "*.safetensors", "*.model", "*.txt", "*.gguf"]
+        ignore_patterns = test_case["config"]["ignore_patterns"]
+        if test_case["fallback"]:
+            allow_patterns += ["*.bin", "*.pt", "*.pth"]
+            ignore_patterns = ["*.msgpack", "*.h5"]
+
         # Verify download parameters
         mock_download.assert_called_once_with(
             repo_id=test_case["expected_repo_id"],
             local_dir=utils.MODEL_PATH,
-            allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt", "*.gguf"],
-            ignore_patterns=test_case["config"]["ignore_patterns"],
+            allow_patterns=allow_patterns,
+            ignore_patterns=ignore_patterns,
         )
+        assert test_case["config"]["ignore_patterns"] == [
+            "*.msgpack",
+            "*.h5",
+            "*.bin",
+            "*.pt",
+            "*.pth",
+        ]
     print("Test execution completed")

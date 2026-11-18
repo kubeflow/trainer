@@ -43,14 +43,24 @@ class HuggingFace(utils.ModelProvider):
         if self.config.access_token:
             huggingface_hub.login(self.config.access_token)
 
-        # TODO (andreyvelich): We should consider to follow vLLM approach with allow patterns,
-        # including a fallback to *.bin/*.pt/*.pth when a repo has no safetensors.
-        # Ref: https://github.com/kubeflow/trainer/pull/2303#discussion_r1815913663
+        allow_patterns = ["*.json", "*.safetensors", "*.model", "*.txt", "*.gguf"]
+        ignore_patterns = self.config.ignore_patterns
+        repo_files = huggingface_hub.list_repo_files(
+            repo_id=model_uri, token=self.config.access_token
+        )
+        if not any(path.endswith(".safetensors") for path in repo_files):
+            logging.info("No safetensors found; falling back to PyTorch weights")
+            pytorch_patterns = ["*.bin", "*.pt", "*.pth"]
+            allow_patterns.extend(pytorch_patterns)
+            ignore_patterns = [
+                p for p in (ignore_patterns or []) if p not in pytorch_patterns
+            ]
+
         huggingface_hub.snapshot_download(
             repo_id=model_uri,
             local_dir=utils.MODEL_PATH,
-            allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt", "*.gguf"],
-            ignore_patterns=self.config.ignore_patterns,
+            allow_patterns=allow_patterns,
+            ignore_patterns=ignore_patterns,
         )
 
         logging.info("Model has been downloaded")
