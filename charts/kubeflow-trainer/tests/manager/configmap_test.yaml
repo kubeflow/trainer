@@ -141,7 +141,7 @@ tests:
     asserts:
       - notMatchRegex:
           path: data["controller_manager_config.yaml"]
-          pattern: "tls:"
+          pattern: '(?m)^\s*tls:'
 
   - it: should render tls options
     set:
