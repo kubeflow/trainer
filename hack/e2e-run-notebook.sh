@@ -95,13 +95,15 @@ print_local_container_diagnostics() {
 }
 
 # Run diagnostics before exiting so a hung or failed notebook always leaves debug output.
-# $? is the pending exit status: non-zero means the notebook or the cluster diagnostics
-# failed. Best effort: never changes the exit status.
+# $? is the notebook's exit status. The local containers are only dumped when it failed, so
+# green runs stay quiet. Best effort: never changes the exit status.
 on_exit() {
     local status=$?
     trap - EXIT
     print_cluster_diagnostics || true
-    print_local_container_diagnostics || true
+    if [ "${status}" -ne 0 ]; then
+        print_local_container_diagnostics || true
+    fi
     exit "${status}"
 }
 trap on_exit EXIT
