@@ -17,12 +17,17 @@ name: Approve Workflow Runs
 permissions:
   actions: write
   contents: read
+  pull-requests: read
 
 on:
   pull_request_target:
     types:
       - labeled
       - synchronize
+  # Approves runs that the event-driven job missed, for example when it failed to start.
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.number }}
@@ -109,4 +114,33 @@ jobs:
                 run_id: run.id,
               }
               await github.rest.actions.approveWorkflowRun(request)
+            }
+
+  # Sweep open PRs that have ok-to-test and approve any of their runs still waiting.
+  sweep:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Approve pending runs on ok-to-test PRs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          retries: 3
+          script: |
+            const { owner, repo } = context.repo
+            const pulls = await github.paginate(github.rest.pulls.list, { owner, repo, state: "open", per_page: 100 })
+            const labelled = pulls.filter((pr) => pr.labels.some((label) => label.name === "ok-to-test"))
+            core.info(`Found ${labelled.length} open pull requests with ok-to-test`)
+            for (const pr of labelled) {
+              const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+                owner,
+                repo,
+                event: "pull_request",
+                status: "action_required",
+                head_sha: pr.head.sha,
+              })
+              for (const run of runs) {
+                core.info(`Approving workflow run ${run.id} of #${pr.number}`)
+                await github.rest.actions.approveWorkflowRun({ owner, repo, run_id: run.id })
+              }
             }
