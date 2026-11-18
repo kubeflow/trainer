@@ -212,6 +212,66 @@ You can use the `get_job_logs()` API to see your TrainJob logs:
 print("\n".join(TrainerClient().get_job_logs(name=job_id)))
 ```
 
+## Shared Memory (`/dev/shm`)
+
+PyTorch uses shared memory in `/dev/shm` for multi-process `DataLoader` workers
+(`num_workers > 0`) and for NCCL communicators. Container runtimes typically give Pods only 64 MiB
+of `/dev/shm`, which can cause `bus error` or NCCL failures.
+
+The builtin `torch-distributed` and `torch-distributed-with-cache` runtimes mount a memory-backed
+`emptyDir` volume named `dshm` at `/dev/shm` in the `node` container, with `sizeLimit: 2Gi`:
+
+```yaml
+volumes:
+  - name: dshm
+    emptyDir:
+      medium: Memory
+      sizeLimit: 2Gi
+```
+
+`sizeLimit` is an upper bound and does not reserve memory up front. Data written to `/dev/shm`
+counts toward the container's memory usage, so if you set a memory limit, size it for both the
+training process and the shared memory it uses. See
+[the Kubernetes `emptyDir` documentation](https://kubernetes.io/docs/reference/storage/volume-types/#emptydir)
+for details.
+
+To change the limit for a single TrainJob, patch the `dshm` volume with
+[RuntimePatches](../operator-guides/runtime-patches). RuntimePatches are applied as a strategic
+merge patch, and volumes are merged by name, so only the fields in your patch change. The
+existing `medium: Memory` and the mount at `/dev/shm` are kept:
+
+```yaml
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: pytorch-large-shm
+spec:
+  runtimeRef:
+    name: torch-distributed
+  runtimePatches:
+    - manager: trainer.kubeflow.org/kubeflow-sdk
+      trainingRuntimeSpec:
+        template:
+          spec:
+            replicatedJobs:
+              - name: node
+                template:
+                  spec:
+                    template:
+                      spec:
+                        volumes:
+                          - name: dshm
+                            emptyDir:
+                              sizeLimit: 8Gi
+```
+
+Use the volume name `dshm` so the patch updates the default volume instead of adding a second
+one. Fields omitted from the patch keep the runtime's values: a patch that defines the `dshm`
+volume without `sizeLimit` still gets the default `2Gi` limit.
+
+Custom runtimes do not get this mount automatically; add the same volume and mount to your
+runtime if your workload needs more than the default `/dev/shm`.
+
 ## Next Steps
 
 - Check out [the PyTorch MNIST example](https://github.com/kubeflow/trainer/blob/master/examples/pytorch/image-classification/mnist.ipynb).

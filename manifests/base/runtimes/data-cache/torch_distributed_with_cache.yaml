@@ -67,3 +67,11 @@ spec:
                           fieldRef:
                             apiVersion: v1
                             fieldPath: metadata.labels['jobset.sigs.k8s.io/jobset-name']
+                    volumeMounts:
+                      - name: dshm
+                        mountPath: /dev/shm
+                volumes:
+                  - name: dshm
+                    emptyDir:
+                      medium: Memory
+                      sizeLimit: 2Gi
