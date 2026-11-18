@@ -60,6 +60,8 @@ jobs:
       - name: Approve Pending Workflow Runs
         if: steps.membership-check.outputs.is_member == 'true' || contains(github.event.pull_request.labels.*.name, 'ok-to-test')
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          IS_MEMBER: ${{ steps.membership-check.outputs.is_member }}
         with:
           retries: 3
           script: |
@@ -71,8 +73,18 @@ jobs:
               head_sha: context.payload.pull_request.head.sha,
             }
 
-            core.info(`Getting workflow runs that need approval for commit ${request.head_sha}`)
-            const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, request)
+            // On a push this job can start before GitHub has created the PR's workflow runs,
+            // so retry for a short while before giving up. Members' runs never need approval.
+            const attempts = process.env.IS_MEMBER === "true" ? 1 : 6
+            let runs = []
+            for (let attempt = 1; attempt <= attempts; attempt++) {
+              core.info(`Getting workflow runs that need approval for commit ${request.head_sha} (attempt ${attempt}/${attempts})`)
+              runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, request)
+              if (runs.length > 0 || attempt === attempts) {
+                break
+              }
+              await new Promise((resolve) => setTimeout(resolve, 10000))
+            }
 
             core.info(`Found ${runs.length} workflow runs that need approval`)
             for (const run of runs) {
