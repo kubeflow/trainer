@@ -70,7 +70,6 @@ mv /tmp/flux-view.sh ${viewbase}/flux-view.sh
 
 # Variables we can use again
 cfg="${configroot}/etc/flux/config"
-command="$@"
 
 # Copy mounted curve to expected location
 curvepath=/mnt/flux/config/etc/curve/curve.cert
@@ -113,16 +112,16 @@ run_interactive_cluster() {
 # Start flux with the original entrypoint
 if [ "$(hostname)" = "${mainHost}" ]; then
 
-  echo "Command provided is: ${command}"
-  if [ -z "${command}" ]; then
+  echo "Command provided is: $*"
+  if [ "$#" -eq 0 ]; then
     run_interactive_cluster
   else
 
     # If tasks are == 0, then only define nodes
     flags="%s  "
     echo "Flags for flux are ${flags}"
-    echo "🌀 flux start  -o --config ${cfg} ${brokerOptions} flux submit ${flags} --quiet --watch ${command}"
-	flux start  -o --config ${cfg} ${brokerOptions} flux run ${flags} ${command}
+    echo "🌀 flux start  -o --config ${cfg} ${brokerOptions} flux run ${flags} $*"
+	flux start  -o --config ${cfg} ${brokerOptions} flux run ${flags} "$@"
   fi
 
 # Block run by workers
