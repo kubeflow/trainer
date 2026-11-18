@@ -36,6 +36,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/config"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -455,6 +457,46 @@ func TestReconcileObjects(t *testing.T) {
 				if tc.wantDeleted && !apierrors.IsNotFound(getErr) {
 					t.Errorf("Expected %s to be deleted, got error: %v", obj.GetName(), getErr)
 				}
+			}
+		})
+	}
+}
+
+type controllerOptionsManager struct {
+	ctrl.Manager
+	controllerOptions config.Controller
+}
+
+func (m *controllerOptionsManager) GetControllerOptions() config.Controller {
+	return m.controllerOptions
+}
+
+func TestWithGroupKindConcurrency(t *testing.T) {
+	cases := map[string]struct {
+		groupKindConcurrency map[string]int
+		options              controller.Options
+		want                 int
+	}{
+		"groupKindConcurrency for TrainJob is applied": {
+			groupKindConcurrency: map[string]int{"TrainJob.trainer.kubeflow.org": 5},
+			want:                 5,
+		},
+		"explicit MaxConcurrentReconciles is kept": {
+			groupKindConcurrency: map[string]int{"TrainJob.trainer.kubeflow.org": 5},
+			options:              controller.Options{MaxConcurrentReconciles: 2},
+			want:                 2,
+		},
+		"no groupKindConcurrency for TrainJob leaves the default": {
+			groupKindConcurrency: map[string]int{"TrainingRuntime.trainer.kubeflow.org": 3},
+			want:                 0,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			mgr := &controllerOptionsManager{controllerOptions: config.Controller{GroupKindConcurrency: tc.groupKindConcurrency}}
+			got := withGroupKindConcurrency(mgr, trainer.TrainJobKind, tc.options)
+			if got.MaxConcurrentReconciles != tc.want {
+				t.Errorf("MaxConcurrentReconciles = %d, want %d", got.MaxConcurrentReconciles, tc.want)
 			}
 		})
 	}
