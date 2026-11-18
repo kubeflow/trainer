@@ -30,6 +30,7 @@ use datafusion::physical_plan::{
 use futures::{StreamExt, TryStreamExt};
 use std::any::Any;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use std::time::Duration;
@@ -94,7 +95,8 @@ use tracing::{error, info};
 ///
 /// # Performance Considerations
 ///
-/// - Establishes new Flight connections for each batch (stateless)
+/// - Reuses one Flight connection per worker for the life of the partition, instead of
+///   reconnecting for every batch routed to that worker
 /// - Uses configurable timeouts for connection and data transfer
 /// - Processes batches sequentially to avoid overwhelming workers
 /// - Memory efficient: streams data without buffering entire dataset
@@ -219,6 +221,13 @@ pub async fn send_record_batch(
         Ok(stream) => stream,
     };
 
+    // Reuse one Flight connection per worker across the batches this partition sends,
+    // instead of paying a fresh TCP/HTTP2 handshake for every batch routed to the same
+    // worker. A partition's input stream is split into many RecordBatches whenever the
+    // assigned data exceeds one batch, and they are not guaranteed to alternate workers,
+    // so without this a large partition reconnects to the same worker over and over.
+    let mut clients: HashMap<u64, ExecutorClient> = HashMap::new();
+
     while let Some(item) = stream.next().await {
         match item {
             Ok(rb) => {
@@ -242,20 +251,27 @@ pub async fn send_record_batch(
                             )
                         })?;
                     let values = list_array.values();
-                    values.first().ok_or_else(|| {
+                    *values.first().ok_or_else(|| {
                         DataFusionError::Execution("No worker ID found".to_string())
                     })?
                 } else {
                     return exec_err!("Expected UInt64 DataType");
                 };
                 info!("Sending batch of partition: {_partition}");
-                let addr = worker_map.get(&worker_id.to_string()).ok_or_else(|| {
-                    DataFusionError::Execution(format!(
-                        "Worker {} not found in worker map",
-                        worker_id
-                    ))
-                })?;
-                let mut client = ExecutorClient::try_new(addr, config.connect_timeout).await?;
+                let client = match clients.entry(worker_id) {
+                    Entry::Occupied(entry) => entry.into_mut(),
+                    Entry::Vacant(entry) => {
+                        let addr = worker_map.get(&worker_id.to_string()).ok_or_else(|| {
+                            DataFusionError::Execution(format!(
+                                "Worker {} not found in worker map",
+                                worker_id
+                            ))
+                        })?;
+                        let new_client =
+                            ExecutorClient::try_new(addr, config.connect_timeout).await?;
+                        entry.insert(new_client)
+                    }
+                };
                 let _ = client.send_batch(rb.schema(), vec![Ok(rb)]).await;
             }
             Err(error) => {
@@ -342,9 +358,17 @@ mod tests {
     use super::*;
     use crate::config::config::DatasetConfig;
     use arrow::array::ArrayRef;
+    use arrow_flight::{
+        Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
+        HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
+    };
     use arrow_schema::{Field, Schema};
     use datafusion::datasource::memory::MemorySourceConfig;
     use datafusion::prelude::SessionContext;
+    use futures::Stream;
+    use std::pin::Pin;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tonic::{Request, Response, Status, Streaming};
 
     fn test_config() -> Arc<CacheConfig> {
         Arc::new(CacheConfig {
@@ -409,6 +433,173 @@ mod tests {
         .await;
 
         assert!(result.is_err());
+        Ok(())
+    }
+
+    /// A [`FlightService`] that only implements `do_put`, draining the request body
+    /// and replying with an empty stream. Every other method is unreachable from this
+    /// test because `ExecutorClient` only ever calls `do_put`.
+    struct CountingFlightService;
+
+    #[tonic::async_trait]
+    impl arrow_flight::flight_service_server::FlightService for CountingFlightService {
+        type HandshakeStream =
+            Pin<Box<dyn Stream<Item = std::result::Result<HandshakeResponse, Status>> + Send>>;
+        type ListFlightsStream =
+            Pin<Box<dyn Stream<Item = std::result::Result<FlightInfo, Status>> + Send>>;
+        type DoGetStream =
+            Pin<Box<dyn Stream<Item = std::result::Result<FlightData, Status>> + Send>>;
+        type DoPutStream =
+            Pin<Box<dyn Stream<Item = std::result::Result<PutResult, Status>> + Send>>;
+        type DoExchangeStream =
+            Pin<Box<dyn Stream<Item = std::result::Result<FlightData, Status>> + Send>>;
+        type DoActionStream =
+            Pin<Box<dyn Stream<Item = std::result::Result<arrow_flight::Result, Status>> + Send>>;
+        type ListActionsStream =
+            Pin<Box<dyn Stream<Item = std::result::Result<ActionType, Status>> + Send>>;
+
+        async fn handshake(
+            &self,
+            _request: Request<Streaming<HandshakeRequest>>,
+        ) -> std::result::Result<Response<Self::HandshakeStream>, Status> {
+            Err(Status::unimplemented("not used in this test"))
+        }
+        async fn list_flights(
+            &self,
+            _request: Request<Criteria>,
+        ) -> std::result::Result<Response<Self::ListFlightsStream>, Status> {
+            Err(Status::unimplemented("not used in this test"))
+        }
+        async fn get_flight_info(
+            &self,
+            _request: Request<FlightDescriptor>,
+        ) -> std::result::Result<Response<FlightInfo>, Status> {
+            Err(Status::unimplemented("not used in this test"))
+        }
+        async fn poll_flight_info(
+            &self,
+            _request: Request<FlightDescriptor>,
+        ) -> std::result::Result<Response<PollInfo>, Status> {
+            Err(Status::unimplemented("not used in this test"))
+        }
+        async fn get_schema(
+            &self,
+            _request: Request<FlightDescriptor>,
+        ) -> std::result::Result<Response<SchemaResult>, Status> {
+            Err(Status::unimplemented("not used in this test"))
+        }
+        async fn do_get(
+            &self,
+            _request: Request<Ticket>,
+        ) -> std::result::Result<Response<Self::DoGetStream>, Status> {
+            Err(Status::unimplemented("not used in this test"))
+        }
+        async fn do_put(
+            &self,
+            request: Request<Streaming<FlightData>>,
+        ) -> std::result::Result<Response<Self::DoPutStream>, Status> {
+            // Drain the request body so the client's do_put call completes normally.
+            let mut inbound = request.into_inner();
+            while inbound
+                .message()
+                .await
+                .map_err(|e| Status::internal(e.to_string()))?
+                .is_some()
+            {}
+            Ok(Response::new(Box::pin(futures::stream::empty())))
+        }
+        async fn do_exchange(
+            &self,
+            _request: Request<Streaming<FlightData>>,
+        ) -> std::result::Result<Response<Self::DoExchangeStream>, Status> {
+            Err(Status::unimplemented("not used in this test"))
+        }
+        async fn do_action(
+            &self,
+            _request: Request<Action>,
+        ) -> std::result::Result<Response<Self::DoActionStream>, Status> {
+            Err(Status::unimplemented("not used in this test"))
+        }
+        async fn list_actions(
+            &self,
+            _request: Request<Empty>,
+        ) -> std::result::Result<Response<Self::ListActionsStream>, Status> {
+            Err(Status::unimplemented("not used in this test"))
+        }
+    }
+
+    /// Wraps a bound `TcpListener` as the `Stream` of accepted sockets `serve_with_incoming`
+    /// expects, counting each accepted connection in `counter`.
+    fn counting_incoming(
+        listener: tokio::net::TcpListener,
+        counter: Arc<AtomicUsize>,
+    ) -> impl Stream<Item = std::io::Result<tokio::net::TcpStream>> {
+        futures::stream::unfold((listener, counter), |(listener, counter)| async move {
+            let accepted = listener.accept().await.map(|(socket, _)| {
+                counter.fetch_add(1, Ordering::SeqCst);
+                socket
+            });
+            Some((accepted, (listener, counter)))
+        })
+    }
+
+    /// Three batches routed to the same worker used to open three Flight connections
+    /// (one `ExecutorClient::try_new` per batch). They should now share one connection
+    /// for the life of the partition.
+    #[tokio::test]
+    async fn test_send_record_batch_reuses_connection_per_worker() -> Result<()> {
+        let std_listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        std_listener.set_nonblocking(true).unwrap();
+        let addr = std_listener.local_addr().unwrap();
+        let listener = tokio::net::TcpListener::from_std(std_listener).unwrap();
+
+        let connections = Arc::new(AtomicUsize::new(0));
+        let incoming = counting_incoming(listener, connections.clone());
+
+        let server = tokio::spawn(async move {
+            tonic::transport::Server::builder()
+                .add_service(
+                    arrow_flight::flight_service_server::FlightServiceServer::new(
+                        CountingFlightService,
+                    ),
+                )
+                .serve_with_incoming(incoming)
+                .await
+        });
+
+        let schema = assignment_schema();
+        // Three separate batches addressed to the same worker, the way a single
+        // partition's assigned rows split across DataFusion's target batch size.
+        let batches: Vec<RecordBatch> = (0..3)
+            .map(|_| {
+                let worker_ids: ArrayRef = Arc::new(UInt64Array::from(vec![0u64]));
+                RecordBatch::try_new(schema.clone(), vec![worker_ids]).unwrap()
+            })
+            .collect();
+        let input = MemorySourceConfig::try_new_exec(&[batches], schema.clone(), None)?;
+
+        let mut worker_map = HashMap::new();
+        worker_map.insert("0".to_string(), format!("http://{addr}"));
+
+        let ctx = SessionContext::new();
+        let stream = send_record_batch(
+            input,
+            ctx.task_ctx(),
+            0,
+            Arc::new(worker_map),
+            test_config(),
+        )
+        .await?;
+        let _: Vec<RecordBatch> = stream.try_collect().await?;
+
+        assert_eq!(
+            connections.load(Ordering::SeqCst),
+            1,
+            "expected one reused connection for 3 batches sent to the same worker, got {}",
+            connections.load(Ordering::SeqCst)
+        );
+
+        server.abort();
         Ok(())
     }
 }
