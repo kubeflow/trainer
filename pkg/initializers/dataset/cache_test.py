@@ -371,3 +371,37 @@ def test_download_dataset_service_account_already_exists():
         mock_custom_api.create_namespaced_custom_object.assert_called_once()
         mock_core_v1.create_namespaced_service.assert_called_once()
         mock_core_v1.delete_namespaced_service_account.assert_not_called()
+
+
+def test_download_dataset_stops_when_train_job_lookup_fails():
+    """Cache resources are not created when the parent TrainJob cannot be read."""
+    cache_initializer_instance = CacheInitializer()
+    config = {
+        "storage_uri": "cache://test_schema/test_table",
+        "train_job_name": "missing-job",
+        "cache_image": "test-image:latest",
+        "iam_role": "arn:aws:iam::123456789012:role/test-role",
+        "metadata_loc": "s3://test-bucket/metadata",
+    }
+
+    with patch.object(utils, "get_config_from_env", return_value=config):
+        cache_initializer_instance.load_config()
+
+    with patch(
+        "pkg.initializers.dataset.cache.get_namespace", return_value="test-namespace"
+    ), patch("pkg.initializers.dataset.cache.config"), patch(
+        "pkg.initializers.dataset.cache.client"
+    ) as mock_client:
+        mock_core_v1 = MagicMock()
+        mock_custom_api = MagicMock()
+        mock_client.CoreV1Api.return_value = mock_core_v1
+        mock_client.CustomObjectsApi.return_value = mock_custom_api
+        mock_custom_api.get_namespaced_custom_object.side_effect = ApiException(
+            status=404, reason="NotFound"
+        )
+
+        cache_initializer_instance.download_dataset()
+
+        mock_core_v1.create_namespaced_service_account.assert_not_called()
+        mock_custom_api.create_namespaced_custom_object.assert_not_called()
+        mock_core_v1.create_namespaced_service.assert_not_called()
