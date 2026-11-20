@@ -7,7 +7,7 @@ to an `OptimizationJob` and lists the Katib features that do not have an equival
 :::{warning}
 OptimizationJob uses the alpha `trainer.kubeflow.org/v1alpha1` API and currently runs
 **random search only**, with a single objective. Read the limitations in the
-[OptimizationJob guide](optimizationjob.md) before migrating, and check
+[OptimizationJob guide](../user-guides/optimizationjob.md) before migrating, and check
 [Features without an equivalent](#features-without-an-equivalent) to see whether your
 Experiments depend on something that is not available yet.
 :::
@@ -15,7 +15,7 @@ Experiments depend on something that is not available yet.
 ## Before you begin
 
 You need Kubeflow Trainer 2.4 or later with the `OptimizationJob` and `TrainJobStatus` feature
-gates enabled. The [OptimizationJob guide](optimizationjob.md#before-you-begin) lists the full
+gates enabled. The [OptimizationJob guide](../user-guides/optimizationjob.md#before-you-begin) lists the full
 prerequisites.
 
 Katib and Kubeflow Trainer can run in the same cluster, so you can move Experiments one at a
@@ -92,7 +92,7 @@ the final value is sent and check the return value.
 With `transformers >= 5.4.0`, metrics logged during `trainer.train()`, including evaluation
 metrics, are pushed automatically. Metrics from a `trainer.evaluate()` call made after
 `trainer.train()` returns are not sent, so report those with `update_trainjob_status`. See
-[Report the objective metric](optimizationjob.md#report-the-objective-metric).
+[Report the objective metric](../user-guides/optimizationjob.md#report-the-objective-metric).
 
 :::{note}
 For each trial, Katib's default metric strategy keeps the best value the trial reported: the
@@ -262,23 +262,27 @@ that TrainJob, under `status.trainerStatus.metrics`. Katib's `Succeeded` conditi
 ## Features without an equivalent
 
 The following Katib features are not available in OptimizationJob yet. Keep using Katib for
-Experiments that depend on them.
+Experiments that depend on them. If you rely on one of these features, start a thread in the
+[`#kubeflow-trainer` Slack channel](https://www.kubeflow.org/docs/about/community/#kubeflow-slack)
+so it can be prioritized.
 
 | Katib feature | Status |
 | --- | --- |
 | Algorithms other than `random`: `grid`, `tpe`, `multivariate-tpe`, `cmaes`, `bayesianoptimization`, `hyperband`, `sobol`, `pbt` | `searchAlgorithm.grid` is defined in the API but fails with `UnsupportedSearchAlgorithm`. Hyperband and PBT are tracked in [#3802](https://github.com/kubeflow/trainer/issues/3802). |
 | Early stopping (`earlyStopping`, median stop) | Tracked in [#3802](https://github.com/kubeflow/trainer/issues/3802). |
 | Neural architecture search (`nasConfig`, ENAS, DARTS) | Not supported. The [OptimizationJob KEP](https://github.com/kubeflow/trainer/tree/master/proposals/2605-optimization-job-crd) drops NAS. |
-| Multiple objectives | Exactly one objective is supported. |
 | `feasibleSpace.step` | No equivalent. List the values in a `categorical` search space instead. |
-| `normal` and `logNormal` distributions | Not supported. |
-| `maxFailedTrialCount` | Not supported. Any trial failure fails the job. |
+| `normal` and `logNormal` distributions | Tracked in [#3795](https://github.com/kubeflow/trainer/issues/3795). |
+| `maxFailedTrialCount` | Not supported. Any trial failure fails the job. Tracked in [#3743](https://github.com/kubeflow/trainer/issues/3743). |
 | Trial templates from a ConfigMap (`trialTemplate.configMap`) | Not supported. The template is inline. |
 | Trials that are not TrainJobs, such as a plain `Job` | Not supported. The KEP limits trials to TrainJobs. |
-| Katib UI | Not available. Use `kubectl` to inspect the OptimizationJob and its TrainJobs. |
+| Katib UI | Not available. Use `kubectl` to inspect the OptimizationJob, and `kubectl` or the Kubeflow SDK `TrainerClient` to inspect its TrainJobs. |
 
 ## Python SDK
 
 The Katib SDK `KatibClient.tune()` API and the Kubeflow SDK `OptimizerClient` create Katib
 Experiments. To use OptimizationJob today, create the resource from YAML, as shown above.
-SDK integration is tracked in [#3562](https://github.com/kubeflow/trainer/issues/3562).
+Python SDK support for OptimizationJob is tracked in
+[#3794](https://github.com/kubeflow/trainer/issues/3794). The design in
+[#3881](https://github.com/kubeflow/trainer/pull/3881) proposes an `optimize()` API on
+`TrainerClient`.
