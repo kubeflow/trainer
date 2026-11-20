@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
 	clocktesting "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
@@ -75,7 +76,7 @@ func TestReconcileDeadline(t *testing.T) {
 		"deadline exceeded fails the TrainJob and deletes the child JobSet": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
 				CreationTimestamp(created).
-				ActiveDeadlineSeconds(60).
+				ActiveDeadlineSeconds(ptr.To(int64(60))).
 				Obj(),
 			jobSet:         utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "deadline-job").Obj(),
 			now:            created.Add(61 * time.Second),
@@ -85,7 +86,7 @@ func TestReconcileDeadline(t *testing.T) {
 		"deadline exceeded still fails the TrainJob when the child JobSet is already gone": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
 				CreationTimestamp(created).
-				ActiveDeadlineSeconds(60).
+				ActiveDeadlineSeconds(ptr.To(int64(60))).
 				Obj(),
 			now:            created.Add(61 * time.Second),
 			wantResult:     ctrl.Result{},
@@ -94,7 +95,7 @@ func TestReconcileDeadline(t *testing.T) {
 		"active deadline requeues after exactly the remaining duration": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
 				CreationTimestamp(created).
-				ActiveDeadlineSeconds(60).
+				ActiveDeadlineSeconds(ptr.To(int64(60))).
 				Obj(),
 			jobSet:     utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "deadline-job").Obj(),
 			now:        created.Add(20 * time.Second),
@@ -104,7 +105,7 @@ func TestReconcileDeadline(t *testing.T) {
 		"requeue is floored at one second when the deadline is exactly now": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
 				CreationTimestamp(created).
-				ActiveDeadlineSeconds(60).
+				ActiveDeadlineSeconds(ptr.To(int64(60))).
 				Obj(),
 			// now.After(deadline) is false on equality, so the remaining duration is
 			// zero and must be clamped rather than requeued immediately.
@@ -114,7 +115,7 @@ func TestReconcileDeadline(t *testing.T) {
 		"deadline is measured from the resume transition rather than the creation timestamp": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
 				CreationTimestamp(created).
-				ActiveDeadlineSeconds(60).
+				ActiveDeadlineSeconds(ptr.To(int64(60))).
 				Conditions(resumedCondition).
 				Obj(),
 			// An hour past creation, but only 20s past the resume, so the job is still
@@ -125,7 +126,7 @@ func TestReconcileDeadline(t *testing.T) {
 		},
 		"zero creation timestamp leaves the TrainJob untouched": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
-				ActiveDeadlineSeconds(60).
+				ActiveDeadlineSeconds(ptr.To(int64(60))).
 				Obj(),
 			now:        created.Add(time.Hour),
 			wantResult: ctrl.Result{},
@@ -140,7 +141,7 @@ func TestReconcileDeadline(t *testing.T) {
 		"suspended TrainJob does not start the deadline timer": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
 				CreationTimestamp(created).
-				ActiveDeadlineSeconds(60).
+				ActiveDeadlineSeconds(ptr.To(int64(60))).
 				Suspend(true).
 				Obj(),
 			jobSet:     utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "deadline-job").Obj(),
@@ -151,7 +152,7 @@ func TestReconcileDeadline(t *testing.T) {
 		"finished TrainJob is not failed again once the deadline passes": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
 				CreationTimestamp(created).
-				ActiveDeadlineSeconds(60).
+				ActiveDeadlineSeconds(ptr.To(int64(60))).
 				Conditions(metav1.Condition{
 					Type:   trainer.TrainJobComplete,
 					Status: metav1.ConditionTrue,
