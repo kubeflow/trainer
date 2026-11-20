@@ -121,6 +121,75 @@ func TestServerStartReturnsAfterContextCancel(t *testing.T) {
 	}
 }
 
+func TestServerServeTLSStartsWithHTTP2IncompatibleCipherList(t *testing.T) {
+	certSrv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	t.Cleanup(certSrv.Close)
+
+	// TLS 1.2 with an AES-256-only cipher list: net/http's HTTP/2 startup
+	// check rejects it, so the server must disable HTTP/2 instead of
+	// failing ListenAndServeTLS at startup.
+	tlsConfig := &tls.Config{
+		MinVersion:   tls.VersionTLS12,
+		CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384},
+		Certificates: certSrv.TLS.Certificates,
+	}
+	srv, err := NewServer(
+		utiltesting.NewClientBuilder().Build(),
+		&configapi.StatusServer{Port: ptr.To(freeLoopbackPort(t))},
+		tlsConfig,
+		fakeAuthorizer{authorized: true},
+	)
+	if err != nil {
+		t.Fatalf("NewServer() error = %v", err)
+	}
+	if srv.httpServer.Protocols == nil || !srv.httpServer.Protocols.HTTP1() || srv.httpServer.Protocols.HTTP2() {
+		t.Fatalf("Protocols = %v, want HTTP/1 only", srv.httpServer.Protocols)
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("net.Listen() error = %v", err)
+	}
+	serveDone := make(chan error, 1)
+	go func() { serveDone <- srv.httpServer.ServeTLS(listener, "", "") }()
+
+	select {
+	case err := <-serveDone:
+		t.Fatalf("ServeTLS() returned before serving: %v", err)
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), serverLifecycleTimeout)
+	defer cancel()
+	if err := srv.httpServer.Shutdown(shutdownCtx); err != nil {
+		t.Fatalf("Shutdown() error = %v", err)
+	}
+	if err := <-serveDone; !errors.Is(err, http.ErrServerClosed) {
+		t.Errorf("ServeTLS() error after shutdown = %v, want %v", err, http.ErrServerClosed)
+	}
+}
+
+func TestTLSConfigPermitsHTTP2(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  *tls.Config
+		want bool
+	}{
+		{"TLS 1.2 AES-256-only", &tls.Config{MinVersion: tls.VersionTLS12, CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384}}, false},
+		{"TLS 1.2 AES-128-GCM", &tls.Config{MinVersion: tls.VersionTLS12, CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256}}, true},
+		{"TLS 1.2 empty cipher list", &tls.Config{MinVersion: tls.VersionTLS12}, true},
+		{"TLS 1.3", &tls.Config{MinVersion: tls.VersionTLS13, CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384}}, true},
+		{"unset minimum with incompatible list", &tls.Config{CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384}}, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tlsConfigPermitsHTTP2(tc.cfg); got != tc.want {
+				t.Errorf("tlsConfigPermitsHTTP2() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 // freeLoopbackPort reserves a port from the kernel and releases it again, so the
 // caller can bind it. This is racy in principle but reliable enough for a test.
 func freeLoopbackPort(t *testing.T) int32 {
