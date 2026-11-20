@@ -250,9 +250,17 @@ func validateScheduling(ctx context.Context, newSpec, oldSpec *trainer.TrainingR
 func (w *TrainingRuntimeValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.TrainingRuntime) (admission.Warnings, error) {
 	log := ctrl.LoggerFrom(ctx).WithName("trainingruntime-webhook")
 	log.V(5).Info("Validating update", "trainingRuntime", klog.KObj(newObj))
+	var warnings admission.Warnings
+	if trainingruntime.IsSupportDeprecated(newObj.Labels) {
+		warnings = append(warnings, fmt.Sprintf(
+			"TrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
+			newObj.Name,
+			constants.RuntimeDeprecationPolicyURL,
+		))
+	}
 	allErrs := validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs)
 	allErrs = append(allErrs, validateScheduling(ctx, &newObj.Spec, &oldObj.Spec)...)
-	return nil, allErrs.ToAggregate()
+	return warnings, allErrs.ToAggregate()
 }
 
 func (w *TrainingRuntimeValidator) ValidateDelete(ctx context.Context, obj *trainer.TrainingRuntime) (admission.Warnings, error) {

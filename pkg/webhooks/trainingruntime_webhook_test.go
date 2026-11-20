@@ -199,6 +199,7 @@ func TestTrainingRuntimeValidateUpdate(t *testing.T) {
 	cases := map[string]struct {
 		oldObj    *trainer.TrainingRuntime
 		newObj    *trainer.TrainingRuntime
+		warnings  admission.Warnings
 		wantError field.ErrorList
 	}{
 		"valid update succeeds": {
@@ -210,6 +211,21 @@ func TestTrainingRuntimeValidateUpdate(t *testing.T) {
 				}
 				return obj
 			}(),
+		},
+		"support=deprecated on updated object emits deprecation warning": {
+			oldObj: testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj(),
+			newObj: func() *trainer.TrainingRuntime {
+				obj := testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").
+					Label(constants.LabelSupport, constants.SupportDeprecated).
+					Obj()
+				for i := range obj.Spec.Template.Spec.ReplicatedJobs {
+					obj.Spec.Template.Spec.ReplicatedJobs[i].Replicas = 1
+				}
+				return obj
+			}(),
+			warnings: admission.Warnings{
+				"TrainingRuntime \"test-runtime\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: " + constants.RuntimeDeprecationPolicyURL,
+			},
 		},
 		"invalid update with invalid replicas fails": {
 			oldObj: testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj(),
@@ -279,8 +295,8 @@ func TestTrainingRuntimeValidateUpdate(t *testing.T) {
 			if diff := cmp.Diff(tc.wantError.ToAggregate(), err, cmpopts.IgnoreFields(field.Error{}, "Detail")); len(diff) != 0 {
 				t.Errorf("Unexpected error from ValidateUpdate (-want, +got): %s", diff)
 			}
-			if len(warnings) != 0 {
-				t.Errorf("ValidateUpdate() warnings = %v, want nil", warnings)
+			if diff := cmp.Diff(tc.warnings, warnings); diff != "" {
+				t.Fatalf("unexpected warnings (-want, +got): %s", diff)
 			}
 		})
 	}
