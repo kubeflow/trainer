@@ -229,6 +229,68 @@ class TestS3Storage:
                 "models/llama/weights/model.safetensors",
             ]
 
+    @pytest.mark.parametrize(
+        "prefix,ignore_patterns,expected",
+        [
+            (
+                "models/llama/",
+                ["original/*", "onnx/*"],
+                ["config.json", "weights.bin"],
+            ),
+            (
+                "models/llama",
+                ["original/*", "onnx/*"],
+                ["config.json", "weights.bin"],
+            ),
+            (
+                "models/llama/",
+                ["config.json"],
+                ["onnx/model.onnx", "original/consolidated.00.pth", "weights.bin"],
+            ),
+            (
+                "models/llama/",
+                ["*.bin"],
+                ["config.json", "onnx/model.onnx", "original/consolidated.00.pth"],
+            ),
+            (
+                # Patterns written against the full object key keep working.
+                "models/llama/",
+                ["models/llama/original/*"],
+                ["config.json", "onnx/model.onnx", "weights.bin"],
+            ),
+        ],
+    )
+    def test_download_ignore_patterns(self, prefix, ignore_patterns, expected):
+        """Ignore patterns match the path relative to the prefix or the full key."""
+        with patch("pkg.initializers.utils.opendal.opendal") as mock_opendal:
+            mock_operator = MagicMock()
+            mock_opendal.Operator.return_value = mock_operator
+            mock_operator.layer.return_value = mock_operator
+            self._mock_bucket(
+                mock_operator,
+                {
+                    "models/llama/config.json": b"config",
+                    "models/llama/original/consolidated.00.pth": b"checkpoint",
+                    "models/llama/onnx/model.onnx": b"onnx",
+                    "models/llama/weights.bin": b"weights",
+                },
+            )
+
+            storage = S3Storage(bucket="test-bucket", region="us-east-1")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(
+                    prefix=prefix,
+                    destination_path=tmpdir,
+                    ignore_patterns=ignore_patterns,
+                )
+                assert self._downloaded_files(tmpdir) == expected
+
+            # Ignored objects are never read from the storage.
+            assert sorted(
+                call.args[0] for call in mock_operator.read.call_args_list
+            ) == [f"models/llama/{path}" for path in expected]
+
     def test_download_single_object(self):
         """A prefix that names one object downloads that object under its file name."""
         with patch("pkg.initializers.utils.opendal.opendal") as mock_opendal:
