@@ -160,6 +160,26 @@ func TestClusterTrainingRuntimeValidateUpdate(t *testing.T) {
 					},
 				}).Obj(),
 		},
+		"update to a torch runtime whose trainer replicatedJob is not named node is rejected": {
+			oldObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj(),
+			newObj: func() *trainer.ClusterTrainingRuntime {
+				obj := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj()
+				obj.Spec.MLPolicy = testingutil.MakeMLPolicyWrapper().
+					WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj()).
+					Obj()
+				for i := range obj.Spec.Template.Spec.ReplicatedJobs {
+					obj.Spec.Template.Spec.ReplicatedJobs[i].Replicas = 1
+				}
+				obj.Spec.Template.Spec.ReplicatedJobs[2].Name = "trainer"
+				obj.Spec.Template.Spec.ReplicatedJobs[2].Template.Labels = map[string]string{
+					constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+				}
+				return obj
+			}(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "template", "spec", "replicatedJobs").Index(2).Child("name"), "trainer", ""),
+			},
+		},
 		"leaving a ReplicatedJob untargeted is rejected": {
 			oldObj: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
 				RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj().Spec).
