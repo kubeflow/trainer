@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -113,12 +115,16 @@ func (w *OptimizationJobValidator) ValidateCreate(ctx context.Context, obj *trai
 	return warnings, allErrs.ToAggregate()
 }
 
-func (w *OptimizationJobValidator) ValidateUpdate(_ context.Context, _, newObj *trainer.OptimizationJob) (admission.Warnings, error) {
+func (w *OptimizationJobValidator) ValidateUpdate(_ context.Context, oldObj, newObj *trainer.OptimizationJob) (admission.Warnings, error) {
 	if newObj == nil {
 		return nil, nil
 	}
+	var oldTemplate *trainer.TrainJobTemplateSpec
+	if oldObj != nil {
+		oldTemplate = &oldObj.Spec.TrainJobTemplate
+	}
 	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateReservedEnvVars(&newObj.Spec.TrainJobTemplate, field.NewPath("spec", "trainJobTemplate"))...)
+	allErrs = append(allErrs, validateReservedEnvVarsOnUpdate(oldTemplate, &newObj.Spec.TrainJobTemplate, field.NewPath("spec", "trainJobTemplate"))...)
 	return nil, allErrs.ToAggregate()
 }
 
@@ -137,6 +143,32 @@ func validateReservedEnvVars(trainJobTemplate *trainer.TrainJobTemplateSpec, fld
 					fmt.Sprintf("environment variable name %q must not use the reserved prefix %q", env.Name, constants.EnvVarPrefix),
 				))
 			}
+		}
+	}
+	return allErrs
+}
+
+func validateReservedEnvVarsOnUpdate(oldTemplate, newTemplate *trainer.TrainJobTemplateSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if newTemplate.Spec.Trainer == nil {
+		return nil
+	}
+	oldEnvVars := make(map[string]corev1.EnvVar)
+	if oldTemplate != nil && oldTemplate.Spec.Trainer != nil {
+		for _, env := range oldTemplate.Spec.Trainer.Env {
+			oldEnvVars[env.Name] = env
+		}
+	}
+	envPath := fldPath.Child("spec", "trainer", "env")
+	for i, env := range newTemplate.Spec.Trainer.Env {
+		if strings.HasPrefix(env.Name, constants.EnvVarPrefix) {
+			if oldEnv, exists := oldEnvVars[env.Name]; exists && equality.Semantic.DeepEqual(oldEnv, env) {
+				continue
+			}
+			allErrs = append(allErrs, field.Forbidden(
+				envPath.Index(i).Child("name"),
+				fmt.Sprintf("environment variable name %q must not use the reserved prefix %q", env.Name, constants.EnvVarPrefix),
+			))
 		}
 	}
 	return allErrs

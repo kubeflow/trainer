@@ -284,6 +284,64 @@ func TestOptimizationJobValidateUpdate(t *testing.T) {
 				),
 			},
 		},
+		"OptimizationJob update modifying pre-existing reserved env var fails": {
+			oldOptimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+							},
+						},
+					},
+				}).
+				Obj(),
+			newOptimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.002"},
+							},
+						},
+					},
+				}).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Forbidden(
+					field.NewPath("spec", "trainJobTemplate", "spec", "trainer", "env").Index(0).Child("name"),
+					"",
+				),
+			},
+		},
+		"OptimizationJob update preserving unchanged pre-existing reserved env var passes": {
+			oldOptimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+							},
+						},
+					},
+				}).
+				Obj(),
+			newOptimizationJob: func() *trainer.OptimizationJob {
+				job := testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+					TrainJobTemplate(trainer.TrainJobTemplateSpec{
+						Spec: trainer.TrainJobSpec{
+							Trainer: &trainer.Trainer{
+								Env: []corev1.EnvVar{
+									{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+								},
+							},
+						},
+					}).
+					Obj()
+				job.Labels = map[string]string{"updated-label": "true"}
+				return job
+			}(),
+		},
 		"OptimizationJob update with valid trainer env passes": {
 			oldOptimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").Obj(),
 			newOptimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").
