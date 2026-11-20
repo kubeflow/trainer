@@ -62,6 +62,7 @@ var (
 
 	errorInvalidReplicas                = errors.New("replicatedJob replicas must be greater than or equal to 1")
 	errorPodCountNotDivisibleByReplicas = errors.New("replicatedJob Pod count must be divisible by replicas")
+	errorJobSetNotControlledByTrainJob  = errors.New("JobSet with the TrainJob name exists and is not controlled by the TrainJob")
 )
 
 type JobSet struct {
@@ -388,12 +389,14 @@ func (j *JobSet) checkRuntimePatchesImmutability(ctx context.Context, oldObj, ne
 			allErrs = append(allErrs, field.Forbidden(runtimePatchesPath, "RuntimePatches can only be modified when the TrainJob is suspended before or after the update"))
 		} else if err := j.client.Get(ctx, client.ObjectKeyFromObject(newObj), jobSet); client.IgnoreNotFound(err) != nil {
 			allErrs = append(allErrs, field.InternalError(runtimePatchesPath, err))
-		} else {
-			// If the JobSet exists, check whether it's inactive
+		} else if metav1.IsControlledBy(jobSet, newObj) {
+			// If the TrainJob's own JobSet exists, check whether it's inactive
 			// so changes won't have side effects on the JobSet's Pods
 			// that are still running.
 			// This can happen while the TrainJob is transitioning out
 			// from unsuspended state.
+			// A JobSet with the TrainJob name that the TrainJob does not control
+			// does not run its Pods, so it does not block the change.
 			for _, replicatedJob := range jobSet.Status.ReplicatedJobsStatus {
 				if replicatedJob.Active > 0 {
 					allErrs = append(allErrs, field.Forbidden(runtimePatchesPath,
@@ -526,6 +529,11 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 		}
 		oldJobSet = nil
 	}
+	// A JobSet that this TrainJob does not control must be neither updated nor treated as
+	// already created, e.g. the JobSet of a deleted TrainJob with the same name.
+	if oldJobSet != nil && !metav1.IsControlledBy(oldJobSet, trainJob) {
+		return nil, fmt.Errorf("%w: %s/%s", errorJobSetNotControlledByTrainJob, oldJobSet.Namespace, oldJobSet.Name)
+	}
 	if oldJobSet != nil &&
 		!ptr.Deref(trainJob.Spec.Suspend, false) &&
 		!ptr.Deref(oldJobSet.Spec.Suspend, false) {
@@ -641,6 +649,10 @@ func (j *JobSet) Status(ctx context.Context, trainJob *trainer.TrainJob) (*train
 			return nil, nil
 		}
 		return nil, err
+	}
+	// The conditions of a JobSet that this TrainJob does not control say nothing about it.
+	if !metav1.IsControlledBy(jobSet, trainJob) {
+		return nil, nil
 	}
 	status := trainJob.Status.DeepCopy()
 
