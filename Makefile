@@ -247,14 +247,16 @@ test-python: ## Run Python unit test.
 	uv sync --locked --no-dev --directory ./cmd/initializers/model
 
 	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/pkg/initializers/dataset
-	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/pkg/initializers/model
+	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/model pytest $(PROJECT_DIR)/pkg/initializers/model
 	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/pkg/initializers/utils
 
 .PHONY: test-python-integration
 test-python-integration: ## Run Python integration test.
 	uv sync --locked --no-dev --directory ./cmd/initializers/dataset
+	uv sync --locked --no-dev --directory ./cmd/initializers/model
 
-	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/test/integration/initializers
+	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/test/integration/initializers/dataset_test.py
+	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/model pytest $(PROJECT_DIR)/test/integration/initializers/model_test.py
 
 .PHONY: test-rust
 test-rust: ## Run Rust unit test.
