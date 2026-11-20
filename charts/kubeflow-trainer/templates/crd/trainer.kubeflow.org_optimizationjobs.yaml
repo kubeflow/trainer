@@ -6596,6 +6596,19 @@ spec:
                     required:
                     - runtimeRef
                     type: object
+                    x-kubernetes-validations:
+                    - fieldPath: .initializer
+                      message: initializer is immutable
+                      rule: has(self.initializer) == has(oldSelf.initializer)
+                    - fieldPath: .trainer
+                      message: trainer is immutable
+                      rule: has(self.trainer) == has(oldSelf.trainer)
+                    - fieldPath: .activeDeadlineSeconds
+                      message: activeDeadlineSeconds is immutable
+                      rule: has(self.activeDeadlineSeconds) == has(oldSelf.activeDeadlineSeconds)
+                    - fieldPath: .managedBy
+                      message: managedBy is immutable
+                      rule: has(self.managedBy) == has(oldSelf.managedBy)
                 required:
                 - spec
                 type: object

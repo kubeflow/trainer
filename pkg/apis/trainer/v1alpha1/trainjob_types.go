@@ -99,6 +99,10 @@ type TrainJobList struct {
 }
 
 // TrainJobSpec represents specification of the desired TrainJob.
+// +kubebuilder:validation:XValidation:rule="has(self.initializer) == has(oldSelf.initializer)",fieldPath=".initializer",message="initializer is immutable"
+// +kubebuilder:validation:XValidation:rule="has(self.trainer) == has(oldSelf.trainer)",fieldPath=".trainer",message="trainer is immutable"
+// +kubebuilder:validation:XValidation:rule="has(self.activeDeadlineSeconds) == has(oldSelf.activeDeadlineSeconds)",fieldPath=".activeDeadlineSeconds",message="activeDeadlineSeconds is immutable"
+// +kubebuilder:validation:XValidation:rule="has(self.managedBy) == has(oldSelf.managedBy)",fieldPath=".managedBy",message="managedBy is immutable"
 type TrainJobSpec struct {
 	// runtimeRef is the reference to the training runtime.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
