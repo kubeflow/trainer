@@ -37,18 +37,18 @@ time.
 
 | Katib `Experiment` field | `OptimizationJob` field | Notes |
 | --- | --- | --- |
-| `objective.objectiveMetricName` | `objectives[0].metric` | Exactly one objective. |
+| `objective.objectiveMetricName` | `objectives[0].metric` | Exactly one objective. `objective.additionalMetricNames` has no equivalent: extra metrics you push appear in the TrainJob status but are not used by the search. |
 | `objective.type` (`minimize`, `maximize`) | `objectives[0].direction` (`Minimize`, `Maximize`) | Values are capitalized. Defaults to `Minimize`. |
 | `algorithm.algorithmName: random` | `searchAlgorithm.random` | |
 | `algorithm.algorithmSettings` `random_state` | `searchAlgorithm.random.seed` | |
 | `parameters[].parameterType: double` | `parameters[].searchSpace.uniform` or `logUniform` | `type` defaults to `Float`. |
 | `parameters[].parameterType: int` | `parameters[].searchSpace.uniform` or `logUniform` with `type: Int` | Bounds must be integers, such as `"1"` and `"64"`. |
 | `parameters[].parameterType: categorical` | `parameters[].searchSpace.categorical.choices` | |
-| `parameters[].parameterType: discrete` | `parameters[].searchSpace.categorical.choices` | Choices are strings; convert them in your code. |
+| `parameters[].parameterType: discrete` | `parameters[].searchSpace.categorical.choices` | Choices are strings; convert them in your code. Choices must be unique, at most 64 characters each, and at most 100 in total. |
 | `parameters[].feasibleSpace.distribution: logUniform` | `parameters[].searchSpace.logUniform` | `min` must be greater than 0. |
 | `parameters[].feasibleSpace.min`, `max` | `searchSpace.<space>.min`, `max` | Quoted decimal strings, with `min < max`. |
 | `maxTrialCount` | `numTrials` | 1 to 100. Defaults to 1. |
-| `parallelTrialCount` | `parallelTrials` | Defaults to 1. Katib defaults to 3. |
+| `parallelTrialCount` | `parallelTrials` | 1 to `numTrials`. Defaults to 1. Katib defaults to 3. |
 | `trialTemplate.trialSpec` | `trainJobTemplate.spec` | Always a TrainJob that references a training runtime. |
 | `trialTemplate.trialParameters` | Not needed | Every parameter is injected as an environment variable. |
 | `trialTemplate.primaryContainerName`, `successCondition`, `failureCondition` | Not needed | Trial status comes from the TrainJob. |
@@ -248,7 +248,8 @@ that TrainJob, under `status.trainerStatus.metrics`. Katib's `Succeeded` conditi
 
 - **Trial failures.** Katib keeps going until `maxFailedTrialCount` trials fail. The current
   OptimizationJob controller marks the job `Failed` as soon as one trial fails, or when a
-  successful trial is missing its objective metric.
+  successful trial is missing its objective metric. Trials that are still running are not
+  cancelled and keep using resources until they finish.
 - **Objective goal.** Katib stops early once `objective.goal` is reached. OptimizationJob always
   runs `numTrials` trials.
 - **Trial count.** Katib's `maxTrialCount` counts finished trials. `numTrials` counts the
