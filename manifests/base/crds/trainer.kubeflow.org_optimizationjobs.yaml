@@ -6255,6 +6255,52 @@ spec:
                                                                     immutable
                                                                   rule: self == oldSelf
                                                             type: object
+                                                            x-kubernetes-validations:
+                                                            - fieldPath: .schedulerName
+                                                              message: schedulerName
+                                                                is immutable
+                                                              rule: has(self.schedulerName)
+                                                                == has(oldSelf.schedulerName)
+                                                            - fieldPath: .serviceAccountName
+                                                              message: serviceAccountName
+                                                                is immutable
+                                                              rule: has(self.serviceAccountName)
+                                                                == has(oldSelf.serviceAccountName)
+                                                            - fieldPath: .volumes
+                                                              message: volumes is
+                                                                immutable
+                                                              rule: has(self.volumes)
+                                                                == has(oldSelf.volumes)
+                                                            - fieldPath: .resourceClaims
+                                                              message: resourceClaims
+                                                                is immutable
+                                                              rule: has(self.resourceClaims)
+                                                                == has(oldSelf.resourceClaims)
+                                                            - fieldPath: .initContainers
+                                                              message: initContainers
+                                                                is immutable
+                                                              rule: has(self.initContainers)
+                                                                == has(oldSelf.initContainers)
+                                                            - fieldPath: .containers
+                                                              message: containers
+                                                                is immutable
+                                                              rule: has(self.containers)
+                                                                == has(oldSelf.containers)
+                                                            - fieldPath: .imagePullSecrets
+                                                              message: imagePullSecrets
+                                                                is immutable
+                                                              rule: has(self.imagePullSecrets)
+                                                                == has(oldSelf.imagePullSecrets)
+                                                            - fieldPath: .securityContext
+                                                              message: securityContext
+                                                                is immutable
+                                                              rule: has(self.securityContext)
+                                                                == has(oldSelf.securityContext)
+                                                            - fieldPath: .terminationGracePeriodSeconds
+                                                              message: terminationGracePeriodSeconds
+                                                                is immutable
+                                                              rule: has(self.terminationGracePeriodSeconds)
+                                                                == has(oldSelf.terminationGracePeriodSeconds)
                                                         type: object
                                                     type: object
                                                 type: object

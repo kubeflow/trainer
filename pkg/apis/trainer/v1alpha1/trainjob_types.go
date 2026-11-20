@@ -427,6 +427,15 @@ type PodTemplatePatch struct {
 }
 
 // PodSpecPatch contains the Pod spec fields that managers are permitted to patch.
+// +kubebuilder:validation:XValidation:rule="has(self.schedulerName) == has(oldSelf.schedulerName)",fieldPath=".schedulerName",message="schedulerName is immutable"
+// +kubebuilder:validation:XValidation:rule="has(self.serviceAccountName) == has(oldSelf.serviceAccountName)",fieldPath=".serviceAccountName",message="serviceAccountName is immutable"
+// +kubebuilder:validation:XValidation:rule="has(self.volumes) == has(oldSelf.volumes)",fieldPath=".volumes",message="volumes is immutable"
+// +kubebuilder:validation:XValidation:rule="has(self.resourceClaims) == has(oldSelf.resourceClaims)",fieldPath=".resourceClaims",message="resourceClaims is immutable"
+// +kubebuilder:validation:XValidation:rule="has(self.initContainers) == has(oldSelf.initContainers)",fieldPath=".initContainers",message="initContainers is immutable"
+// +kubebuilder:validation:XValidation:rule="has(self.containers) == has(oldSelf.containers)",fieldPath=".containers",message="containers is immutable"
+// +kubebuilder:validation:XValidation:rule="has(self.imagePullSecrets) == has(oldSelf.imagePullSecrets)",fieldPath=".imagePullSecrets",message="imagePullSecrets is immutable"
+// +kubebuilder:validation:XValidation:rule="has(self.securityContext) == has(oldSelf.securityContext)",fieldPath=".securityContext",message="securityContext is immutable"
+// +kubebuilder:validation:XValidation:rule="has(self.terminationGracePeriodSeconds) == has(oldSelf.terminationGracePeriodSeconds)",fieldPath=".terminationGracePeriodSeconds",message="terminationGracePeriodSeconds is immutable"
 type PodSpecPatch struct {
 	// schedulerName patches the scheduler for the Pods in the target job templates.
 	// When omitted, the scheduler specified in the runtime template is preserved.

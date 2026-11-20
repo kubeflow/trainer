@@ -1013,6 +1013,38 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 	})
 
 	ginkgo.When("Updating TrainJob", func() {
+		// suspendedJobWithPodSpecPatch returns a suspended TrainJob with one runtime patch for the node job,
+		// so the webhook allows the runtimePatches update and only the CRD rules can reject it.
+		suspendedJobWithPodSpecPatch := func(name string, podSpec *trainer.PodSpecPatch) *trainer.TrainJob {
+			return testingutil.MakeTrainJobWrapper(ns.Name, name).
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+				Suspend(true).
+				RuntimePatches([]trainer.RuntimePatch{{
+					Manager: "test.io/manager",
+					TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+						Template: &trainer.JobSetTemplatePatch{
+							Spec: &trainer.JobSetSpecPatch{
+								ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+									Name: constants.Node,
+									Template: &trainer.JobTemplatePatch{
+										Spec: &trainer.JobSpecPatch{
+											Template: &trainer.PodTemplatePatch{Spec: podSpec},
+										},
+									},
+								}},
+							},
+						},
+					},
+				}}).
+				Obj()
+		}
+		podSpecPatch := func(job *trainer.TrainJob) *trainer.PodSpecPatch {
+			return job.Spec.RuntimePatches[0].TrainingRuntimeSpec.Template.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec
+		}
+		nodeSelectorOnly := func() *trainer.PodSpecPatch {
+			return &trainer.PodSpecPatch{NodeSelector: map[string]string{"test": "test"}}
+		}
+
 		ginkgo.DescribeTable("Validate TrainJob on update", func(old func() *trainer.TrainJob, new func(*trainer.TrainJob) *trainer.TrainJob, errorMatcher gomega.OmegaMatcher) {
 			oldTrainJob := old()
 			gomega.Expect(k8sClient.Create(ctx, oldTrainJob)).Should(gomega.Succeed())
@@ -1212,6 +1244,119 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 					return job
 				},
 				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed to add a runtimePatch for another manager when suspend is true",
+				func() *trainer.TrainJob {
+					return suspendedJobWithPodSpecPatch("add-manager-patch", nodeSelectorOnly())
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					patch := *job.Spec.RuntimePatches[0].DeepCopy()
+					patch.Manager = "kueue.x-k8s.io/manager"
+					patch.Time = nil
+					job.Spec.RuntimePatches = append(job.Spec.RuntimePatches, patch)
+					return job
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to add schedulerName to a runtimePatch after creation",
+				func() *trainer.TrainJob {
+					return suspendedJobWithPodSpecPatch("add-scheduler-name", nodeSelectorOnly())
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					podSpecPatch(job).SchedulerName = "volcano"
+					return job
+				},
+				gomega.MatchError(gomega.ContainSubstring("schedulerName is immutable"))),
+			ginkgo.Entry("Should fail to add serviceAccountName to a runtimePatch after creation",
+				func() *trainer.TrainJob {
+					return suspendedJobWithPodSpecPatch("add-service-account", nodeSelectorOnly())
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					podSpecPatch(job).ServiceAccountName = ptr.To("custom-sa")
+					return job
+				},
+				gomega.MatchError(gomega.ContainSubstring("serviceAccountName is immutable"))),
+			ginkgo.Entry("Should fail to add volumes to a runtimePatch after creation",
+				func() *trainer.TrainJob {
+					return suspendedJobWithPodSpecPatch("add-volumes", nodeSelectorOnly())
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					podSpecPatch(job).Volumes = []corev1.Volume{{
+						Name:         "extra",
+						VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+					}}
+					return job
+				},
+				gomega.MatchError(gomega.ContainSubstring("volumes is immutable"))),
+			ginkgo.Entry("Should fail to remove volumes from a runtimePatch after creation",
+				func() *trainer.TrainJob {
+					podSpec := nodeSelectorOnly()
+					podSpec.Volumes = []corev1.Volume{{
+						Name:         "extra",
+						VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+					}}
+					return suspendedJobWithPodSpecPatch("remove-volumes", podSpec)
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					podSpecPatch(job).Volumes = nil
+					return job
+				},
+				gomega.MatchError(gomega.ContainSubstring("volumes is immutable"))),
+			ginkgo.Entry("Should fail to add resourceClaims to a runtimePatch after creation",
+				func() *trainer.TrainJob {
+					return suspendedJobWithPodSpecPatch("add-resource-claims", nodeSelectorOnly())
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					podSpecPatch(job).ResourceClaims = []corev1.PodResourceClaim{{
+						Name:                      "gpu",
+						ResourceClaimTemplateName: ptr.To("gpu-template"),
+					}}
+					return job
+				},
+				gomega.MatchError(gomega.ContainSubstring("resourceClaims is immutable"))),
+			ginkgo.Entry("Should fail to add initContainers to a runtimePatch after creation",
+				func() *trainer.TrainJob {
+					return suspendedJobWithPodSpecPatch("add-init-containers", nodeSelectorOnly())
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					podSpecPatch(job).InitContainers = []trainer.ContainerPatch{{Name: constants.Node}}
+					return job
+				},
+				gomega.MatchError(gomega.ContainSubstring("initContainers is immutable"))),
+			ginkgo.Entry("Should fail to add containers to a runtimePatch after creation",
+				func() *trainer.TrainJob {
+					return suspendedJobWithPodSpecPatch("add-containers", nodeSelectorOnly())
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					podSpecPatch(job).Containers = []trainer.ContainerPatch{{Name: constants.Node}}
+					return job
+				},
+				gomega.MatchError(gomega.ContainSubstring("containers is immutable"))),
+			ginkgo.Entry("Should fail to add imagePullSecrets to a runtimePatch after creation",
+				func() *trainer.TrainJob {
+					return suspendedJobWithPodSpecPatch("add-image-pull-secrets", nodeSelectorOnly())
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					podSpecPatch(job).ImagePullSecrets = []corev1.LocalObjectReference{{Name: "registry"}}
+					return job
+				},
+				gomega.MatchError(gomega.ContainSubstring("imagePullSecrets is immutable"))),
+			ginkgo.Entry("Should fail to add securityContext to a runtimePatch after creation",
+				func() *trainer.TrainJob {
+					return suspendedJobWithPodSpecPatch("add-security-context", nodeSelectorOnly())
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					podSpecPatch(job).SecurityContext = &corev1.PodSecurityContext{RunAsNonRoot: ptr.To(true)}
+					return job
+				},
+				gomega.MatchError(gomega.ContainSubstring("securityContext is immutable"))),
+			ginkgo.Entry("Should fail to add terminationGracePeriodSeconds to a runtimePatch after creation",
+				func() *trainer.TrainJob {
+					return suspendedJobWithPodSpecPatch("add-term-grace-period", nodeSelectorOnly())
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					podSpecPatch(job).TerminationGracePeriodSeconds = ptr.To(int64(30))
+					return job
+				},
+				gomega.MatchError(gomega.ContainSubstring("terminationGracePeriodSeconds is immutable"))),
 		)
 	})
 })
