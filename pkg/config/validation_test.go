@@ -40,11 +40,11 @@ func TestValidate(t *testing.T) {
 			cfg: &configapi.Configuration{
 				Webhook: configapi.ControllerWebhook{
 					Port: ptr.To[int32](9443),
-					Host: ptr.To("0.0.0.0"),
+					Host: new("0.0.0.0"),
 				},
 				Metrics: configapi.ControllerMetrics{
 					BindAddress:   ":8443",
-					SecureServing: ptr.To(true),
+					SecureServing: new(true),
 				},
 				Health: configapi.ControllerHealth{
 					HealthProbeBindAddress: ":8081",
@@ -105,7 +105,7 @@ func TestValidate(t *testing.T) {
 			},
 			wantErr: nil,
 		},
-		"invalid negative QPS": {
+		"invalid ClientConnection negative QPS": {
 			cfg: &configapi.Configuration{
 				ClientConnection: &configapi.ClientConnection{
 					QPS: ptr.To[float32](-1),
@@ -118,7 +118,7 @@ func TestValidate(t *testing.T) {
 				},
 			},
 		},
-		"valid QPS at zero": {
+		"valid ClientConnection QPS at zero": {
 			cfg: &configapi.Configuration{
 				ClientConnection: &configapi.ClientConnection{
 					QPS: ptr.To[float32](0),
@@ -126,7 +126,7 @@ func TestValidate(t *testing.T) {
 			},
 			wantErr: nil,
 		},
-		"valid QPS with decimal": {
+		"valid ClientConnection QPS with decimal": {
 			cfg: &configapi.Configuration{
 				ClientConnection: &configapi.ClientConnection{
 					QPS: ptr.To[float32](123.456),
@@ -134,7 +134,7 @@ func TestValidate(t *testing.T) {
 			},
 			wantErr: nil,
 		},
-		"invalid negative Burst": {
+		"invalid ClientConnection negative Burst": {
 			cfg: &configapi.Configuration{
 				ClientConnection: &configapi.ClientConnection{
 					Burst: ptr.To[int32](-1),
@@ -147,46 +147,13 @@ func TestValidate(t *testing.T) {
 				},
 			},
 		},
-		"valid Burst at zero": {
+		"valid ClientConnection Burst at zero": {
 			cfg: &configapi.Configuration{
 				ClientConnection: &configapi.ClientConnection{
 					Burst: ptr.To[int32](0),
 				},
 			},
 			wantErr: nil,
-		},
-		"valid TLS options": {
-			cfg: &configapi.Configuration{
-				TLS: &configapi.TLSOptions{
-					MinVersion:       configapi.TLSVersion12,
-					CipherSuites:     []string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"},
-					CurvePreferences: []int32{29, 23},
-				},
-			},
-			wantErr: nil,
-		},
-		"invalid TLS options are rejected": {
-			cfg: &configapi.Configuration{
-				TLS: &configapi.TLSOptions{
-					MinVersion:       "0.9",
-					CipherSuites:     []string{"TLS_NOT_A_CIPHER"},
-					CurvePreferences: []int32{9999},
-				},
-			},
-			wantErr: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "tls.minVersion",
-				},
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "tls.cipherSuites[0]",
-				},
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "tls.curvePreferences",
-				},
-			},
 		},
 		"invalid concurrency zero": {
 			cfg: &configapi.Configuration{
@@ -238,6 +205,99 @@ func TestValidate(t *testing.T) {
 			},
 			wantErr: nil,
 		},
+		"valid StatusServer options": {
+			cfg: &configapi.Configuration{
+				StatusServer: &configapi.StatusServer{
+					Port:  ptr.To[int32](60000),
+					QPS:   ptr.To[float32](1.0),
+					Burst: ptr.To[int32](1),
+				},
+			},
+			wantErr: nil,
+		},
+		"invalid StatusServer negative QPS": {
+			cfg: &configapi.Configuration{
+				StatusServer: &configapi.StatusServer{
+					QPS: ptr.To[float32](-1),
+				},
+			},
+			wantErr: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "statusServer.qps",
+				},
+			},
+		},
+		"valid StatusServer QPS at zero": {
+			cfg: &configapi.Configuration{
+				StatusServer: &configapi.StatusServer{
+					QPS: ptr.To[float32](0),
+				},
+			},
+			wantErr: nil,
+		},
+		"valid StatusServer QPS with decimal": {
+			cfg: &configapi.Configuration{
+				StatusServer: &configapi.StatusServer{
+					QPS: ptr.To[float32](123.456),
+				},
+			},
+			wantErr: nil,
+		},
+		"invalid StatusServer negative Burst": {
+			cfg: &configapi.Configuration{
+				StatusServer: &configapi.StatusServer{
+					Burst: ptr.To[int32](-1),
+				},
+			},
+			wantErr: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "statusServer.burst",
+				},
+			},
+		},
+		"valid StatusServer Burst at zero": {
+			cfg: &configapi.Configuration{
+				StatusServer: &configapi.StatusServer{
+					Burst: ptr.To[int32](0),
+				},
+			},
+			wantErr: nil,
+		},
+		"valid TLS options": {
+			cfg: &configapi.Configuration{
+				TLS: &configapi.TLSOptions{
+					MinVersion:       configapi.TLSVersion12,
+					CipherSuites:     []string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"},
+					CurvePreferences: []int32{29, 23},
+				},
+			},
+			wantErr: nil,
+		},
+		"invalid TLS options are rejected": {
+			cfg: &configapi.Configuration{
+				TLS: &configapi.TLSOptions{
+					MinVersion:       "0.9",
+					CipherSuites:     []string{"TLS_NOT_A_CIPHER"},
+					CurvePreferences: []int32{9999},
+				},
+			},
+			wantErr: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "tls.minVersion",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "tls.cipherSuites[0]",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "tls.curvePreferences",
+				},
+			},
+		},
 		"multiple validation errors": {
 			cfg: &configapi.Configuration{
 				Webhook: configapi.ControllerWebhook{
@@ -251,6 +311,10 @@ func TestValidate(t *testing.T) {
 					GroupKindConcurrency: map[string]int32{
 						"TrainJob.trainer.kubeflow.org": -1,
 					},
+				},
+				StatusServer: &configapi.StatusServer{
+					QPS:   ptr.To[float32](-10),
+					Burst: ptr.To[int32](-20),
 				},
 			},
 			wantErr: field.ErrorList{
@@ -269,6 +333,14 @@ func TestValidate(t *testing.T) {
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
 					Field: "controller.groupKindConcurrency[TrainJob.trainer.kubeflow.org]",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "statusServer.qps",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "statusServer.burst",
 				},
 			},
 		},
@@ -293,6 +365,7 @@ func TestValidate(t *testing.T) {
 			cfg: &configapi.Configuration{
 				ClientConnection: nil,
 				Controller:       nil,
+				StatusServer:     nil,
 			},
 			wantErr: nil,
 		},
