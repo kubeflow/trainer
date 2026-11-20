@@ -19,6 +19,7 @@ package webhooks
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -28,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/features"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/util/optimizationjob"
@@ -70,6 +72,8 @@ func (w *OptimizationJobValidator) ValidateCreate(ctx context.Context, obj *trai
 		return nil, allErrs.ToAggregate()
 	}
 
+	allErrs = append(allErrs, validateReservedEnvVars(&obj.Spec.TrainJobTemplate, field.NewPath("spec", "trainJobTemplate"))...)
+
 	trialName := optimizationjob.GenerateTrialName(obj.Name)
 	syntheticTrainJob := &trainer.TrainJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -109,10 +113,31 @@ func (w *OptimizationJobValidator) ValidateCreate(ctx context.Context, obj *trai
 	return warnings, allErrs.ToAggregate()
 }
 
-func (w *OptimizationJobValidator) ValidateUpdate(context.Context, *trainer.OptimizationJob, *trainer.OptimizationJob) (admission.Warnings, error) {
-	return nil, nil
+func (w *OptimizationJobValidator) ValidateUpdate(_ context.Context, _, newObj *trainer.OptimizationJob) (admission.Warnings, error) {
+	if newObj == nil {
+		return nil, nil
+	}
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateReservedEnvVars(&newObj.Spec.TrainJobTemplate, field.NewPath("spec", "trainJobTemplate"))...)
+	return nil, allErrs.ToAggregate()
 }
 
 func (w *OptimizationJobValidator) ValidateDelete(context.Context, *trainer.OptimizationJob) (admission.Warnings, error) {
 	return nil, nil
+}
+
+func validateReservedEnvVars(trainJobTemplate *trainer.TrainJobTemplateSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if trainJobTemplate.Spec.Trainer != nil {
+		envPath := fldPath.Child("spec", "trainer", "env")
+		for i, env := range trainJobTemplate.Spec.Trainer.Env {
+			if strings.HasPrefix(env.Name, constants.EnvVarPrefix) {
+				allErrs = append(allErrs, field.Forbidden(
+					envPath.Index(i).Child("name"),
+					fmt.Sprintf("environment variable name %q must not use the reserved prefix %q", env.Name, constants.EnvVarPrefix),
+				))
+			}
+		}
+	}
+	return allErrs
 }
