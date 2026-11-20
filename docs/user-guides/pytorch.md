@@ -27,6 +27,10 @@ different GPUs. The model is split into shards, each hosted on a different GPU. 
 parameter updates are computed locally and synchronized globally. FSDP is particularly useful for
 training very large models that cannot fit into the memory of a single GPU.
 
+:::{note}
+Platform administrators can deploy customized FSDP runtimes with annotated YAML templates by following the [Distributed Training Runtimes Guide](../operator-guides/distributed-training-runtimes).
+:::
+
 ## Get PyTorch Runtime Packages
 
 Kubeflow Trainer includes a PyTorch runtime called [`torch-distributed`](https://github.com/kubeflow/trainer/blob/master/manifests/base/runtimes/torch_distributed.yaml),
@@ -214,6 +218,7 @@ print("\n".join(TrainerClient().get_job_logs(name=job_id)))
 
 ## Next Steps
 
+- Explore how to configure [FSDP in TrainingRuntimes](../operator-guides/distributed-training-runtimes).
 - Check out [the PyTorch MNIST example](https://github.com/kubeflow/trainer/blob/master/examples/pytorch/image-classification/mnist.ipynb).
 - Follow [the PyTorch fine-tuning example](https://github.com/kubeflow/trainer/blob/master/examples/pytorch/question-answering/fine-tune-distilbert.ipynb)
  using the pre-trained DistilBERT model.

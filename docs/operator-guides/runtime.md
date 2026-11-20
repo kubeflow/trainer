@@ -174,6 +174,10 @@ The following runtimes are supported for TorchTune BuiltinTrainer:
 | torchtune-llama3.2-3b  | Llama 3.2 (3B)  |
 | torchtune-qwen2.5-1.5b | Qwen 2.5 (1.5B) |
 
+### Advanced Distributed Configurations (FSDP and DeepSpeed)
+
+For large-scale model training requiring distributed parameter or optimizer sharding, explore [the Distributed Training Runtimes Guide](distributed-training-runtimes) for annotated YAML templates, ConfigMap integrations, and comparison matrices for **PyTorch FSDP** and **DeepSpeed via Torch plugin**.
+
 ### Runtime Deprecation Policy
 
 As ML frameworks evolve over time, the Kubeflow community may decide to deprecate
@@ -199,6 +203,7 @@ These measures are taken to inform users about runtime deprecation:
 
 ## Next Steps
 
+- Learn how to configure [FSDP and DeepSpeed in TrainingRuntimes](distributed-training-runtimes).
 - Learn how to configure [job scheduling in Kubeflow Trainer](job-scheduling/overview.md).
 - Explore how to set up [MLPolicy in runtime](ml-policy).
 - See how to define [Job Template in runtimes](job-template).
