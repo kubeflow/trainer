@@ -85,9 +85,10 @@ if not update_trainjob_status(progress_percent=100, metrics={"validation_loss": 
 ```
 
 `update_trainjob_status` sends at most one update every 5 seconds and returns `False` for calls
-it drops. If your Katib code printed the metric after every epoch, make sure the final value is
-sent and check the return value. With `transformers >= 4.57.0`, evaluation metrics are pushed
-automatically. See [Report the objective metric](optimizationjob.md#report-the-objective-metric).
+it drops. Each update replaces the whole `metrics` list, so the last update a trial sends must
+include the objective metric. If your Katib code printed the metric after every epoch, make sure
+the final value is sent and check the return value. With `transformers >= 4.57.0`, evaluation
+metrics are pushed automatically. See [Report the objective metric](optimizationjob.md#report-the-objective-metric).
 
 :::{note}
 For each trial, Katib's default metric strategy keeps the best value the trial reported: the
