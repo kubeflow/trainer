@@ -19,14 +19,44 @@ knowledge_base:
   code_guidelines:
     enabled: true
     filePatterns:
-      - ".github/copilot-instructions.md"
+      - files: ".github/copilot-instructions.md"
+        applyTo: "**"
       - "AGENTS.md"
+      # Kubernetes API conventions apply to CRD/config API changes only.
+      - files: ".agents/docs/api-conventions.md"
+        applyTo: "pkg/apis/**"
+      - files: ".agents/docs/api_changes.md"
+        applyTo: "pkg/apis/**"
+      # Reviewer personas from the review-pr skill (.agents/skills/review-pr).
+      - files: ".agents/skills/review-pr/agents/code-reviewer.md"
+        applyTo: "**"
+      - files: ".agents/skills/review-pr/agents/pr-test-analyzer.md"
+        applyTo: "**/*_test.go, **/*_test.py, test/**"
+      - files: ".agents/skills/review-pr/agents/silent-failure-hunter.md"
+        applyTo: "**"
+      - files: ".agents/skills/review-pr/agents/comment-analyzer.md"
+        applyTo: "**"
+      - files: ".agents/skills/review-pr/agents/type-design-analyzer.md"
+        applyTo: "**"
 
 reviews:
+  profile: quiet
+  in_progress_fortune: false
+  high_level_summary_in_walkthrough: true
+
   auto_review:
     labels:
       - "!do-not-merge/work-in-progress"
       - "!do-not-merge/hold"
+
+  # Linters already enforced by CI/pre-commit; avoid duplicate feedback.
+  tools:
+    golangci-lint:
+      enabled: false
+    ruff:
+      enabled: false
+    flake8:
+      enabled: false
 
   path_filters:
     # Generated Go code (make generate).
