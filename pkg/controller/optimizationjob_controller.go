@@ -589,6 +589,7 @@ func (r *OptimizationJobReconciler) constructTrainJob(optJob *trainer.Optimizati
 		found := false
 		for i := range tj.Spec.Trainer.Env {
 			if tj.Spec.Trainer.Env[i].Name == envName {
+				tj.Spec.Trainer.Env[i].ValueFrom = nil
 				tj.Spec.Trainer.Env[i].Value = param.Value
 				found = true
 				break

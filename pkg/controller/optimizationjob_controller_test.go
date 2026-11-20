@@ -2420,7 +2420,14 @@ func TestConstructTrainJob(t *testing.T) {
 				Spec: trainer.TrainJobSpec{
 					Trainer: &trainer.Trainer{
 						Env: []corev1.EnvVar{
-							{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+							{
+								Name: constants.EnvVarPrefix + "lr",
+								ValueFrom: &corev1.EnvVarSource{
+									ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+										Key: "lr-key",
+									},
+								},
+							},
 							{Name: "OTHER_ENV", Value: "foo"},
 						},
 					},
