@@ -137,6 +137,13 @@ Monitor training progress and custom metrics in TrainJob status
 Tune TrainJob hyperparameters with OptimizationJob
 ::::
 
+::::{grid-item-card} Migrate from Katib
+:link: katib-migration
+:link-type: doc
+
+Move Katib Experiments to OptimizationJob
+::::
+
 :::::
 
 ## Local Development
@@ -192,6 +199,7 @@ mpi
 flux
 trainjob-progress
 optimizationjob
+katib-migration
 data-cache
 builtin-trainer/index
 local-execution/index
