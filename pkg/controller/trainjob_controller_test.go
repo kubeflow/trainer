@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2/ktesting"
 	clocktesting "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -267,6 +268,64 @@ func TestReconcileUnsupportedRuntime(t *testing.T) {
 		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime", "ObservedGeneration"),
 	); len(diff) != 0 {
 		t.Errorf("Unexpected TrainJob conditions (-want, +got): \n%s", diff)
+	}
+}
+
+// TestReconcileDeletingTrainJob ensures a TrainJob being deleted is not reconciled. With
+// foreground deletion, the TrainJob stays visible until its dependents are gone, so
+// reconciling it would re-create the JobSet that the garbage collector just removed.
+func TestReconcileDeletingTrainJob(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deleting-job").
+		RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+		Obj()
+	// The fake client only accepts objects with a deletionTimestamp if they carry a finalizer,
+	// which is what the API server does for foreground deletion.
+	trainJob.Finalizers = []string{metav1.FinalizerDeleteDependents}
+	trainJob.DeletionTimestamp = ptr.To(metav1.NewTime(time.Now().Truncate(time.Second)))
+
+	var applyCalled bool
+	cli := utiltesting.NewClientBuilder().
+		WithObjects(trainJob).
+		WithStatusSubresource(trainJob).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Apply: func(context.Context, client.WithWatch, apiruntime.ApplyConfiguration, ...client.ApplyOption) error {
+				applyCalled = true
+				return nil
+			},
+		}).
+		Build()
+
+	fr := &fakeRuntime{
+		objsToApply: []apiruntime.ApplyConfiguration{
+			corev1ac.ConfigMap("to-apply", metav1.NamespaceDefault),
+		},
+	}
+	r := &TrainJobReconciler{
+		client:   cli,
+		recorder: events.NewFakeRecorder(1),
+		clock:    clocktesting.NewFakePassiveClock(time.Now()),
+		runtimes: map[string]jobruntimes.Runtime{
+			jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef): fr,
+		},
+	}
+
+	result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(trainJob)})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if diff := cmp.Diff(ctrl.Result{}, result); len(diff) != 0 {
+		t.Errorf("Unexpected result (-want, +got): \n%s", diff)
+	}
+	if fr.newObjectsCalled {
+		t.Error("Expected NewObjects not to be called for a TrainJob being deleted")
+	}
+	if fr.deleteObjectsCalled {
+		t.Error("Expected DeleteObjects not to be called for a TrainJob being deleted")
+	}
+	if applyCalled {
+		t.Error("Expected client.Apply not to be called for a TrainJob being deleted")
 	}
 }
 
