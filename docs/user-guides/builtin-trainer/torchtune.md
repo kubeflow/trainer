@@ -96,10 +96,11 @@ Output:
 
 ```sh
 2025-07-02T08:24:23Z INFO     [__main__.py:16] Starting pre-trained model initialization
-2025-07-02T08:24:23Z INFO     [huggingface.py:26] Downloading model: meta-llama/Llama-3.2-1B-Instruct
-2025-07-02T08:24:23Z INFO     [huggingface.py:27] ----------------------------------------
+2025-07-02T08:24:23Z INFO     [huggingface.py:39] Downloading model: meta-llama/Llama-3.2-1B-Instruct
+2025-07-02T08:24:23Z INFO     [huggingface.py:40] ----------------------------------------
+2025-07-02T08:24:23Z INFO     [huggingface.py:69] Attempting to download model with safetensors format...
 Fetching 8 files: 100%|██████████| 8/8 [01:02<00:00,  7.87s/it]
-2025-07-02T08:25:27Z INFO     [huggingface.py:43] Model has been downloaded
+2025-07-02T08:25:27Z INFO     [huggingface.py:80] Model downloaded successfully with safetensors format
 ```
 
 #### Training Node
@@ -175,7 +176,13 @@ Currently, we support:
 
 #### Model Initializer
 
-Currently, we only support downloading models from HuggingFace by defining [`HuggingFaceModelInitializer`](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py):
+Currently, we only support downloading models from HuggingFace by defining [`HuggingFaceModelInitializer`](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py).
+
+The model initializer uses a smart fallback strategy for downloading model weights:
+1. **Safetensors format** (preferred): Tries to download `.safetensors` files first, which are faster to load and more secure.
+2. **PyTorch formats** (fallback): If safetensors files are not available, automatically falls back to `.bin`, `.pt`, or `.pth` files.
+
+This ensures compatibility with both modern models (safetensors) and legacy models (PyTorch formats).
 
 #### Example Usage
 
