@@ -206,6 +206,31 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 					return optimizationJob
 				},
 				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed in creating optimizationJob with non-empty categorical choices",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
+						Parameters(trainer.Parameter{
+							Name: "optimizer",
+							SearchSpace: &trainer.SearchSpace{
+								Categorical: trainer.CategoricalSpace{Choices: []string{"adam", "sgd"}},
+							},
+						}).
+						Obj()
+				},
+				gomega.Succeed()),
+			// The chosen value is written to status.result.parameters[].value, which requires at least one character.
+			ginkgo.Entry("Should fail in creating optimizationJob with an empty categorical choice",
+				func() *trainer.OptimizationJob {
+					return testingutil.MakeOptimizationJobWrapper(ns.Name, optimizationJobName).
+						Parameters(trainer.Parameter{
+							Name: "flag",
+							SearchSpace: &trainer.SearchSpace{
+								Categorical: trainer.CategoricalSpace{Choices: []string{"", "--fp16"}},
+							},
+						}).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
 			ginkgo.Entry("Should succeed in creating optimizationJob with a valid RFC 1035 name",
 				func() *trainer.OptimizationJob {
 					return testingutil.MakeOptimizationJobWrapper(ns.Name, "valid-job-name").Obj()
