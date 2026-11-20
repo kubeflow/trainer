@@ -61,6 +61,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/networkpolicy"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
@@ -86,15 +87,16 @@ func TestNew(t *testing.T) {
 			wantFramework: &Framework{
 				registry: fwkplugins.NewRegistry(),
 				plugins: map[string]framework.Plugin{
-					coscheduling.Name: &coscheduling.CoScheduling{},
-					flux.Name:         &flux.Flux{},
-					volcano.Name:      &volcano.Volcano{},
-					mpi.Name:          &mpi.MPI{},
-					plainml.Name:      &plainml.PlainML{},
-					torch.Name:        &torch.Torch{},
-					jobset.Name:       &jobset.JobSet{},
-					jax.Name:          &jax.Jax{},
-					xgboost.Name:      &xgboost.XGBoost{},
+					coscheduling.Name:  &coscheduling.CoScheduling{},
+					flux.Name:          &flux.Flux{},
+					volcano.Name:       &volcano.Volcano{},
+					mpi.Name:           &mpi.MPI{},
+					plainml.Name:       &plainml.PlainML{},
+					networkpolicy.Name: &networkpolicy.NetworkPolicy{},
+					torch.Name:         &torch.Torch{},
+					jobset.Name:        &jobset.JobSet{},
+					jax.Name:           &jax.Jax{},
+					xgboost.Name:       &xgboost.XGBoost{},
 				},
 				enforceMLPlugins: []framework.EnforceMLPolicyPlugin{
 					&flux.Flux{},
@@ -118,6 +120,7 @@ func TestNew(t *testing.T) {
 					&xgboost.XGBoost{},
 				},
 				watchExtensionPlugins: []framework.WatchExtensionPlugin{
+					&networkpolicy.NetworkPolicy{},
 					&flux.Flux{},
 					&coscheduling.CoScheduling{},
 					&volcano.Volcano{},
@@ -128,6 +131,7 @@ func TestNew(t *testing.T) {
 					&jobset.JobSet{},
 				},
 				componentBuilderPlugins: []framework.ComponentBuilderPlugin{
+					&networkpolicy.NetworkPolicy{},
 					&flux.Flux{},
 					&coscheduling.CoScheduling{},
 					&volcano.Volcano{},
@@ -135,6 +139,7 @@ func TestNew(t *testing.T) {
 					&mpi.MPI{},
 				},
 				componentDeleterPlugins: []framework.ComponentDeleterPlugin{
+					&networkpolicy.NetworkPolicy{},
 					&volcano.Volcano{},
 				},
 				trainJobStatusPlugin: &jobset.JobSet{},
@@ -157,7 +162,7 @@ func TestNew(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmp.AllowUnexported(Framework{}),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, flux.Flux{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}, xgboost.XGBoost{}),
+		cmpopts.IgnoreUnexported(networkpolicy.NetworkPolicy{}, coscheduling.CoScheduling{}, flux.Flux{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}, xgboost.XGBoost{}),
 		cmpopts.IgnoreFields(flux.Flux{}, "client", "scheme"),
 		cmpopts.IgnoreFields(coscheduling.CoScheduling{}, "client"),
 		cmpopts.IgnoreFields(volcano.Volcano{}, "client"),
@@ -198,7 +203,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestNewPluginOrderIsDeterministic(t *testing.T) {
-	// Verify the implementation detail that plugins are executed in name order.
+	// Isolation runs first; other plugins retain deterministic name order.
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	clientBuilder := testingutil.NewClientBuilder()
@@ -225,13 +230,46 @@ func TestNewPluginOrderIsDeterministic(t *testing.T) {
 	for i, p := range fwk.componentBuilderPlugins {
 		buildNames[i] = p.(framework.Plugin).Name()
 	}
-	assertSorted("componentBuilderPlugins", buildNames)
+	if len(buildNames) == 0 || buildNames[0] != networkpolicy.Name {
+		t.Fatalf("isolation must be first: %v", buildNames)
+	}
+	assertSorted("componentBuilderPlugins", buildNames[1:])
 
 	validationNames := make([]string, len(fwk.customValidationPlugins))
 	for i, p := range fwk.customValidationPlugins {
 		validationNames[i] = p.(framework.Plugin).Name()
 	}
 	assertSorted("customValidationPlugins", validationNames)
+}
+
+type orderedBuilder struct {
+	framework.ComponentBuilderPlugin
+	order int
+}
+
+func (p *orderedBuilder) BuildOrder() int { return p.order }
+
+func TestNewComponentBuilderOrder(t *testing.T) {
+	c := testingutil.NewClientBuilder()
+	first := &orderedBuilder{ComponentBuilderPlugin: &networkpolicy.NetworkPolicy{}, order: -10}
+	last := &orderedBuilder{ComponentBuilderPlugin: &networkpolicy.NetworkPolicy{}, order: 10}
+	tieA := &orderedBuilder{ComponentBuilderPlugin: &networkpolicy.NetworkPolicy{}}
+	tieB := &orderedBuilder{ComponentBuilderPlugin: &networkpolicy.NetworkPolicy{}}
+	plain := &flux.Flux{}
+	registry := fwkplugins.Registry{}
+	for name, plugin := range map[string]framework.Plugin{"Z-first": first, "A-last": last, "B-tie": tieB, "A-tie": tieA, "C-default": plain} {
+		registry[name] = func(context.Context, client.Client, client.FieldIndexer, *configapi.Configuration) (framework.Plugin, error) {
+			return plugin, nil
+		}
+	}
+	fwk, err := New(context.Background(), c.Build(), registry, testingutil.AsIndex(c), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []framework.ComponentBuilderPlugin{first, tieA, tieB, plain, last}
+	if !slices.Equal(fwk.componentBuilderPlugins, want) {
+		t.Fatal("builders must follow explicit order, then deterministic name order; unspecified order is zero")
+	}
 }
 
 func TestRunEnforceMLPolicyPlugins(t *testing.T) {
@@ -2483,6 +2521,7 @@ func TestWatchExtensionPlugins(t *testing.T) {
 		"coscheduling, jobset, and mpi are performed": {
 			registry: fwkplugins.NewRegistry(),
 			wantPlugins: []framework.WatchExtensionPlugin{
+				&networkpolicy.NetworkPolicy{},
 				&flux.Flux{},
 				&coscheduling.CoScheduling{},
 				&volcano.Volcano{},
@@ -2496,7 +2535,7 @@ func TestWatchExtensionPlugins(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmpopts.SortSlices(func(a, b framework.Plugin) bool { return a.Name() < b.Name() }),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, jobset.JobSet{}, mpi.MPI{}, flux.Flux{}),
+		cmpopts.IgnoreUnexported(networkpolicy.NetworkPolicy{}, coscheduling.CoScheduling{}, volcano.Volcano{}, jobset.JobSet{}, mpi.MPI{}, flux.Flux{}),
 		cmpopts.IgnoreFields(flux.Flux{}, "client", "scheme"),
 	}
 	for name, tc := range cases {

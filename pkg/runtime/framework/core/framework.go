@@ -17,6 +17,7 @@ limitations under the License.
 package core
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"slices"
@@ -109,6 +110,15 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 			f.trainJobStatusPlugin = p
 		}
 	}
+	order := func(p framework.ComponentBuilderPlugin) int {
+		if ordered, ok := p.(framework.OrderedComponentBuilderPlugin); ok {
+			return ordered.BuildOrder()
+		}
+		return 0
+	}
+	slices.SortStableFunc(f.componentBuilderPlugins, func(a, b framework.ComponentBuilderPlugin) int {
+		return cmp.Compare(order(a), order(b))
+	})
 	f.plugins = plugins
 	return f, nil
 }
