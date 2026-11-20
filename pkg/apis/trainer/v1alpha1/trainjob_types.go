@@ -133,10 +133,18 @@ type TrainJobSpec struct {
 	// before the system tries to terminate it. Value must be a positive integer.
 	// Once reached, all running Pods are terminated and the TrainJob status becomes
 	// Failed with reason: DeadlineExceeded.
+	// TODO(beta): replace with *int64 to match batch/v1.JobSpec.
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="field is immutable"
 	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds,omitempty"`
+
+	// ttlSecondsAfterFinished is the retention after the TrainJob becomes Complete or Failed. Ignored for OptimizationJob trials.
+	// Zero makes the TrainJob eligible for immediate deletion. This field is mutable and overrides
+	// the runtime snapshot default; if unset, that default applies.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
 
 	// managedBy is used to indicate the controller or entity that manages a TrainJob.
 	// The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or
@@ -567,6 +575,11 @@ type TrainJobStatus struct {
 	// +listMapKey=type
 	// +kubebuilder:validation:MaxItems=8
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// startTime records when the TrainJob becomes active.
+	// It is cleared on suspension and reset on resume.
+	// +optional
+	StartTime *metav1.Time `json:"startTime,omitempty"`
 
 	// jobsStatus tracks the child Jobs in TrainJob.
 	// +listType=map

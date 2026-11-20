@@ -111,6 +111,10 @@ type TrainingRuntimeList struct {
 // +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.template) && has(self.template.spec) && has(self.template.spec.replicatedJobs) && self.template.spec.replicatedJobs.exists(r, has(r.template.spec) && has(r.template.spec.scheduling)))", message="Job scheduling must not be set, it is owned by the TrainJob controller"
 // +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.template) && has(self.template.spec) && has(self.template.spec.replicatedJobs) && self.template.spec.replicatedJobs.exists(r, has(r.template.spec) && has(r.template.spec.template.spec) && has(r.template.spec.template.spec.schedulingGroup)))", message="Pod schedulingGroup must not be set, it is owned by the TrainJob controller"
 // +kubebuilder:validation:XValidation:rule="!has(self.scheduling) || !(has(self.scheduling.schedulingPolicy) ? has(self.scheduling.schedulingPolicy.gang) : (!has(self.scheduling.replicatedJobs) || size(self.scheduling.replicatedJobs) == 0)) || !has(self.template) || !has(self.template.spec) || ((!has(self.template.spec.replicatedJobs) || self.template.spec.replicatedJobs.all(rj, !has(rj.dependsOn) || size(rj.dependsOn) == 0)) && (!has(self.template.spec.startupPolicy) || self.template.spec.startupPolicy.startupPolicyOrder != 'InOrder'))", message="TrainJob-level gang scheduling cannot be used with dependsOn or InOrder startupPolicy; target the ReplicatedJobs with separate scheduling.replicatedJobs entries instead"
+// +kubebuilder:validation:XValidation:rule="!has(self.template) || !has(self.template.spec) || !has(self.template.spec.ttlSecondsAfterFinished)",message="template.spec.ttlSecondsAfterFinished must be unset; use runPolicy instead"
+// +kubebuilder:validation:XValidation:rule="!has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs) || self.template.spec.replicatedJobs.all(rj, !has(rj.template.spec) || !has(rj.template.spec.ttlSecondsAfterFinished))",message="Job ttlSecondsAfterFinished must be unset; use runPolicy instead"
+// +kubebuilder:validation:XValidation:rule="!has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs) || self.template.spec.replicatedJobs.all(rj, !has(rj.template.spec) || !has(rj.template.spec.activeDeadlineSeconds))",message="Job activeDeadlineSeconds must be unset; use runPolicy instead"
+// +kubebuilder:validation:XValidation:rule="!has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs) || self.template.spec.replicatedJobs.all(rj, !has(rj.template.spec) || !has(rj.template.spec.template.spec) || !has(rj.template.spec.template.spec.activeDeadlineSeconds))",message="Pod activeDeadlineSeconds must be unset; use runPolicy instead"
 type TrainingRuntimeSpec struct {
 	// mlPolicy provides the ML-specific parameters for the model training.
 	// +optional
@@ -132,9 +136,27 @@ type TrainingRuntimeSpec struct {
 	// +optional
 	Scheduling *TrainingRuntimeScheduling `json:"scheduling,omitempty"`
 
+	// runPolicy defines lifecycle defaults that referencing TrainJobs can override.
+	// +optional
+	RunPolicy *RunPolicy `json:"runPolicy,omitempty"`
+
 	// template for the JobSet which will be used by TrainJob.
 	// +optional
 	Template JobSetTemplateSpec `json:"template,omitzero"`
+}
+
+// RunPolicy holds mutable lifecycle defaults captured in runtime snapshots.
+// Explicit TrainJob values override their matching defaults.
+type RunPolicy struct {
+	// activeDeadlineSeconds is the default maximum active duration in seconds.
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"` //nolint:kubeapilinter // KEP-2899 requires a pointer to match the Kubernetes Job API.
+
+	// ttlSecondsAfterFinished is the default retention after completion or failure. Ignored for OptimizationJob trials.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
 }
 
 // JobSetTemplateSpec represents a template of the desired JobSet.

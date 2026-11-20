@@ -31,6 +31,7 @@ import pprint
 import re  # noqa: F401
 import json
 
+from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_apis_meta_v1_condition import IoK8sApimachineryPkgApisMetaV1Condition
@@ -45,8 +46,9 @@ class TrainerV1alpha1TrainJobStatus(BaseModel):
     """ # noqa: E501
     conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = Field(default=None, description="conditions for the TrainJob.")
     jobs_status: Optional[List[TrainerV1alpha1JobStatus]] = Field(default=None, description="jobsStatus tracks the child Jobs in TrainJob.", alias="jobsStatus")
+    start_time: Optional[datetime] = Field(default=None, description="startTime records when the TrainJob becomes active. It is cleared on suspension and reset on resume.", alias="startTime")
     trainer_status: Optional[TrainerV1alpha1TrainerStatus] = Field(default=None, description="trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.  This field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).  This is an alpha feature and requires enabling the TrainJobStatus feature gate.", alias="trainerStatus")
-    __properties: ClassVar[List[str]] = ["conditions", "jobsStatus", "trainerStatus"]
+    __properties: ClassVar[List[str]] = ["conditions", "jobsStatus", "startTime", "trainerStatus"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -118,6 +120,7 @@ class TrainerV1alpha1TrainJobStatus(BaseModel):
         _obj = cls.model_validate({
             "conditions": [IoK8sApimachineryPkgApisMetaV1Condition.from_dict(_item) for _item in obj["conditions"]] if obj.get("conditions") is not None else None,
             "jobsStatus": [TrainerV1alpha1JobStatus.from_dict(_item) for _item in obj["jobsStatus"]] if obj.get("jobsStatus") is not None else None,
+            "startTime": obj.get("startTime"),
             "trainerStatus": TrainerV1alpha1TrainerStatus.from_dict(obj["trainerStatus"]) if obj.get("trainerStatus") is not None else None
         })
         return _obj
