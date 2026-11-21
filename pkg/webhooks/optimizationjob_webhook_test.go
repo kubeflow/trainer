@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/features"
 	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
@@ -166,6 +168,64 @@ func TestOptimizationJobValidateCreate(t *testing.T) {
 					"must be no more than 63 characters"),
 			},
 		},
+		"OptimizationJob with reserved env var prefix in trainJobTemplate trainer env fails": {
+			featureGates: featuregatetesting.FeatureOverrides{features.TrainJobStatus: true, features.OptimizationJob: true},
+			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
+					},
+				}).Obj(),
+			optimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						RuntimeRef: trainer.RuntimeRef{
+							APIGroup: ptr.To(trainer.SchemeGroupVersion.Group),
+							Kind:     ptr.To(trainer.ClusterTrainingRuntimeKind),
+							Name:     "runtime",
+						},
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+								{Name: "OTHER_ENV", Value: "foo"},
+							},
+						},
+					},
+				}).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Forbidden(
+					field.NewPath("spec", "trainJobTemplate", "spec", "trainer", "env").Index(0).Child("name"),
+					"",
+				),
+			},
+		},
+		"OptimizationJob with non-reserved env vars in trainJobTemplate trainer env passes": {
+			featureGates: featuregatetesting.FeatureOverrides{features.TrainJobStatus: true, features.OptimizationJob: true},
+			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
+					},
+				}).Obj(),
+			optimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						RuntimeRef: trainer.RuntimeRef{
+							APIGroup: ptr.To(trainer.SchemeGroupVersion.Group),
+							Kind:     ptr.To(trainer.ClusterTrainingRuntimeKind),
+							Name:     "runtime",
+						},
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: "MY_CUSTOM_VAR", Value: "custom"},
+								{Name: "LEARNING_RATE", Value: "0.01"},
+							},
+						},
+					},
+				}).
+				Obj(),
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -193,6 +253,117 @@ func TestOptimizationJobValidateCreate(t *testing.T) {
 			_, err = validator.ValidateCreate(ctx, optimizationJob)
 			if diff := cmp.Diff(tc.wantError.ToAggregate(), err, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); len(diff) != 0 {
 				t.Errorf("Unexpected error from ValidateCreate (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestOptimizationJobValidateUpdate(t *testing.T) {
+	cases := map[string]struct {
+		oldOptimizationJob *trainer.OptimizationJob
+		newOptimizationJob *trainer.OptimizationJob
+		wantError          field.ErrorList
+	}{
+		"OptimizationJob update with reserved env var prefix in trainJobTemplate trainer env fails": {
+			oldOptimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").Obj(),
+			newOptimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+							},
+						},
+					},
+				}).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Forbidden(
+					field.NewPath("spec", "trainJobTemplate", "spec", "trainer", "env").Index(0).Child("name"),
+					"",
+				),
+			},
+		},
+		"OptimizationJob update modifying pre-existing reserved env var fails": {
+			oldOptimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+							},
+						},
+					},
+				}).
+				Obj(),
+			newOptimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.002"},
+							},
+						},
+					},
+				}).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Forbidden(
+					field.NewPath("spec", "trainJobTemplate", "spec", "trainer", "env").Index(0).Child("name"),
+					"",
+				),
+			},
+		},
+		"OptimizationJob update preserving unchanged pre-existing reserved env var passes": {
+			oldOptimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+							},
+						},
+					},
+				}).
+				Obj(),
+			newOptimizationJob: func() *trainer.OptimizationJob {
+				job := testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+					TrainJobTemplate(trainer.TrainJobTemplateSpec{
+						Spec: trainer.TrainJobSpec{
+							Trainer: &trainer.Trainer{
+								Env: []corev1.EnvVar{
+									{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+								},
+							},
+						},
+					}).
+					Obj()
+				job.Labels = map[string]string{"updated-label": "true"}
+				return job
+			}(),
+		},
+		"OptimizationJob update with valid trainer env passes": {
+			oldOptimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").Obj(),
+			newOptimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: "CUSTOM_ENV", Value: "0.001"},
+							},
+						},
+					},
+				}).
+				Obj(),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			validator := &OptimizationJobValidator{}
+			_, err := validator.ValidateUpdate(ctx, tc.oldOptimizationJob, tc.newOptimizationJob)
+			if diff := cmp.Diff(tc.wantError.ToAggregate(), err, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); len(diff) != 0 {
+				t.Errorf("Unexpected error from ValidateUpdate (-want, +got): %s", diff)
 			}
 		})
 	}

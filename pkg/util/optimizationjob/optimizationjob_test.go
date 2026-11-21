@@ -260,6 +260,42 @@ func TestExtractBestResult(t *testing.T) {
 			},
 			want: nil,
 		},
+		"duplicate parameter env vars in best trial are deduplicated": {
+			optJob: &trainer.OptimizationJob{
+				Spec: trainer.OptimizationJobSpec{
+					Objectives: []trainer.Objective{
+						{Metric: "accuracy", Direction: trainer.ObjectiveDirectionMaximize},
+					},
+				},
+			},
+			trainJobs: []trainer.TrainJob{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "tj-dup"},
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+								{Name: constants.EnvVarPrefix + "lr", Value: "0.01"},
+							},
+						},
+					},
+					Status: trainer.TrainJobStatus{
+						Conditions: []metav1.Condition{
+							{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue},
+						},
+						TrainerStatus: &trainer.TrainerStatus{
+							Metrics: []trainer.Metric{{Name: "accuracy", Value: "0.95"}},
+						},
+					},
+				},
+			},
+			want: &trainer.Result{
+				TrainJobName: "tj-dup",
+				Parameters: []trainer.ParameterAssignment{
+					{Name: "lr", Value: "0.01"},
+				},
+			},
+		},
 		"maximize direction selects highest metric": {
 			optJob: &trainer.OptimizationJob{
 				Spec: trainer.OptimizationJobSpec{
@@ -921,6 +957,63 @@ func TestBuildSuggestionRequest(t *testing.T) {
 			t2.Spec.ParameterAssignments.Assignments[0].Name != "lr" ||
 			t2.Spec.ParameterAssignments.Assignments[0].Value != "0.05" {
 			t.Errorf("unexpected parameter assignments for trial 2: %+v", t2.Spec.ParameterAssignments.Assignments)
+		}
+	})
+
+	t.Run("duplicate parameter env vars in trainJobs are deduplicated", func(t *testing.T) {
+		optJob := &trainer.OptimizationJob{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-optjob"},
+			Spec: trainer.OptimizationJobSpec{
+				Objectives: []trainer.Objective{
+					{Metric: "accuracy", Direction: trainer.ObjectiveDirectionMaximize},
+				},
+				SearchAlgorithm: &trainer.SearchAlgorithm{
+					Random: &trainer.RandomAlgorithm{},
+				},
+				Parameters: []trainer.Parameter{
+					{
+						Name: "lr",
+						SearchSpace: &trainer.SearchSpace{
+							Uniform: trainer.UniformSpace{Min: "0.001", Max: "0.1"},
+						},
+					},
+				},
+			},
+		}
+
+		trainJobs := []trainer.TrainJob{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "trial-dup"},
+				Spec: trainer.TrainJobSpec{
+					Trainer: &trainer.Trainer{
+						Env: []corev1.EnvVar{
+							{Name: constants.EnvVarPrefix + "lr", Value: "0.001"},
+							{Name: constants.EnvVarPrefix + "lr", Value: "0.01"},
+						},
+					},
+				},
+				Status: trainer.TrainJobStatus{
+					Conditions: []metav1.Condition{
+						{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue},
+					},
+					TrainerStatus: &trainer.TrainerStatus{
+						Metrics: []trainer.Metric{{Name: "accuracy", Value: "0.95"}},
+					},
+				},
+			},
+		}
+
+		req, err := BuildSuggestionRequest(optJob, trainJobs, 1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if len(req.Trials) != 1 {
+			t.Fatalf("expected 1 trial, got %d", len(req.Trials))
+		}
+		assignments := req.Trials[0].Spec.ParameterAssignments.Assignments
+		if len(assignments) != 1 || assignments[0].Name != "lr" || assignments[0].Value != "0.01" {
+			t.Errorf("expected 1 deduplicated assignment {lr, 0.01}, got %+v", assignments)
 		}
 	})
 }

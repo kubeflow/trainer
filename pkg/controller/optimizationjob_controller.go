@@ -585,9 +585,8 @@ func (r *OptimizationJobReconciler) constructTrainJob(optJob *trainer.Optimizati
 	}
 
 	for _, param := range params {
-		envName := fmt.Sprintf("%s%s", constants.EnvVarPrefix, param.Name)
 		tj.Spec.Trainer.Env = append(tj.Spec.Trainer.Env, corev1.EnvVar{
-			Name:  envName,
+			Name:  fmt.Sprintf("%s%s", constants.EnvVarPrefix, param.Name),
 			Value: param.Value,
 		})
 	}

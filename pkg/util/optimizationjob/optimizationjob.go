@@ -171,7 +171,9 @@ func ExtractBestResult(optJob *trainer.OptimizationJob, trainJobs []trainer.Trai
 		for _, env := range bestJob.Spec.Trainer.Env {
 			if strings.HasPrefix(env.Name, constants.EnvVarPrefix) {
 				paramName := strings.TrimPrefix(env.Name, constants.EnvVarPrefix)
-				paramNames = append(paramNames, paramName)
+				if _, ok := paramMap[paramName]; !ok {
+					paramNames = append(paramNames, paramName)
+				}
 				paramMap[paramName] = env.Value
 			}
 		}
@@ -287,17 +289,26 @@ func BuildSuggestionRequest(optJob *trainer.OptimizationJob, trainJobs []trainer
 
 		// Reconstruct ParameterAssignments from TrainJob EnvVars
 		if tj.Spec.Trainer != nil {
+			paramMap := make(map[string]string)
+			var paramNames []string
 			for _, env := range tj.Spec.Trainer.Env {
 				if strings.HasPrefix(env.Name, constants.EnvVarPrefix) {
 					paramName := strings.TrimPrefix(env.Name, constants.EnvVarPrefix)
-					trial.Spec.ParameterAssignments.Assignments = append(
-						trial.Spec.ParameterAssignments.Assignments,
-						&katibapi.ParameterAssignment{
-							Name:  paramName,
-							Value: env.Value,
-						},
-					)
+					if _, ok := paramMap[paramName]; !ok {
+						paramNames = append(paramNames, paramName)
+					}
+					paramMap[paramName] = env.Value
 				}
+			}
+			sort.Strings(paramNames)
+			for _, name := range paramNames {
+				trial.Spec.ParameterAssignments.Assignments = append(
+					trial.Spec.ParameterAssignments.Assignments,
+					&katibapi.ParameterAssignment{
+						Name:  name,
+						Value: paramMap[name],
+					},
+				)
 			}
 		}
 
