@@ -61,6 +61,26 @@ class S3ModelInitializer:
     role_arn: Optional[str] = None
 
 
+# Configuration for the HTTP/HTTPS model initializer.
+@dataclass
+class HTTPModelInitializer:
+    storage_uri: str
+    ignore_patterns: Optional[list[str]] = field(
+        default_factory=lambda: ["*.msgpack", "*.h5"]
+    )
+    headers: Optional[dict[str, str]] = None
+    timeout: Optional[int] = 300
+
+
+# Configuration for the HTTP/HTTPS dataset initializer.
+@dataclass
+class HTTPDatasetInitializer:
+    storage_uri: str
+    ignore_patterns: Optional[list[str]] = None
+    headers: Optional[dict[str, str]] = None
+    timeout: Optional[int] = 300
+
+
 # Configuration for the cache dataset initializer.
 @dataclass
 class CacheDatasetInitializer:

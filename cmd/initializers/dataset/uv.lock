@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 
 [[package]]
@@ -320,6 +320,7 @@ dependencies = [
     { name = "huggingface-hub" },
     { name = "kubernetes" },
     { name = "opendal" },
+    { name = "requests" },
 ]
 
 [package.metadata]
@@ -327,6 +328,7 @@ requires-dist = [
     { name = "huggingface-hub", specifier = ">=2.3.0,<2.4" },
     { name = "kubernetes", specifier = ">=37.0.1" },
     { name = "opendal", specifier = ">=0.47.12" },
+    { name = "requests", specifier = ">=2.32.0,<3.0" },
 ]
 
 [[package]]
