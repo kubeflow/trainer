@@ -47,3 +47,5 @@ trainer-controller-manager.exe
 
 # Sphinx documentation build artifacts
 docs/_build/
+node_modules/
+package-lock.json

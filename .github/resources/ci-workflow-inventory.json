@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "workflows": [
+    {
+      "path": ".github/workflows/build-and-push-images.yaml",
+      "name": "Build and Publish Images",
+      "header_sha256": "ff91a0324443f9dc3e68b6975507fc6e2ce626dcdba5ee40d8a95e752b8b0273",
+      "pull_request": {
+        "paths-ignore": [
+          "docs/**",
+          "proposals/**"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/check-pr-title.yaml",
+      "name": "Check PR Title",
+      "header_sha256": "ddaa169ee289291b175f346ebb1a2f2b1b29029a544b2310db2fbb2d6c9677b2",
+      "pull_request": null
+    },
+    {
+      "path": ".github/workflows/ci-checks.yaml",
+      "name": "CI Check",
+      "header_sha256": "2e8f24d121ee64449d0d43b88fdf39ecff8ce83886845eabf1c9fda5999ef9cd",
+      "pull_request": null
+    },
+    {
+      "path": ".github/workflows/ci-scripts-tests.yaml",
+      "name": "CI Scripts Tests",
+      "header_sha256": "723ccf91f560a0d19eee4da743f76d3a75dcebba7a599e49b7dd81c3de6a563c",
+      "pull_request": {
+        "paths": [
+          ".github/resources/scripts/*.py",
+          ".github/resources/scripts/*.js",
+          ".github/resources/ci-workflow-inventory.json",
+          ".github/workflows/**"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/code-quality-check.yaml",
+      "name": "Code Quality Checks",
+      "header_sha256": "29fb1093e4a95ca5170c7e9b1c8f3d4cbae7de95657cb2be50c8dd19fa537cab",
+      "pull_request": {}
+    },
+    {
+      "path": ".github/workflows/gh-workflow-approve.yaml",
+      "name": "Approve Workflow Runs",
+      "header_sha256": "b580251086ec81f4c82d7465411656cc42ac3e5bba654b031ce0d8431c7b8bfc",
+      "pull_request": null
+    },
+    {
+      "path": ".github/workflows/github-stale.yaml",
+      "name": "Mark stale issues and pull requests",
+      "header_sha256": "884f20489968171895643b8cfd9263fcbc88e5f022b91e29a6a1ee547a942b60",
+      "pull_request": null
+    },
+    {
+      "path": ".github/workflows/govulncheck.yaml",
+      "name": "govulncheck - CVE Detection",
+      "header_sha256": "0e76e5f2a0be61691167b98f1b3e5734096a933772be373dac783eed736f7dc7",
+      "pull_request": {
+        "paths": [
+          "**.go",
+          "go.mod",
+          "go.sum"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/osv-scanner.yaml",
+      "name": "OSV-Scanner Vulnerability Scan",
+      "header_sha256": "027f5dc0148155652576f7da03d96b311324d91b955c2bbc01b0ab11846398c1",
+      "pull_request": null
+    },
+    {
+      "path": ".github/workflows/publish-helm-charts.yaml",
+      "name": "Publish Helm Charts",
+      "header_sha256": "ce5fd772d9399b6e5d44c9430a63e28cad8a619db2acc25f649379677c4f6145",
+      "pull_request": null
+    },
+    {
+      "path": ".github/workflows/release.yaml",
+      "name": "Release",
+      "header_sha256": "7e2f639663836deeeca850ac197f5ca659fefa9ca6ca887aaad85095bf888320",
+      "pull_request": null
+    },
+    {
+      "path": ".github/workflows/test-e2e.yaml",
+      "name": "E2E Tests",
+      "header_sha256": "0599a36e8e328fc83469b50b319ec95fc8786c05d5b672d2fff3618cb7a38da5",
+      "pull_request": {
+        "paths-ignore": [
+          "docs/**",
+          "proposals/**"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/test-go.yaml",
+      "name": "Unit and Integration Test - Go",
+      "header_sha256": "38796be8db1783457658eb6406ff72a86c6cd58434638f03b040a06f3deeebf0",
+      "pull_request": {}
+    },
+    {
+      "path": ".github/workflows/test-helm.yaml",
+      "name": "Unit and E2E Test - Helm",
+      "header_sha256": "697c3f515323dd0566676e5bd9b032faae343d7d7a915fa971db7f6f9d6b71e2",
+      "pull_request": {}
+    },
+    {
+      "path": ".github/workflows/test-python.yaml",
+      "name": "Unit and Integration Test - Python",
+      "header_sha256": "1b276ab2e35b4b5c03876662fc0b12e4d68e95630dd6caacfb6039061a908d4f",
+      "pull_request": {}
+    },
+    {
+      "path": ".github/workflows/test-rust.yaml",
+      "name": "Unit and Integration Test - Rust",
+      "header_sha256": "fc2fcf5e047bb30f18d921c769048a6a5ff5b10900a4b5608bf7bca9eaae9cc0",
+      "pull_request": {}
+    },
+    {
+      "path": ".github/workflows/validate-lockfile.yaml",
+      "name": "Validate Python Lockfiles",
+      "header_sha256": "85fecd4f64921cc97e895c04132209e1fc357e7133416c727b01e0842d303c7a",
+      "pull_request": {
+        "paths": [
+          "cmd/initializers/dataset/pyproject.toml",
+          "cmd/initializers/dataset/uv.lock",
+          "cmd/initializers/model/pyproject.toml",
+          "cmd/initializers/model/uv.lock",
+          "api/python_api/pyproject.toml",
+          "api/python_api/uv.lock"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/welcome-new-contributors.yaml",
+      "name": "Welcome New Contributors",
+      "header_sha256": "a8bfc030861e104c4207a376af99313f7885c227c47366c3d9464090564a6590",
+      "pull_request": null
+    }
+  ]
+}
