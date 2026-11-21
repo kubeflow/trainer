@@ -1,16 +1,16 @@
 approvers:
   - andreyvelich
   - astefanutti
-  - Electronic-Waste
-  - gaocegege
-  - Jeffwan
-  - johnugeorge
+  - robert-bell
   - tenzen-y
   - terrytangyuan
 reviewers:
   - akshaychitneni
-  - jinchihe
-  - kuizhiqing
-  - robert-bell
 emeritus_approvers:
+  - Electronic-Waste
+  - gaocegege
+  - Jeffwan
+  - jinchihe
+  - johnugeorge
+  - kuizhiqing
   - zw0610
