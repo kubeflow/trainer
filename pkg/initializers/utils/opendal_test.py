@@ -364,3 +364,59 @@ class TestS3Storage:
 
             assert "skipped by the ignore patterns" in caplog.text
             mock_operator.read.assert_not_called()
+
+    def test_download_ignore_patterns_match_relative_paths(self):
+        """Patterns are matched against paths relative to the prefix.
+
+        huggingface_hub resolves ignore patterns against repo-relative paths, so
+        a pattern such as "original/*" has to exclude
+        "models/llama/original/consolidated.00.pth" without spelling out the
+        bucket prefix.
+        """
+        with patch("pkg.initializers.utils.opendal.opendal") as mock_opendal:
+            mock_operator = MagicMock()
+            mock_opendal.Operator.return_value = mock_operator
+            mock_operator.layer.return_value = mock_operator
+            self._mock_bucket(
+                mock_operator,
+                {
+                    "models/llama/config.json": b"config",
+                    "models/llama/original/consolidated.00.pth": b"ckpt",
+                    "models/llama/onnx/model.onnx": b"onnx",
+                    "models/llama/weights.bin": b"bin",
+                },
+            )
+
+            storage = S3Storage(bucket="test-bucket", region="us-east-1")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(
+                    prefix="models/llama",
+                    destination_path=tmpdir,
+                    ignore_patterns=["original/*", "onnx/*", "config.json"],
+                )
+                assert self._downloaded_files(tmpdir) == ["weights.bin"]
+
+    def test_download_ignore_patterns_still_accept_full_keys(self):
+        """Patterns written against the full object key keep working."""
+        with patch("pkg.initializers.utils.opendal.opendal") as mock_opendal:
+            mock_operator = MagicMock()
+            mock_opendal.Operator.return_value = mock_operator
+            mock_operator.layer.return_value = mock_operator
+            self._mock_bucket(
+                mock_operator,
+                {
+                    "models/llama/config.json": b"config",
+                    "models/llama/original/consolidated.00.pth": b"ckpt",
+                },
+            )
+
+            storage = S3Storage(bucket="test-bucket", region="us-east-1")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(
+                    prefix="models/llama",
+                    destination_path=tmpdir,
+                    ignore_patterns=["models/llama/original/*"],
+                )
+                assert self._downloaded_files(tmpdir) == ["config.json"]
