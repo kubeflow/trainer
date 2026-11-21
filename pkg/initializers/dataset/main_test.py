@@ -52,6 +52,15 @@ from pkg.initializers.dataset.__main__ import main
         ),
         pytest.param(
             {
+                "storage_uri": "S3://dataset/path",
+                "expected_provider": "s3",
+                "expected_error": None,
+                "expected_error_match": None,
+            },
+            id="uppercase-s3-scheme",
+        ),
+        pytest.param(
+            {
                 "storage_uri": None,
                 "expected_provider": None,
                 "expected_error": ValueError,
@@ -149,3 +158,41 @@ def test_dataset_main(test_case, mock_env_vars):
             provider_constructor.assert_not_called()
             provider_instance.load_config.assert_not_called()
             provider_instance.download_dataset.assert_not_called()
+
+
+def test_dataset_main_load_config_error(mock_env_vars):
+    """Test that errors during provider load_config propagate and abort download."""
+    mock_env_vars(STORAGE_URI="s3://dataset/path")
+
+    mock_s3_instance = MagicMock()
+    mock_s3_instance.load_config.side_effect = ValueError("Invalid S3 configuration")
+    mock_s3 = MagicMock(return_value=mock_s3_instance)
+
+    with patch.dict(
+        sys.modules,
+        {"pkg.initializers.dataset.s3": MagicMock(S3=mock_s3)},
+    ):
+        with pytest.raises(ValueError, match="Invalid S3 configuration"):
+            main()
+
+        mock_s3_instance.load_config.assert_called_once_with()
+        mock_s3_instance.download_dataset.assert_not_called()
+
+
+def test_dataset_main_download_dataset_error(mock_env_vars):
+    """Test that errors during provider download_dataset propagate."""
+    mock_env_vars(STORAGE_URI="hf://org/dataset")
+
+    mock_hf_instance = MagicMock()
+    mock_hf_instance.download_dataset.side_effect = RuntimeError("HF download failed")
+    mock_hf = MagicMock(return_value=mock_hf_instance)
+
+    with patch.dict(
+        sys.modules,
+        {"pkg.initializers.dataset.huggingface": MagicMock(HuggingFace=mock_hf)},
+    ):
+        with pytest.raises(RuntimeError, match="HF download failed"):
+            main()
+
+        mock_hf_instance.load_config.assert_called_once_with()
+        mock_hf_instance.download_dataset.assert_called_once_with()
