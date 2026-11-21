@@ -19,6 +19,8 @@ package webhooks
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -35,6 +37,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -511,25 +514,84 @@ func TestValidateCreate(t *testing.T) {
 }
 
 func TestValidateUpdate(t *testing.T) {
-	clusterRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
-		RuntimeSpec(trainer.TrainingRuntimeSpec{
+	runtimeSpec := trainer.TrainingRuntimeSpec{
+		Template: trainer.JobSetTemplateSpec{
+			Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
+		},
+	}
+	clusterRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").RuntimeSpec(runtimeSpec).Obj()
+	trainingRuntime := testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").RuntimeSpec(runtimeSpec).Obj()
+	volcanoRuntime := testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").
+		RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(trainer.TrainingRuntimeSpec{
 			Template: trainer.JobSetTemplateSpec{
-				Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
+				Spec: testingutil.MakeJobSetWrapper("", "").PodPriorityClassName("high-priority").Obj().Spec,
 			},
-		}).Obj()
+		}).PodGroupPolicyVolcano(&trainer.VolcanoPodGroupPolicySource{}).Obj()).
+		Obj()
+	// A snapshot ConfigMap whose ownerReference was removed, as the garbage collector does
+	// when the TrainJob is deleted with --cascade=orphan.
+	orphanedSnapshot := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-runtime-snapshot", Namespace: "default"},
+		Data:       map[string]string{"runtime": ""},
+	}
+
+	trainJob := func(runtimeKind string) *testingutil.TrainJobWrapper {
+		return testingutil.MakeTrainJobWrapper("default", "test").
+			UID("test-uid").
+			RuntimeRef(trainer.SchemeGroupVersion.WithKind(runtimeKind), "test-runtime")
+	}
+	deletedAt := metav1.NewTime(time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC))
+	terminating := func(job *trainer.TrainJob, finalizers ...string) *trainer.TrainJob {
+		job.DeletionTimestamp = &deletedAt
+		job.Finalizers = finalizers
+		return job
+	}
+	withMetadata := func(job *trainer.TrainJob) *trainer.TrainJob {
+		job.Labels = map[string]string{"app.kubernetes.io/managed-by": "argocd"}
+		job.Annotations = map[string]string{"example.com/note": "changed"}
+		job.OwnerReferences = []metav1.OwnerReference{{APIVersion: "v1", Kind: "ConfigMap", Name: "owner", UID: "owner-uid"}}
+		return job
+	}
+	patchTime := metav1.NewTime(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
+	labelPatch := func(value string, patchTime *metav1.Time) []trainer.RuntimePatch {
+		return []trainer.RuntimePatch{{
+			Manager: "acme.io/manager",
+			Time:    patchTime,
+			TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+				Template: &trainer.JobSetTemplatePatch{
+					Metadata: &metav1.ObjectMeta{Labels: map[string]string{"key": value}},
+				},
+			},
+		}}
+	}
+	trainingRuntimeNotFound := field.ErrorList{
+		field.Invalid(field.NewPath("spec", "runtimeRef"), trainJob(trainer.TrainingRuntimeKind).Obj().Spec.RuntimeRef, ""),
+	}
+	clusterTrainingRuntimeNotFound := field.ErrorList{
+		field.Invalid(field.NewPath("spec", "runtimeRef"), trainJob(trainer.ClusterTrainingRuntimeKind).Obj().Spec.RuntimeRef, ""),
+	}
+	invalidSnapshot := field.ErrorList{
+		field.InternalError(field.NewPath("spec", "runtimeRef"), fmt.Errorf("unable to get runtime snapshot: %w",
+			errors.New("invalid runtime snapshot: a snapshot configmap exists but is owned by another object"))),
+	}
 
 	// Feature-gated fields are rejected on create while their gate is disabled. On update they are
 	// rejected only when the update introduces them, so a TrainJob created while the gate was
 	// enabled stays updatable (for example, suspend) after the gate is disabled. The cases below
 	// use TrainJobDynamicResourceAllocation fields; the same shape works for any gated field.
 	cases := map[string]struct {
-		oldObj             *trainer.TrainJob
-		newObj             *trainer.TrainJob
+		// objs are the objects in the cluster, e.g. the referenced runtime and its snapshot.
+		objs   []client.Object
+		oldObj *trainer.TrainJob
+		newObj *trainer.TrainJob
+		// runDefaulter runs the TrainJobDefaulter on newObj first, as the API server does.
+		runDefaulter       bool
 		wantError          field.ErrorList
 		wantWarnings       admission.Warnings
 		enableFeatureGates []featuregate.Feature
 	}{
 		"update adds a feature-gated field while the gate is disabled: forbidden": {
+			objs: []client.Object{clusterRuntime},
 			wantError: field.ErrorList{
 				field.Forbidden(field.NewPath("spec", "trainer", "resourceClaimsPerNode"), ""),
 			},
@@ -549,6 +611,7 @@ func TestValidateUpdate(t *testing.T) {
 				Obj(),
 		},
 		"update of a TrainJob that already uses a feature-gated field while the gate is disabled: passes": {
+			objs: []client.Object{clusterRuntime},
 			oldObj: testingutil.MakeTrainJobWrapper("default", "test").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
 				Trainer(
@@ -573,7 +636,120 @@ func TestValidateUpdate(t *testing.T) {
 				Suspend(true).
 				Obj(),
 		},
+		"TrainingRuntime: removing the deletion finalizer passes when the runtime and snapshot are deleted": {
+			oldObj: terminating(trainJob(trainer.TrainingRuntimeKind).Obj(), metav1.FinalizerDeleteDependents),
+			newObj: terminating(trainJob(trainer.TrainingRuntimeKind).Obj()),
+		},
+		"ClusterTrainingRuntime: removing the deletion finalizer passes when the runtime and snapshot are deleted": {
+			oldObj: terminating(trainJob(trainer.ClusterTrainingRuntimeKind).Obj(), metav1.FinalizerDeleteDependents),
+			newObj: terminating(trainJob(trainer.ClusterTrainingRuntimeKind).Obj()),
+		},
+		"TrainingRuntime: no-op update passes when the runtime and snapshot are deleted": {
+			oldObj: trainJob(trainer.TrainingRuntimeKind).Obj(),
+			newObj: trainJob(trainer.TrainingRuntimeKind).Obj(),
+		},
+		"TrainingRuntime: label, annotation and ownerReference update passes when the runtime and snapshot are deleted": {
+			oldObj: trainJob(trainer.TrainingRuntimeKind).Obj(),
+			newObj: withMetadata(trainJob(trainer.TrainingRuntimeKind).Obj()),
+		},
+		"ClusterTrainingRuntime: label, annotation and ownerReference update passes when the runtime and snapshot are deleted": {
+			oldObj: trainJob(trainer.ClusterTrainingRuntimeKind).Obj(),
+			newObj: withMetadata(trainJob(trainer.ClusterTrainingRuntimeKind).Obj()),
+		},
+		"TrainingRuntime: removing the orphan finalizer passes when the snapshot has no owner": {
+			objs:   []client.Object{trainingRuntime, orphanedSnapshot},
+			oldObj: terminating(trainJob(trainer.TrainingRuntimeKind).Obj(), metav1.FinalizerOrphanDependents),
+			newObj: terminating(trainJob(trainer.TrainingRuntimeKind).Obj()),
+		},
+		"ClusterTrainingRuntime: removing the orphan finalizer passes when the snapshot has no owner": {
+			objs:   []client.Object{clusterRuntime, orphanedSnapshot},
+			oldObj: terminating(trainJob(trainer.ClusterTrainingRuntimeKind).Obj(), metav1.FinalizerOrphanDependents),
+			newObj: terminating(trainJob(trainer.ClusterTrainingRuntimeKind).Obj()),
+		},
+		"TrainingRuntime: spec update is rejected when the runtime and snapshot are deleted": {
+			oldObj:    trainJob(trainer.TrainingRuntimeKind).Obj(),
+			newObj:    trainJob(trainer.TrainingRuntimeKind).Suspend(true).Obj(),
+			wantError: trainingRuntimeNotFound,
+		},
+		"ClusterTrainingRuntime: spec update is rejected when the runtime and snapshot are deleted": {
+			oldObj:    trainJob(trainer.ClusterTrainingRuntimeKind).Obj(),
+			newObj:    trainJob(trainer.ClusterTrainingRuntimeKind).Suspend(true).Obj(),
+			wantError: clusterTrainingRuntimeNotFound,
+		},
+		"TrainingRuntime: spec update is rejected when the snapshot has no owner": {
+			objs:      []client.Object{trainingRuntime, orphanedSnapshot},
+			oldObj:    trainJob(trainer.TrainingRuntimeKind).Obj(),
+			newObj:    trainJob(trainer.TrainingRuntimeKind).Suspend(true).Obj(),
+			wantError: invalidSnapshot,
+		},
+		"terminating TrainJob: spec update is still validated": {
+			oldObj:    terminating(trainJob(trainer.TrainingRuntimeKind).Obj(), metav1.FinalizerDeleteDependents),
+			newObj:    terminating(trainJob(trainer.TrainingRuntimeKind).Suspend(true).Obj(), metav1.FinalizerDeleteDependents),
+			wantError: trainingRuntimeNotFound,
+		},
+		"terminating TrainJob: update adds a feature-gated field while the gate is disabled: forbidden": {
+			objs:   []client.Object{clusterRuntime},
+			oldObj: terminating(trainJob(trainer.ClusterTrainingRuntimeKind).Obj(), metav1.FinalizerDeleteDependents),
+			newObj: terminating(trainJob(trainer.ClusterTrainingRuntimeKind).
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						ResourceClaimsPerNode(trainer.TrainerResourceClaim{
+							Name:                      "gpu",
+							ResourceClaimTemplateName: "gpu-template",
+						}).
+						Obj(),
+				).
+				Obj(), metav1.FinalizerDeleteDependents),
+			wantError: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "trainer", "resourceClaimsPerNode"), ""),
+			},
+		},
+		"defaulted: unchanged runtimePatch without time passes when the runtime is deleted": {
+			runDefaulter: true,
+			oldObj:       trainJob(trainer.TrainingRuntimeKind).RuntimePatches(labelPatch("a", nil)).Obj(),
+			newObj:       withMetadata(trainJob(trainer.TrainingRuntimeKind).RuntimePatches(labelPatch("a", nil)).Obj()),
+		},
+		"defaulted: unchanged runtimePatch with time passes when the runtime is deleted": {
+			runDefaulter: true,
+			oldObj:       trainJob(trainer.TrainingRuntimeKind).RuntimePatches(labelPatch("a", &patchTime)).Obj(),
+			newObj:       withMetadata(trainJob(trainer.TrainingRuntimeKind).RuntimePatches(labelPatch("a", nil)).Obj()),
+		},
+		"defaulted: changed runtimePatch is validated": {
+			runDefaulter: true,
+			oldObj:       trainJob(trainer.TrainingRuntimeKind).RuntimePatches(labelPatch("a", &patchTime)).Obj(),
+			newObj:       trainJob(trainer.TrainingRuntimeKind).RuntimePatches(labelPatch("b", &patchTime)).Obj(),
+			wantError:    trainingRuntimeNotFound,
+		},
+		"defaulted: added runtimePatch is validated": {
+			runDefaulter: true,
+			oldObj:       trainJob(trainer.TrainingRuntimeKind).Obj(),
+			newObj:       trainJob(trainer.TrainingRuntimeKind).RuntimePatches(labelPatch("a", nil)).Obj(),
+			wantError:    trainingRuntimeNotFound,
+		},
+		"Volcano: metadata update passes when the referenced PriorityClass is deleted": {
+			objs:   []client.Object{volcanoRuntime},
+			oldObj: trainJob(trainer.TrainingRuntimeKind).Obj(),
+			newObj: withMetadata(trainJob(trainer.TrainingRuntimeKind).Obj()),
+		},
+		"Volcano: spec update is validated when the referenced PriorityClass is deleted": {
+			objs:   []client.Object{volcanoRuntime},
+			oldObj: trainJob(trainer.TrainingRuntimeKind).Obj(),
+			newObj: trainJob(trainer.TrainingRuntimeKind).Suspend(true).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "templateSpec", "priorityClassName"), "high-priority", ""),
+			},
+		},
 	}
+
+	// field.InternalError stores the wrapped error in BadValue; compare such errors by message.
+	equateBadValueErrors := cmp.FilterPath(func(p cmp.Path) bool {
+		for _, step := range p {
+			if sf, ok := step.(cmp.StructField); ok && sf.Name() == "BadValue" {
+				return true
+			}
+		}
+		return false
+	}, cmp.Comparer(func(a, b error) bool { return a.Error() == b.Error() }))
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -586,18 +762,33 @@ func TestValidateUpdate(t *testing.T) {
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
 
-			clientBuilder := testingutil.NewClientBuilder().WithObjects(clusterRuntime)
+			clientBuilder := testingutil.NewClientBuilder().WithObjects(tc.objs...)
 			runtimes, err := runtimecore.New(context.Background(), clientBuilder.Build(), testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 			validator := &TrainJobValidator{runtimes: runtimes}
 
+			if tc.runDefaulter {
+				raw, err := json.Marshal(tc.oldObj)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defaultCtx := admission.NewContextWithRequest(ctx, admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Update,
+					OldObject: apiruntime.RawExtension{Raw: raw},
+				}})
+				defaulter := &TrainJobDefaulter{clock: clocktesting.NewFakeClock(time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC))}
+				if err := defaulter.Default(defaultCtx, tc.newObj); err != nil {
+					t.Fatalf("Default returned unexpected error: %v", err)
+				}
+			}
+
 			warnings, err := validator.ValidateUpdate(ctx, tc.oldObj, tc.newObj)
 			if diff := cmp.Diff(tc.wantWarnings, warnings); len(diff) != 0 {
 				t.Errorf("Unexpected warnings from ValidateUpdate (-want, +got): %s", diff)
 			}
-			if diff := cmp.Diff(tc.wantError.ToAggregate(), err, cmpopts.IgnoreFields(field.Error{}, "Detail")); len(diff) != 0 {
+			if diff := cmp.Diff(tc.wantError.ToAggregate(), err, cmpopts.IgnoreFields(field.Error{}, "Detail"), equateBadValueErrors); len(diff) != 0 {
 				t.Errorf("Unexpected error from ValidateUpdate (-want, +got): %s", diff)
 			}
 		})
