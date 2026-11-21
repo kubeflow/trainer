@@ -62,3 +62,7 @@ tests:
       - matchRegex:
           path: data["runtimes.yaml"]
           pattern: "ghcr.io/kubeflow/trainer/data-cache:v1.0.0"
+      # The node container mounts the dshm volume at /dev/shm, backed by a bounded memory emptyDir.
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: '- name: node\n +image: [^\n]+\n +env:\n(?: +[^\n]+\n)*? +volumeMounts:\n +- name: dshm\n +mountPath: /dev/shm\n +volumes:\n +- name: dshm\n +emptyDir:\n +medium: Memory\n +sizeLimit: 2Gi(\n|$)'
