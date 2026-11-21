@@ -24,7 +24,7 @@ use datafusion::physical_plan::execute_stream;
 use datafusion::physical_plan::repartition::RepartitionExec;
 use datafusion::prelude::SessionContext;
 use datafusion::sql::TableReference;
-use futures::StreamExt;
+use futures::TryStreamExt;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tracing::{error, info};
@@ -165,9 +165,9 @@ impl Distributor {
             self.num_workers,
             self.config.clone(),
         );
-        let _ = execute_stream(Arc::new(plan), self.ctx.task_ctx())?
-            .collect::<Vec<_>>()
-            .await;
+        execute_stream(Arc::new(plan), self.ctx.task_ctx())?
+            .try_collect::<Vec<_>>()
+            .await?;
         self.assign_empty_partitions().await?;
         Ok(())
     }
