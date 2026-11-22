@@ -272,11 +272,19 @@ if [ "${CLUSTER_TYPE}" = "gpu" ]; then
   ' | kubectl apply -f -
 
   # hotfix: mount /dev/shm as emptyDir for NCCL shared memory requirements.
+  # Skip runtimes that already define the dshm volume or a /dev/shm mount (e.g. torch-distributed),
+  # since duplicate volume names or mount paths are rejected by the API server.
   echo "Patch CRDs to mount /dev/shm as emptyDir"
   kubectl get clustertrainingruntimes -o json | jq '
     .items[].spec.template.spec.replicatedJobs[].template.spec.template.spec |= (
-      .volumes = ((.volumes // []) + [{"name": "dshm", "emptyDir": {"medium": "Memory"}}]) |
-      .containers = [.containers[] | .volumeMounts = ((.volumeMounts // []) + [{"name": "dshm", "mountPath": "/dev/shm"}])]
+      if any(.volumes[]?; .name == "dshm") then . else
+        .volumes = ((.volumes // []) + [{"name": "dshm", "emptyDir": {"medium": "Memory"}}])
+      end |
+      .containers = [.containers[] |
+        if any(.volumeMounts[]?; .mountPath == "/dev/shm") then . else
+          .volumeMounts = ((.volumeMounts // []) + [{"name": "dshm", "mountPath": "/dev/shm"}])
+        end
+      ]
     )
   ' | kubectl apply -f -
 fi

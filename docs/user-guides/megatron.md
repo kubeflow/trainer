@@ -64,9 +64,11 @@ function with `apt-get`; for production you can bake `make` and `g++` into a cus
 runtime image to skip the install on every run.
 
 Megatron-Core also initializes several NCCL communicators (one per parallel group: TP, DP,
-and helper groups) during training. Each communicator reserves shared memory in `/dev/shm`,
-which is capped at 64 MB by default in Kubernetes Pods, and that is not enough for multi-group
-workloads. See [Increasing /dev/shm for NCCL](#increasing-devshm-for-nccl) below for the fix.
+and helper groups) during training. Depending on the transport, NCCL can use shared memory in
+`/dev/shm`. The builtin `torch-distributed` runtime already mounts a 2 GiB memory-backed
+`/dev/shm`; see
+[Increasing /dev/shm for NCCL](#increasing-devshm-for-nccl) below if you need more or use a
+custom runtime.
 
 ## Create TrainJob with Megatron-Core Training
 
@@ -291,78 +293,18 @@ print("\n".join(TrainerClient().get_job_logs(name=job_name)))
 
 ## Increasing `/dev/shm` for NCCL
 
-NCCL allocates shared memory in `/dev/shm` for its proxy service (roughly 33 MB per communicator).
-Kubernetes pods get 64 MB of `/dev/shm` by default, which is not enough for Megatron-Core because
-it creates multiple NCCL communicators (one per parallel group: TP, DP, etc.). When `/dev/shm`
-fills up, NCCL operations fail silently or crash.
+Depending on the transport it selects, NCCL can allocate shared memory in `/dev/shm`, for
+example for its proxy service. The amount depends on the transport, the number of NCCL
+communicators (Megatron-Core creates one per parallel group: TP, DP, etc.), and the workload.
+Container runtimes typically give Pods only 64 MiB of `/dev/shm`, which can be too small. When
+`/dev/shm` fills up, NCCL operations can fail or crash. This is a
+[well-known NCCL + Kubernetes issue](https://github.com/NVIDIA/nccl/issues/525).
 
-The fix is to mount `/dev/shm` as a memory-backed `emptyDir` volume. You have two ways to
-apply it: a cluster administrator can patch the `torch-distributed` ClusterTrainingRuntime so
-every job picks it up, or an individual user can attach the same mount to a single TrainJob
-via [RuntimePatches](../../operator-guides/runtime-patches).
-
-**Option 1: Cluster administrator — patch the runtime once for every job.**
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: torch-distributed
-spec:
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                spec:
-                  volumes:
-                    - name: dshm
-                      emptyDir:
-                        medium: Memory
-                  containers:
-                    - name: node
-                      volumeMounts:
-                        - name: dshm
-                          mountPath: /dev/shm
-```
-
-**Option 2: TrainJob author — attach the mount to a single job with `runtimePatches`.**
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: TrainJob
-metadata:
-  name: megatron-tp
-spec:
-  runtimeRef:
-    name: torch-distributed
-  runtimePatches:
-    - manager: trainer.kubeflow.org/kubeflow-sdk
-      trainingRuntimeSpec:
-        template:
-          spec:
-            replicatedJobs:
-              - name: node
-                template:
-                  spec:
-                    template:
-                      spec:
-                        volumes:
-                          - name: dshm
-                            emptyDir:
-                              medium: Memory
-                        containers:
-                          - name: node
-                            volumeMounts:
-                              - name: dshm
-                                mountPath: /dev/shm
-```
-
-This is a [well-known NCCL + Kubernetes issue](https://github.com/NVIDIA/nccl/issues/525).
-Without the mount, the default 64 MB limit causes failures during multi-node or multi-GPU
-training with frameworks that create several NCCL communicators.
+The builtin `torch-distributed` runtime mounts a memory-backed `emptyDir` volume named `dshm` at
+`/dev/shm` with a 2 GiB limit. If your workload needs a larger limit, or you use a custom runtime
+without this mount, see
+[Shared Memory in the PyTorch Guide](pytorch.md#shared-memory-devshm) for how the default works
+and how to change it with `runtimePatches`.
 
 ## Multi-Node vs Multi-GPU Configuration
 
