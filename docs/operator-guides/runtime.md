@@ -24,8 +24,7 @@ metadata:
 spec:
   mlPolicy:
     numNodes: 1
-    torch:
-      numProcPerNode: auto
+    torch: {}
   template:
     spec:
       replicatedJobs:
@@ -79,8 +78,7 @@ metadata:
 spec:
   mlPolicy:
     numNodes: 1
-    torch:
-      numProcPerNode: auto
+    torch: {}
   template:
     spec:
       replicatedJobs:

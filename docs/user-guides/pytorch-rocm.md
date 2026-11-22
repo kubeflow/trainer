@@ -309,8 +309,7 @@ metadata:
 spec:
   mlPolicy:
     numNodes: 2
-    torch:
-      numProcPerNode: auto
+    torch: {}
   template:
     spec:
       replicatedJobs:

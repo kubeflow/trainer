@@ -36,14 +36,23 @@ metadata:
   name: pytorch-kai-runtime
 spec:
   mlPolicy:
-    torch:
-      numNodes: 1
+    numNodes: 1
+    torch: {}
   template:
     spec:
-      schedulerName: kai-scheduler
-      containers:
-        - name: train
-          image: pytorch/pytorch:latest
+      replicatedJobs:
+        - name: node
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  schedulerName: kai-scheduler
+                  containers:
+                    - name: node
+                      image: pytorch/pytorch:latest
 ```
 
 ### Example: TrainJob with KAI
