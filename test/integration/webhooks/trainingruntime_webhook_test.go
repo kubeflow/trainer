@@ -245,6 +245,28 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 				},
 				testingutil.BeInvalidError(),
 			),
+			ginkgo.Entry("Should fail to create trainingRuntime with a negative mlPolicy.numNodes",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							WithMLPolicy(testingutil.MakeMLPolicyWrapper().WithNumNodes(-3).Obj()).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeInvalidError(),
+			),
+			ginkgo.Entry("Should succeed to create trainingRuntime with a zero mlPolicy.numNodes",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							WithMLPolicy(testingutil.MakeMLPolicyWrapper().WithNumNodes(0).Obj()).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed(),
+			),
 			ginkgo.Entry("Should fail to create trainingRuntime with a negative coscheduling timeout",
 				func() *trainer.TrainingRuntime {
 					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")

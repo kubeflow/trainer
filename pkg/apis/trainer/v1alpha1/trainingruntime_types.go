@@ -330,6 +330,7 @@ type JobScheduling struct {
 type MLPolicy struct {
 	// numNodes is the number of training nodes.
 	// Defaults to 1.
+	// +kubebuilder:validation:Minimum=0
 	// +optional
 	NumNodes *int32 `json:"numNodes,omitempty"`
 
