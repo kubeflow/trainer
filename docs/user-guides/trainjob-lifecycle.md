@@ -103,7 +103,7 @@ the full deadline duration after each resume.
 
 ## Next Steps
 
-- Learn more about [runtime patches](../../operator-guides/runtime-patches)
+- Learn more about [runtime patches](../operator-guides/runtime-patches)
  for customizing TrainJob behavior.
 - Check out [the TrainJob API reference](https://github.com/kubeflow/trainer/blob/master/pkg/apis/trainer/v1alpha1/trainjob_types.go)
  for the full list of `TrainJobSpec` fields.

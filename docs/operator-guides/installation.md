@@ -44,7 +44,7 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
 ```
 
 :::{note}
-The Trainer CRDs (`TrainJob`, `TrainingRuntime`, `ClusterTrainingRuntime`) are installed by the chart by default.
+The Trainer CRDs (`TrainJob`, `TrainingRuntime`, `ClusterTrainingRuntime`, `OptimizationJob`) are installed by the chart by default.
 If you manage the CRDs out-of-band (previously via Helm's `--skip-crds` flag), set `--set crds.enabled=false` to skip
 installing them with the chart.
 :::
