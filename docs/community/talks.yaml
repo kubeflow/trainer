@@ -41,10 +41,23 @@
 
 # Talks
 
+- title: "OptimizationJob: Hyperparameter Optimization at Scale with Kubeflow Trainer"
+  url: https://youtu.be/aaqYVR_fems
+  date: 2026-11
+  type: talk
+  event: KubeCon + CloudNativeCon NA 2026
+
+- title: "One Workload to Rule Them All: Workload Aware Scheduling for Distributed AI Training on Kubernetes"
+  url: https://youtu.be/3O1MewPx8oA
+  date: 2026-11
+  type: talk
+  event: KubeCon + CloudNativeCon NA 2026
+
 - title: "Kubeflow Trainer Observability: Real-Time Progress Tracking for Reliable ML Training on Kubernetes"
   url: https://youtu.be/2PkIZPJk6I0
   date: 2026-04
   type: talk
+  event: KubeCon + CloudNativeCon EU 2026
   adopters:
     - Red Hat
 
@@ -52,16 +65,19 @@
   url: https://youtu.be/O7cNlaz3Hqs
   date: 2025-11
   type: talk
+  event: KubeCon + CloudNativeCon NA 2025
 
 - title: "From High Performance Computing To AI Workloads on Kubernetes: MPI Runtime in Kubeflow TrainJob"
   url: https://youtu.be/Fnb1a5Kaxgo
   date: 2025-04
   type: talk
+  event: KubeCon + CloudNativeCon EU 2025
 
 - title: Democratizing AI Model Training on Kubernetes with Kubeflow TrainJob and JobSet
   url: https://www.youtube.com/watch?v=Lgy4ir1AhYw
   date: 2024-11
   type: talk
+  event: KubeCon + CloudNativeCon NA 2024
 
 # Blog Posts
 
