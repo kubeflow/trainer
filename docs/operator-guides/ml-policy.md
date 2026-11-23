@@ -35,14 +35,14 @@ mlPolicy:
 configures distributed training for PyTorch.
 
 TrainJobs using this policy are launched via [the `torchrun` CLI](https://docs.pytorch.org/docs/stable/elastic/run.html).
-You can customize `torchrun` options such as `numProcPerNode` to define number of
-processes (e.g. GPUs) to launch per training node.
+The Torch plugin automatically configures distributed rendezvous and injects `PET_*`
+environment variables into the training pods (you can override the number of processes per
+node on individual TrainJobs via `spec.trainer.numProcPerNode`).
 
 ```yaml
 mlPolicy:
   numNodes: 3
-  torch:
-    numProcPerNode: gpu
+  torch: {}
 ```
 
 #### Inject PET_* envs into init/sidecar containers
