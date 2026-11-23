@@ -909,7 +909,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "test:image",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
