@@ -299,7 +299,7 @@ fills up, NCCL operations fail silently or crash.
 The fix is to mount `/dev/shm` as a memory-backed `emptyDir` volume. You have two ways to
 apply it: a cluster administrator can patch the `torch-distributed` ClusterTrainingRuntime so
 every job picks it up, or an individual user can attach the same mount to a single TrainJob
-via [RuntimePatches](../../operator-guides/runtime-patches).
+via [RuntimePatches](../operator-guides/runtime-patches).
 
 **Option 1: Cluster administrator — patch the runtime once for every job.**
 
