@@ -441,7 +441,12 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	coreSpec := generateRange(int32(tasks), 0)
 	Rspec := fmt.Sprintf("--cores=%s", coreSpec)
 	if gpus > 0 {
-		flags = fmt.Sprintf("%s -g %d", flags, gpus)
+		// The node's GPUs are split across its tasks, since -g requests GPUs for every task
+		// and Rspec declares only the GPUs of one node. When a node runs more tasks than it has
+		// GPUs, a task cannot have a whole GPU, so no per-task GPUs are requested.
+		if gpusPerTask := gpus / int(max(tasks, 1)); gpusPerTask > 0 {
+			flags = fmt.Sprintf("%s -g %d", flags, gpusPerTask)
+		}
 		gpuSpec := generateRange(int32(gpus), 0)
 		Rspec = fmt.Sprintf("%s --gpu=%s", Rspec, gpuSpec)
 	}
