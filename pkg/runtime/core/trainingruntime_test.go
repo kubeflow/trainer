@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -3401,6 +3402,19 @@ func TestTrainingRuntimeValidateObjectsRuntimePatchTargets(t *testing.T) {
 				RuntimePatches(containerPatch(constants.Node, constants.Node)).
 				Obj(),
 		},
+		"runtimePatches adding the initializer volumeMount the runtime lacks are accepted": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+				RuntimeSpec(withoutInitializerVolumeMount(
+					testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj().Spec,
+					constants.DatasetInitializer,
+				)).
+				Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Initializer(&trainer.Initializer{Dataset: &trainer.DatasetInitializer{}}).
+				RuntimePatches(initializerVolumeMountPatch(constants.DatasetInitializer, constants.DatasetMountPath)).
+				Obj(),
+		},
 		"runtimePatches targeting a replicated job the runtime doesn't define are rejected": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
@@ -3442,4 +3456,54 @@ func TestTrainingRuntimeValidateObjectsRuntimePatchTargets(t *testing.T) {
 			}
 		})
 	}
+}
+
+// withoutInitializerVolumeMount returns a copy of the runtime spec without the initializer
+// volumeMount in the containers of the given replicatedJob.
+func withoutInitializerVolumeMount(spec trainer.TrainingRuntimeSpec, rJobName string) trainer.TrainingRuntimeSpec {
+	spec = *spec.DeepCopy()
+	for i, rJob := range spec.Template.Spec.ReplicatedJobs {
+		if rJob.Name != rJobName {
+			continue
+		}
+		containers := spec.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers
+		for j := range containers {
+			containers[j].VolumeMounts = slices.DeleteFunc(containers[j].VolumeMounts, func(vm corev1.VolumeMount) bool {
+				return vm.Name == jobsetplgconsts.VolumeNameInitializer
+			})
+		}
+	}
+	return spec
+}
+
+// initializerVolumeMountPatch returns runtimePatches that add the initializer volumeMount to the
+// container of the given initializer replicatedJob, which has the same name as the job.
+func initializerVolumeMountPatch(rJobName, mountPath string) []trainer.RuntimePatch {
+	return []trainer.RuntimePatch{{
+		Manager: "test.io/manager",
+		TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+			Template: &trainer.JobSetTemplatePatch{
+				Spec: &trainer.JobSetSpecPatch{
+					ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+						Name: rJobName,
+						Template: &trainer.JobTemplatePatch{
+							Spec: &trainer.JobSpecPatch{
+								Template: &trainer.PodTemplatePatch{
+									Spec: &trainer.PodSpecPatch{
+										Containers: []trainer.ContainerPatch{{
+											Name: rJobName,
+											VolumeMounts: []corev1.VolumeMount{{
+												Name:      jobsetplgconsts.VolumeNameInitializer,
+												MountPath: mountPath,
+											}},
+										}},
+									},
+								},
+							},
+						},
+					}},
+				},
+			},
+		},
+	}}
 }

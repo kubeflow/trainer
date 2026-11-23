@@ -486,6 +486,19 @@ func TestClusterTrainingRuntimeValidateObjectsRuntimePatchTargets(t *testing.T) 
 				RuntimePatches(replicatedJobPatch(constants.Node)).
 				Obj(),
 		},
+		"runtimePatches adding the initializer volumeMount the runtime lacks are accepted": {
+			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(withoutInitializerVolumeMount(
+					testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj().Spec,
+					constants.ModelInitializer,
+				)).
+				Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Initializer(&trainer.Initializer{Model: &trainer.ModelInitializer{}}).
+				RuntimePatches(initializerVolumeMountPatch(constants.ModelInitializer, constants.ModelMountPath)).
+				Obj(),
+		},
 		"runtimePatches targeting a replicated job the runtime doesn't define are rejected": {
 			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").

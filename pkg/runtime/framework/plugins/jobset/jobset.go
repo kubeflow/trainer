@@ -177,7 +177,20 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 
 	allErrs = append(allErrs, j.checkRuntimePatchesImmutability(ctx, oldObj, newObj)...)
 
-	// Validate per-patch: ensure patched resources exist in the runtime template
+	// Validate per-patch: ensure patched resources exist in the runtime template.
+	// The JobSet spec in the Info has the patches merged, and strategic merge appends the
+	// replicatedJobs and containers a patch targets when they are not found, so the targets are
+	// checked against the runtime template without the patches when it is available.
+	patchTargetNames := rJobContainerNames
+	if info.RuntimeTemplatePodSets != nil {
+		patchTargetNames = make(map[string]sets.Set[string], len(info.RuntimeTemplatePodSets))
+		for _, ps := range info.RuntimeTemplatePodSets {
+			patchTargetNames[ps.Name] = sets.New[string]()
+			for _, c := range slices.Concat(ps.InitContainers, ps.Containers) {
+				patchTargetNames[ps.Name].Insert(c.Name)
+			}
+		}
+	}
 	for _, runtimePatch := range newObj.Spec.RuntimePatches {
 		allErrs = append(allErrs, validation.IsDomainPrefixedPath(runtimePatchesPath.Child("manager"), runtimePatch.Manager)...)
 		if runtimePatch.TrainingRuntimeSpec == nil || runtimePatch.TrainingRuntimeSpec.Template == nil ||
@@ -185,7 +198,7 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 			continue
 		}
 		for _, rJobPatch := range runtimePatch.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs {
-			containers, ok := rJobContainerNames[rJobPatch.Name]
+			containers, ok := patchTargetNames[rJobPatch.Name]
 			if !ok {
 				allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 					"must not have replicated job that doesn't exist in the runtime job template"))
