@@ -107,6 +107,11 @@
   type: End User
   contacts:
     - vtlrazin
+- name: Nutanix
+  url: https://www.nutanix.com/
+  type: End User
+  contacts:
+    - johnugeorge
 - name: NVIDIA
   url: https://www.nvidia.com/
   type: End User
