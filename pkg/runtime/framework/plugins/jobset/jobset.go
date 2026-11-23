@@ -181,14 +181,34 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	// The JobSet spec in the Info has the patches merged, and strategic merge appends the
 	// replicatedJobs and containers a patch targets when they are not found, so the targets are
 	// checked against the runtime template without the patches when it is available.
-	patchTargetNames := rJobContainerNames
+	// initContainers and containers are merged as separate lists, so a patch must target an
+	// initContainer or a container of the runtime by the same kind.
+	type rJobPatchTargets struct {
+		initContainers sets.Set[string]
+		containers     sets.Set[string]
+	}
+	patchTargets := make(map[string]rJobPatchTargets)
 	if info.RuntimeTemplatePodSets != nil {
-		patchTargetNames = make(map[string]sets.Set[string], len(info.RuntimeTemplatePodSets))
 		for _, ps := range info.RuntimeTemplatePodSets {
-			patchTargetNames[ps.Name] = sets.New[string]()
-			for _, c := range slices.Concat(ps.InitContainers, ps.Containers) {
-				patchTargetNames[ps.Name].Insert(c.Name)
+			targets := rJobPatchTargets{initContainers: sets.New[string](), containers: sets.New[string]()}
+			for _, c := range ps.InitContainers {
+				targets.initContainers.Insert(c.Name)
 			}
+			for _, c := range ps.Containers {
+				targets.containers.Insert(c.Name)
+			}
+			patchTargets[ps.Name] = targets
+		}
+	} else {
+		for _, rJob := range jobSetSpec.ReplicatedJobs {
+			targets := rJobPatchTargets{initContainers: sets.New[string](), containers: sets.New[string]()}
+			for _, c := range rJob.Template.Spec.Template.Spec.InitContainers {
+				targets.initContainers.Insert(*c.Name)
+			}
+			for _, c := range rJob.Template.Spec.Template.Spec.Containers {
+				targets.containers.Insert(*c.Name)
+			}
+			patchTargets[*rJob.Name] = targets
 		}
 	}
 	for _, runtimePatch := range newObj.Spec.RuntimePatches {
@@ -198,7 +218,7 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 			continue
 		}
 		for _, rJobPatch := range runtimePatch.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs {
-			containers, ok := patchTargetNames[rJobPatch.Name]
+			targets, ok := patchTargets[rJobPatch.Name]
 			if !ok {
 				allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 					"must not have replicated job that doesn't exist in the runtime job template"))
@@ -211,13 +231,13 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 			podSpecPatch := rJobPatch.Template.Spec.Template.Spec
 
 			for _, c := range podSpecPatch.InitContainers {
-				if !containers.Has(c.Name) {
+				if !targets.initContainers.Has(c.Name) {
 					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 						fmt.Sprintf("must not have initContainer that doesn't exist in the runtime job %s", rJobPatch.Name)))
 				}
 			}
 			for _, c := range podSpecPatch.Containers {
-				if !containers.Has(c.Name) {
+				if !targets.containers.Has(c.Name) {
 					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 						fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", rJobPatch.Name)))
 				} else if len(c.Env) > 0 && (c.Name == constants.DatasetInitializer || c.Name == constants.ModelInitializer || c.Name == constants.Node) {

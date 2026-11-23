@@ -3390,6 +3390,21 @@ func TestTrainingRuntimeValidateObjectsRuntimePatchTargets(t *testing.T) {
 		}}
 	}
 
+	initContainerPatch := func(rJobName, initContainerName string) []trainer.RuntimePatch {
+		patches := containerPatch(rJobName, initContainerName)
+		podSpecPatch := patches[0].TrainingRuntimeSpec.Template.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec
+		podSpecPatch.InitContainers, podSpecPatch.Containers = podSpecPatch.Containers, nil
+		return patches
+	}
+	runtimeWithInitContainer := func() *trainer.TrainingRuntime {
+		return testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+			RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(
+				testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+				InitContainer(constants.Node, "setup", "setup:image").
+				Obj()).
+			Obj()
+	}
+
 	cases := map[string]struct {
 		trainingRuntime *trainer.TrainingRuntime
 		trainJob        *trainer.TrainJob
@@ -3414,6 +3429,33 @@ func TestTrainingRuntimeValidateObjectsRuntimePatchTargets(t *testing.T) {
 				Initializer(&trainer.Initializer{Dataset: &trainer.DatasetInitializer{}}).
 				RuntimePatches(initializerVolumeMountPatch(constants.DatasetInitializer, constants.DatasetMountPath)).
 				Obj(),
+		},
+		"runtimePatches targeting an initContainer of the runtime are accepted": {
+			trainingRuntime: runtimeWithInitContainer(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches(initContainerPatch(constants.Node, "setup")).
+				Obj(),
+		},
+		"runtimePatches targeting a container of the runtime as an initContainer are rejected": {
+			trainingRuntime: runtimeWithInitContainer(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches(initContainerPatch(constants.Node, constants.Node)).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Invalid(runtimePatchesPath, nil, fmt.Sprintf("must not have initContainer that doesn't exist in the runtime job %s", constants.Node)),
+			},
+		},
+		"runtimePatches targeting an initContainer of the runtime as a container are rejected": {
+			trainingRuntime: runtimeWithInitContainer(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches(containerPatch(constants.Node, "setup")).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Invalid(runtimePatchesPath, nil, fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", constants.Node)),
+			},
 		},
 		"runtimePatches targeting a replicated job the runtime doesn't define are rejected": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj(),
