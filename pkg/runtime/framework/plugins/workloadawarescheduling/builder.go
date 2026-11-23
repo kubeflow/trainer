@@ -112,8 +112,8 @@ func newItem(name string, path *field.Path, minCount int32, priorityClassName st
 }
 
 // minCount returns the gang size of a PodGroupTemplate for the given ReplicatedJobs, which is the
-// number of Pods of the ReplicatedJobs. The ReplicatedJobs which depend on another ReplicatedJob of
-// the same PodGroupTemplate are excluded.
+// number of Pods of the ReplicatedJobs across all of their replicas. The ReplicatedJobs which depend
+// on another ReplicatedJob of the same PodGroupTemplate are excluded.
 func minCount(podSets runtime.PodSets, jobSetSpec *jobsetv1alpha2ac.JobSetSpecApplyConfiguration, rJobNames []string) int32 {
 	var podCount int32
 	for _, rJobName := range rJobNames {
@@ -121,16 +121,14 @@ func minCount(podSets runtime.PodSets, jobSetSpec *jobsetv1alpha2ac.JobSetSpecAp
 		if ps == nil {
 			continue
 		}
-		replicas := int32(1)
 		if rJob := findReplicatedJob(jobSetSpec, rJobName); rJob != nil {
 			if slices.ContainsFunc(rJob.DependsOn, func(dep jobsetv1alpha2ac.DependsOnApplyConfiguration) bool {
 				return slices.Contains(rJobNames, ptr.Deref(dep.Name, ""))
 			}) {
 				continue
 			}
-			replicas = ptr.Deref(rJob.Replicas, 1)
 		}
-		podCount += ptr.Deref(ps.Count, 1) * replicas
+		podCount += ptr.Deref(ps.Count, 1)
 	}
 	return podCount
 }

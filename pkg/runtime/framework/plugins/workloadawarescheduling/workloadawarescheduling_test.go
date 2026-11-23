@@ -176,7 +176,7 @@ func TestWorkload(t *testing.T) {
 							WithTemplate(batchv1ac.JobTemplateSpec().WithSpec(batchv1ac.JobSpec().WithTemplate(corev1ac.PodTemplateSpec().WithSpec(corev1ac.PodSpec())))),
 					),
 					PodSets: []runtime.PodSet{
-						{Name: "sidecar", Count: ptr.To[int32](1)},
+						{Name: "sidecar", Count: ptr.To[int32](2)},
 						{Name: constants.Node, Count: ptr.To[int32](2)},
 					},
 				},
@@ -193,7 +193,7 @@ func TestWorkload(t *testing.T) {
 					PodSets: []runtime.PodSet{
 						{
 							Name:            "sidecar",
-							Count:           ptr.To[int32](1),
+							Count:           ptr.To[int32](2),
 							SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-b6ff97ef4e"),
 						},
 						{
@@ -1478,13 +1478,25 @@ func TestMinCount(t *testing.T) {
 			rJobNames:    []string{constants.DatasetInitializer, constants.Node},
 			wantMinCount: 5,
 		},
-		"Pods of every replica are counted": {
-			podSets: runtime.PodSets{{Name: "sidecar", Count: ptr.To[int32](2)}},
+		"PodSet count is the number of Pods across all replicas": {
+			podSets: runtime.PodSets{{Name: "sidecar", Count: ptr.To[int32](6)}},
 			jobSetSpec: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
 				jobsetv1alpha2ac.ReplicatedJob().WithName("sidecar").WithReplicas(3),
 			),
 			rJobNames:    []string{"sidecar"},
 			wantMinCount: 6,
+		},
+		"multi-slice trainer with 4 slices of 8 Pods is counted once": {
+			podSets: runtime.PodSets{
+				{Name: constants.DatasetInitializer, Count: ptr.To[int32](1)},
+				{Name: constants.Node, Count: ptr.To[int32](32)},
+			},
+			jobSetSpec: jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+				jobsetv1alpha2ac.ReplicatedJob().WithName(constants.DatasetInitializer).WithReplicas(1),
+				jobsetv1alpha2ac.ReplicatedJob().WithName(constants.Node).WithReplicas(4),
+			),
+			rJobNames:    []string{constants.DatasetInitializer, constants.Node},
+			wantMinCount: 33,
 		},
 		"ReplicatedJob depending on another ReplicatedJob of the group is excluded": {
 			podSets: runtime.PodSets{
