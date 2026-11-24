@@ -97,7 +97,7 @@ impl IndexableMemTable {
 }
 
 async fn fetch_partitions(
-    batches: Vec<RecordBatch>,
+    batches: &[RecordBatch],
     start_indices: &[u64],
     end_indices: &[u64],
     start: u64,
@@ -178,7 +178,7 @@ impl TableProvider for IndexableMemTable {
             return exec_err!("Incorrect filters");
         };
         let partitions = fetch_partitions(
-            self.batches.clone(),
+            &self.batches,
             &self.start_indices,
             &self.end_indices,
             start,
@@ -273,7 +273,7 @@ mod tests {
     #[tokio::test]
     async fn test_partition_selection() -> Result<(), Box<dyn std::error::Error>> {
         let batches = create_test_batches()?;
-        let result = fetch_partitions(batches, &[0, 4], &[3, 7], 0, 2).await;
+        let result = fetch_partitions(&batches, &[0, 4], &[3, 7], 0, 2).await;
 
         assert_batches_eq!(
             [
@@ -294,7 +294,7 @@ mod tests {
     #[tokio::test]
     async fn test_partition_selection_single_row() -> Result<(), Box<dyn std::error::Error>> {
         let batches = create_test_batches()?;
-        let result = fetch_partitions(batches, &[0, 4], &[3, 7], 2, 2).await;
+        let result = fetch_partitions(&batches, &[0, 4], &[3, 7], 2, 2).await;
 
         assert_batches_eq!(
             [
@@ -315,7 +315,7 @@ mod tests {
     #[tokio::test]
     async fn test_partition_selection_all() -> Result<(), Box<dyn std::error::Error>> {
         let batches = create_test_batches()?;
-        let result = fetch_partitions(batches, &[0, 4], &[3, 7], 0, 7).await;
+        let result = fetch_partitions(&batches, &[0, 4], &[3, 7], 0, 7).await;
 
         assert_batches_eq!(
             [
@@ -401,7 +401,7 @@ mod tests {
         // Batch 0: rows 0-3, Batch 1: rows 4-7
         // Query [2,5] should select BOTH batches (Batch 0 has 2-3, Batch 1 has 4-5)
         let batches = create_test_batches()?;
-        let result = fetch_partitions(batches, &[0, 4], &[3, 7], 2, 5).await;
+        let result = fetch_partitions(&batches, &[0, 4], &[3, 7], 2, 5).await;
 
         assert_eq!(result.len(), 2, "Expected both batches for boundary query");
         Ok(())
