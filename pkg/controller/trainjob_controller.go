@@ -154,16 +154,33 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
-	objects, err := runtime.NewObjects(ctx, trainJob)
-	if err != nil {
-		return err
-	}
-	for _, object := range objects {
-		if err := r.client.Apply(ctx, object, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
-			return err
+	var applyErr error
+	if !trainjob.IsTrainJobFinished(trainJob) {
+		objects, err := runtime.NewObjects(ctx, trainJob)
+		if err != nil {
+			applyErr = err
+		}
+		for _, object := range objects {
+			if err := r.client.Apply(ctx, object, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
+				applyErr = err
+				break
+			}
 		}
 	}
-	return nil
+
+	// Runs even for finished TrainJobs, so plugins can clean up objects of finished or
+	// suspended TrainJobs (e.g. a gang-scheduling PodGroup, which would otherwise keep
+	// reserving scheduler queue capacity indefinitely).
+	toDelete, err := runtime.DeleteObjects(ctx, trainJob)
+	if err != nil {
+		return errors.Join(applyErr, fmt.Errorf("resolving objects to delete: %w", err))
+	}
+	for _, object := range toDelete {
+		if err := client.IgnoreNotFound(r.client.Delete(ctx, object)); err != nil {
+			return errors.Join(applyErr, fmt.Errorf("deleting %s: %w", klog.KObj(object), err))
+		}
+	}
+	return applyErr
 }
 
 func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) ctrl.Result {
@@ -186,6 +203,9 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 			"startTime", startTime,
 			"deadline", deadline)
 		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
+		// TODO(#3833): a failed JobSet delete is only logged here and never retried, since the
+		// TrainJob is already Failed on the next reconcile. Moving this deletion to a JobSet
+		// ComponentDeleterPlugin would let reconcileObjects retry it.
 		jobSet := &jobsetv1alpha2.JobSet{
 			ObjectMeta: metav1.ObjectMeta{Name: trainJob.Name, Namespace: trainJob.Namespace},
 		}

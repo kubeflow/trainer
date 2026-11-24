@@ -53,13 +53,17 @@ func (w *ClusterTrainingRuntimeValidator) ValidateCreate(ctx context.Context, ob
 			constants.RuntimeDeprecationPolicyURL,
 		))
 	}
-	return warnings, validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+	allErrs := validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs)
+	allErrs = append(allErrs, validateScheduling(ctx, &obj.Spec, nil)...)
+	return warnings, allErrs.ToAggregate()
 }
 
 func (w *ClusterTrainingRuntimeValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.ClusterTrainingRuntime) (admission.Warnings, error) {
 	log := ctrl.LoggerFrom(ctx).WithName("clustertrainingruntime-webhook")
 	log.V(5).Info("Validating update", "clusterTrainingRuntime", klog.KObj(newObj))
-	return nil, validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+	allErrs := validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs)
+	allErrs = append(allErrs, validateScheduling(ctx, &newObj.Spec, &oldObj.Spec)...)
+	return nil, allErrs.ToAggregate()
 }
 
 func (w *ClusterTrainingRuntimeValidator) ValidateDelete(ctx context.Context, obj *trainer.ClusterTrainingRuntime) (admission.Warnings, error) {

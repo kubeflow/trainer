@@ -16,8 +16,14 @@ sphinxcontrib-mermaid>=0.9.0,<1.0.0
 # Copy Button for Code Blocks
 sphinx-copybutton>=0.5.2,<1.0.0
 
+# Data-Driven Templates for Community Pages
+sphinxcontrib-datatemplates>=0.11.0,<1.0.0
+
 # Grid and Card Components
 sphinx-design>=0.6.0,<1.0.0
+
+# Redirects for Moved Pages
+sphinx-reredirects>=0.1.3,<1.0.0
 
 # Live Reload for Development
 sphinx-autobuild>=2024.10.3

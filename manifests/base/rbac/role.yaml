@@ -126,6 +126,18 @@ rules:
 - apiGroups:
   - scheduling.k8s.io
   resources:
+  - podgroups
+  - workloads
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - scheduling.k8s.io
+  resources:
   - priorityclasses
   verbs:
   - get
@@ -133,6 +145,17 @@ rules:
   - watch
 - apiGroups:
   - scheduling.volcano.sh
+  resources:
+  - podgroups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - scheduling.x-k8s.io
   resources:
   - podgroups
@@ -159,6 +182,7 @@ rules:
   - trainer.kubeflow.org
   resources:
   - clustertrainingruntimes/finalizers
+  - optimizationjobs/finalizers
   - optimizationjobs/status
   - trainingruntimes/finalizers
   - trainjobs/finalizers

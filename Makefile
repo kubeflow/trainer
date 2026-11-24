@@ -156,14 +156,16 @@ scheduler-plugins-crd: ## Copy the CRDs from the Scheduler Plugins repository to
 	mkdir -p $(EXTERNAL_CRDS_DIR)/scheduler-plugins/
 	cp -f $(SCHEDULER_PLUGINS_ROOT)/manifests/coscheduling/* $(EXTERNAL_CRDS_DIR)/scheduler-plugins
 
-VOLCANO_APIS_ROOT = $(shell go list -m -f "{{.Dir}}" volcano.sh/apis)
-VOLCANO_VERSION = $(shell basename $(VOLCANO_APIS_ROOT) | cut -d'@' -f2)
+# volcano.sh/apis is versioned separately from the volcano-sh/volcano repository, and go.mod may pin it
+# to a pseudo-version (e.g. v1.13.1-0.20251028070205-46d20c0699e7) whose commit does not exist there.
+# Strip the pseudo-version suffix to get the release tag the CRD is downloaded from.
+VOLCANO_VERSION ?= $(shell go list -m -f '{{.Version}}' volcano.sh/apis | sed -E 's/-0\..*//')
 VOLCANO_CRD_URL = https://raw.githubusercontent.com/volcano-sh/volcano/$(VOLCANO_VERSION)/config/crd/volcano/bases/scheduling.volcano.sh_podgroups.yaml
 
 .PHONY: volcano-crd
 volcano-crd: ## Copy the CRDs from Volcano repository to the manifests/external-crds directory.
 	mkdir -p $(EXTERNAL_CRDS_DIR)/volcano/
-	curl -sSL $(VOLCANO_CRD_URL) -o $(EXTERNAL_CRDS_DIR)/volcano/scheduling.volcano.sh_podgroups.yaml
+	curl -fsSL $(VOLCANO_CRD_URL) -o $(EXTERNAL_CRDS_DIR)/volcano/scheduling.volcano.sh_podgroups.yaml
 
 # Instructions for code generation.
 .PHONY: manifests
@@ -179,6 +181,16 @@ manifests: controller-gen ## Generate manifests.
 	@# Copy the header-free CRDs into the chart before adding the kustomize (#)
 	@# header, so the chart templates can use the Helm-style license block.
 	cp -f manifests/base/crds/trainer.kubeflow.org_*.yaml $(TRAINER_CHART_DIR)/templates/crd/
+	@# Keep the chart's manager ClusterRole rules in sync with the generated role.
+	@{ cat $(HELM_BOILERPLATE_HEADER); echo; \
+		echo 'apiVersion: rbac.authorization.k8s.io/v1'; \
+		echo 'kind: ClusterRole'; \
+		echo 'metadata:'; \
+		echo '  name: {{ include "trainer.manager.clusterRole.name" . }}'; \
+		echo '  labels:'; \
+		echo '    {{- include "trainer.manager.labels" . | nindent 4 }}'; \
+		sed -n '/^rules:$$/,$$p' manifests/base/rbac/role.yaml; \
+	} > $(TRAINER_CHART_DIR)/templates/rbac/clusterrole.yaml
 	@for f in manifests/base/crds/trainer.kubeflow.org_*.yaml \
 			manifests/base/rbac/role.yaml \
 			manifests/base/webhook/manifests.yaml; do \
@@ -194,6 +206,8 @@ manifests: controller-gen ## Generate manifests.
 	done
 
 .PHONY: generate
+# Match CI's exact Go version for generation and its prerequisites.
+generate: export GOTOOLCHAIN := go$(shell awk '/^go / {print $$2}' $(PROJECT_DIR)/go.mod)
 generate: go-mod-download manifests helm-docs ## Generate APIs.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/..."
 	hack/update-codegen.sh
@@ -250,9 +264,17 @@ test-rust: ## Run Rust unit test.
 test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test. (Set GPU_CLUSTER=gpu for GPU nodes)
 	CLUSTER_TYPE=$(CLUSTER_TYPE) KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) INSTALL_METHOD=$(INSTALL_METHOD) ./hack/e2e-setup-cluster.sh
 
+.PHONY: test-e2e-setup-cluster-was
+test-e2e-setup-cluster-was: kind ## Setup Kind cluster with Workload-Aware Scheduling for e2e test.
+	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster-was.sh
+
 .PHONY: test-e2e
 test-e2e: ginkgo ## Run Go e2e test.
 	$(GINKGO) -v ./test/e2e/...
+
+.PHONY: test-e2e-was
+test-e2e-was: ginkgo ## Run Go e2e WAS test.
+	$(GINKGO) -v ./test/e2e-was/...
 
 # Input and output location for Notebooks executed with Papermill.
 NOTEBOOK_INPUT=$(PROJECT_DIR)/examples/pytorch/image-classification/mnist.ipynb

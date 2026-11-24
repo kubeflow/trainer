@@ -18,22 +18,31 @@ package core
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
+	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -186,7 +195,106 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 	}
 }
 
+func TestClusterTrainingRuntimeDeleteObjects(t *testing.T) {
+	errGetPodGroup := errors.New("failed to get the PodGroup")
+
+	failedTrainJob := func(name string) *trainer.TrainJob {
+		return testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, name).
+			UID("uid").
+			RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+			Conditions(metav1.Condition{Type: trainer.TrainJobFailed, Status: metav1.ConditionTrue}).
+			Obj()
+	}
+	runningTrainJob := func(name string) *trainer.TrainJob {
+		return testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, name).
+			UID("uid").
+			RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+			Obj()
+	}
+	ownedPodGroup := func(name string) *volcanov1beta1.PodGroup {
+		// No TypeMeta: Delete() returns whatever the fake client's Get() populates,
+		// which (like a real client) leaves TypeMeta unset on a typed object.
+		pg := testingutil.MakeVolcanoPodGroup(metav1.NamespaceDefault, name).
+			ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), name, "uid").
+			Obj()
+		pg.TypeMeta = metav1.TypeMeta{}
+		return pg
+	}
+
+	cases := map[string]struct {
+		trainJob       *trainer.TrainJob
+		podGroup       *volcanov1beta1.PodGroup
+		podGroupGetErr error
+		wantObjs       []client.Object
+		wantErr        error
+	}{
+		"failed TrainJob returns its PodGroup, without the runtime existing": {
+			trainJob: failedTrainJob("test-job"),
+			podGroup: ownedPodGroup("test-job"),
+			wantObjs: []client.Object{ownedPodGroup("test-job")},
+		},
+		"running TrainJob returns nothing": {
+			trainJob: runningTrainJob("test-job"),
+			podGroup: ownedPodGroup("test-job"),
+			wantObjs: nil,
+		},
+		"failed TrainJob without a PodGroup returns nothing": {
+			trainJob: failedTrainJob("test-job"),
+			wantObjs: nil,
+		},
+		"failed read of the PodGroup is returned so the reconcile is retried": {
+			trainJob:       failedTrainJob("test-job"),
+			podGroup:       ownedPodGroup("test-job"),
+			podGroupGetErr: errGetPodGroup,
+			wantErr:        errGetPodGroup,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			// The runtime is deliberately not created: DeleteObjects must not need it.
+			clientBuilder := testingutil.WithVolcanoPodGroupRESTMapping(testingutil.NewClientBuilder())
+			if tc.podGroup != nil {
+				clientBuilder.WithObjects(tc.podGroup)
+			}
+			if tc.podGroupGetErr != nil {
+				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, ok := obj.(*volcanov1beta1.PodGroup); ok {
+							return tc.podGroupGetErr
+						}
+						return c.Get(ctx, key, obj, opts...)
+					},
+				})
+			}
+			c := clientBuilder.Build()
+
+			// ClusterTrainingRuntime requires TrainingRuntime to be initialized first.
+			if _, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil); err != nil {
+				t.Fatal(err)
+			}
+			rt, err := NewClusterTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gotObjs, err := rt.DeleteObjects(ctx, tc.trainJob)
+			if diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantObjs, gotObjs, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion")); len(diff) != 0 {
+				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
+	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
 	validRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj()
 
 	deprecatedRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("deprecated-runtime").Obj()
@@ -232,6 +340,35 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 				`Referenced ClusterTrainingRuntime "deprecated-runtime" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: ` + constants.RuntimeDeprecationPolicyURL,
 			},
 		},
+		"returns field error when TrainJob sets resourceClaimsPerNode and runtime sets Job-level resourceClaims": {
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Trainer(testingutil.MakeTrainJobTrainerWrapper().
+					ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "gpu-template"}).
+					Obj()).
+				Obj(),
+			existingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj().Spec).
+					Scheduling(&trainer.TrainingRuntimeScheduling{
+						ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+							{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+							{
+								TargetReplicatedJobs: []string{constants.Node},
+								Job: &trainer.JobScheduling{
+									ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
+										Name:                      "tpu-slice",
+										ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+									}},
+								},
+							},
+						},
+					}).
+					Obj()).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "trainer", "resourceClaimsPerNode"), ""),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -239,7 +376,7 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 
-			clientBuilder := testingutil.NewClientBuilder()
+			clientBuilder := testingutil.WithWorkloadRESTMapping(testingutil.NewClientBuilder())
 			if tc.existingRuntime != nil {
 				clientBuilder = clientBuilder.WithObjects(tc.existingRuntime)
 			}

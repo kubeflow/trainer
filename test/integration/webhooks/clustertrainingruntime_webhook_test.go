@@ -17,9 +17,12 @@ limitations under the License.
 package webhooks
 
 import (
+	"strings"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -134,6 +137,51 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 						Obj()
 				},
 				gomega.MatchError(gomega.ContainSubstring("references resourceClaim \"gpu\" which is not defined in the Pod's resourceClaims"))),
+			ginkgo.Entry("Should succeed to create ClusterTrainingRuntime with a 20 characters replicatedJob name",
+				func() *trainer.ClusterTrainingRuntime {
+					runtime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName).Obj()
+					runtime.Spec.Template.Spec.ReplicatedJobs[0].Name = strings.Repeat("a", 20)
+					return runtime
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create ClusterTrainingRuntime with a replicatedJob name longer than 20 characters",
+				func() *trainer.ClusterTrainingRuntime {
+					runtime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName).Obj()
+					runtime.Spec.Template.Spec.ReplicatedJobs[0].Name = strings.Repeat("a", 21)
+					return runtime
+				},
+				gomega.MatchError(gomega.ContainSubstring("replicatedJob name must be no more than 20 characters"))),
+			ginkgo.Entry("Should succeed to create ClusterTrainingRuntime with per-ReplicatedJob scheduling",
+				func() *trainer.ClusterTrainingRuntime {
+					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainingRuntimeScheduling{
+								ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+									{
+										TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer},
+										SchedulingPolicy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+											Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+										},
+									},
+									{TargetReplicatedJobs: []string{constants.Node}},
+								},
+							}).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create ClusterTrainingRuntime with both scheduling and podGroupPolicy",
+				func() *trainer.ClusterTrainingRuntime {
+					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							Scheduling(&trainer.TrainingRuntimeScheduling{}).
+							PodGroupPolicyVolcano(&trainer.VolcanoPodGroupPolicySource{}).
+							Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("scheduling and podGroupPolicy are mutually exclusive"))),
 		)
 	})
 })

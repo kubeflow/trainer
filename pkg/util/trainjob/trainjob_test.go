@@ -19,7 +19,10 @@ package trainjob
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -269,5 +272,165 @@ func TestIsTrainJobFinished(t *testing.T) {
 				t.Errorf("IsTrainJobFinished(%v) = %v, want %v", tc.trainJob, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestResourceClaimsPaths(t *testing.T) {
+	cases := map[string]struct {
+		trainJob  *trainer.TrainJob
+		wantPaths []string
+	}{
+		"TrainJob without resource claims": {
+			trainJob: &trainer.TrainJob{},
+		},
+		"resourceClaimsPerNode is set": {
+			trainJob: &trainer.TrainJob{Spec: trainer.TrainJobSpec{
+				Trainer: &trainer.Trainer{
+					ResourceClaimsPerNode: []trainer.TrainerResourceClaim{{Name: "gpu", ResourceClaimTemplateName: "gpu-template"}},
+				},
+			}},
+			wantPaths: []string{"spec.trainer.resourceClaimsPerNode"},
+		},
+		"runtimePatches set Pod resourceClaims": {
+			trainJob: &trainer.TrainJob{Spec: trainer.TrainJobSpec{
+				RuntimePatches: []trainer.RuntimePatch{
+					{Manager: "first.io/manager"},
+					runtimePatch("second.io/manager", trainer.PodSpecPatch{}, trainer.PodSpecPatch{
+						ResourceClaims: []corev1.PodResourceClaim{{Name: "gpu", ResourceClaimTemplateName: ptr.To("gpu-template")}},
+					}),
+				},
+			}},
+			wantPaths: []string{"spec.runtimePatches[1].trainingRuntimeSpec.template.spec.replicatedJobs[1].template.spec.template.spec.resourceClaims"},
+		},
+		"runtimePatches only set container resources.claims": {
+			trainJob: &trainer.TrainJob{Spec: trainer.TrainJobSpec{
+				RuntimePatches: []trainer.RuntimePatch{
+					runtimePatch("first.io/manager", trainer.PodSpecPatch{
+						Containers: []trainer.ContainerPatch{{Name: "node", Resources: &corev1.ResourceRequirements{Claims: []corev1.ResourceClaim{{Name: "gpu"}}}}},
+					}),
+				},
+			}},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if diff := cmp.Diff(tc.wantPaths, pathStrings(ResourceClaimsPaths(tc.trainJob))); len(diff) != 0 {
+				t.Errorf("Unexpected ResourceClaimsPaths (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestContainerResourceClaimsPaths(t *testing.T) {
+	cases := map[string]struct {
+		trainJob  *trainer.TrainJob
+		wantPaths []string
+	}{
+		"TrainJob without resource claims": {
+			trainJob: &trainer.TrainJob{},
+		},
+		"runtimePatches only set Pod resourceClaims": {
+			trainJob: &trainer.TrainJob{Spec: trainer.TrainJobSpec{
+				RuntimePatches: []trainer.RuntimePatch{
+					runtimePatch("first.io/manager", trainer.PodSpecPatch{
+						ResourceClaims: []corev1.PodResourceClaim{{Name: "gpu", ResourceClaimTemplateName: ptr.To("gpu-template")}},
+					}),
+				},
+			}},
+		},
+		"runtimePatches set container and initContainer resources.claims": {
+			trainJob: &trainer.TrainJob{Spec: trainer.TrainJobSpec{
+				RuntimePatches: []trainer.RuntimePatch{
+					runtimePatch("first.io/manager", trainer.PodSpecPatch{
+						Containers: []trainer.ContainerPatch{
+							{Name: "sidecar"},
+							{Name: "node", Resources: &corev1.ResourceRequirements{Claims: []corev1.ResourceClaim{{Name: "gpu"}}}},
+						},
+						InitContainers: []trainer.ContainerPatch{
+							{Name: "init", Resources: &corev1.ResourceRequirements{Claims: []corev1.ResourceClaim{{Name: "gpu"}}}},
+						},
+					}),
+				},
+			}},
+			wantPaths: []string{
+				"spec.runtimePatches[0].trainingRuntimeSpec.template.spec.replicatedJobs[0].template.spec.template.spec.containers[1].resources.claims",
+				"spec.runtimePatches[0].trainingRuntimeSpec.template.spec.replicatedJobs[0].template.spec.template.spec.initContainers[0].resources.claims",
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if diff := cmp.Diff(tc.wantPaths, pathStrings(ContainerResourceClaimsPaths(tc.trainJob))); len(diff) != 0 {
+				t.Errorf("Unexpected ContainerResourceClaimsPaths (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// runtimePatch returns a RuntimePatch which patches one ReplicatedJob Pod spec per given podSpec.
+func runtimePatch(manager string, podSpecs ...trainer.PodSpecPatch) trainer.RuntimePatch {
+	var rJobs []trainer.ReplicatedJobPatch
+	for _, podSpec := range podSpecs {
+		rJobs = append(rJobs, trainer.ReplicatedJobPatch{
+			Name: "node",
+			Template: &trainer.JobTemplatePatch{
+				Spec: &trainer.JobSpecPatch{
+					Template: &trainer.PodTemplatePatch{Spec: &podSpec},
+				},
+			},
+		})
+	}
+	return trainer.RuntimePatch{
+		Manager: manager,
+		TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+			Template: &trainer.JobSetTemplatePatch{
+				Spec: &trainer.JobSetSpecPatch{ReplicatedJobs: rJobs},
+			},
+		},
+	}
+}
+
+func pathStrings(paths []*field.Path) []string {
+	var out []string
+	for _, path := range paths {
+		out = append(out, path.String())
+	}
+	return out
+}
+
+func TestForEachRuntimePatchPodSpec(t *testing.T) {
+	type visit struct {
+		Path     string
+		Manager  string
+		RJobName string
+	}
+	trainJob := &trainer.TrainJob{Spec: trainer.TrainJobSpec{
+		RuntimePatches: []trainer.RuntimePatch{
+			{Manager: "first.io/manager"},
+			runtimePatch("second.io/manager", trainer.PodSpecPatch{}),
+			{
+				Manager: "third.io/manager",
+				TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+					Template: &trainer.JobSetTemplatePatch{
+						Spec: &trainer.JobSetSpecPatch{
+							ReplicatedJobs: []trainer.ReplicatedJobPatch{{Name: "launcher"}},
+						},
+					},
+				},
+			},
+		},
+	}}
+	wantVisits := []visit{{
+		Path:     "spec.runtimePatches[1].trainingRuntimeSpec.template.spec.replicatedJobs[0].template.spec.template.spec",
+		Manager:  "second.io/manager",
+		RJobName: "node",
+	}}
+
+	var gotVisits []visit
+	ForEachRuntimePatchPodSpec(trainJob, func(podSpecPath *field.Path, manager, rJobName string, _ *trainer.PodSpecPatch) {
+		gotVisits = append(gotVisits, visit{Path: podSpecPath.String(), Manager: manager, RJobName: rJobName})
+	})
+	if diff := cmp.Diff(wantVisits, gotVisits); len(diff) != 0 {
+		t.Errorf("Unexpected ForEachRuntimePatchPodSpec visits (-want,+got):\n%s", diff)
 	}
 }

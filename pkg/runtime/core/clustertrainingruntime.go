@@ -75,7 +75,7 @@ func (r *ClusterTrainingRuntime) NewObjects(ctx context.Context, trainJob *train
 		}
 	}
 
-	info, err := r.RuntimeInfo(trainJob, clTrainingRuntime.Spec.Template, clTrainingRuntime.Spec.MLPolicy, clTrainingRuntime.Spec.PodGroupPolicy)
+	info, err := r.RuntimeInfo(trainJob, clTrainingRuntime.Spec.Template, clTrainingRuntime.Spec.MLPolicy, clTrainingRuntime.Spec.PodGroupPolicy, clTrainingRuntime.Spec.Scheduling)
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +84,9 @@ func (r *ClusterTrainingRuntime) NewObjects(ctx context.Context, trainJob *train
 
 func (r *ClusterTrainingRuntime) RuntimeInfo(
 	trainJob *trainer.TrainJob, runtimeTemplateSpec any, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
+	scheduling *trainer.TrainingRuntimeScheduling,
 ) (*runtime.Info, error) {
-	return r.TrainingRuntime.RuntimeInfo(trainJob, runtimeTemplateSpec, mlPolicy, podGroupPolicy)
+	return r.TrainingRuntime.RuntimeInfo(trainJob, runtimeTemplateSpec, mlPolicy, podGroupPolicy, scheduling)
 }
 
 func (r *ClusterTrainingRuntime) TrainJobStatus(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
@@ -131,7 +132,7 @@ func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *
 		))
 	}
 
-	info, _ := r.newRuntimeInfo(new, clusterTrainingRuntime.Spec.Template, clusterTrainingRuntime.Spec.MLPolicy, clusterTrainingRuntime.Spec.PodGroupPolicy)
+	info, _ := r.newRuntimeInfo(new, clusterTrainingRuntime.Spec.Template, clusterTrainingRuntime.Spec.MLPolicy, clusterTrainingRuntime.Spec.PodGroupPolicy, clusterTrainingRuntime.Spec.Scheduling)
 	fwWarnings, errs := r.framework.RunCustomValidationPlugins(ctx, info, old, new)
 	if len(fwWarnings) != 0 {
 		warnings = append(warnings, fwWarnings...)

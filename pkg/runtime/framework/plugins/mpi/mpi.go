@@ -85,6 +85,14 @@ func (m *MPI) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobOb
 		return nil, allErrs
 	}
 	specPath := field.NewPath("spec")
+	// The MPI hostfile and the launcher are built for a single Job per replicatedJob.
+	// The trainer ancestor is the launcher, so the node replicatedJob must be validated as well.
+	for _, rJobName := range []string{constants.Launcher, constants.Node} {
+		if replicas := runtime.ReplicatedJobReplicas(runtimeInfo, rJobName); replicas > 1 {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("runtimeRef"), replicas,
+				fmt.Sprintf("%s replicatedJob replicas must be 1 for the MPI runtime", rJobName)))
+		}
+	}
 	// validate PodSet configurations based on NumNodes and RunLauncherAsNode.
 	if trainJobTrainer := newJobObj.Spec.Trainer; trainJobTrainer != nil && ptr.Deref(trainJobTrainer.NumNodes, 1) >= 2 && ptr.Deref(runtimeInfo.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false) {
 		if runtimeInfo.FindPodSetByName(constants.Launcher) == nil || runtimeInfo.FindPodSetByName(constants.Node) == nil {
@@ -111,6 +119,12 @@ func (m *MPI) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobOb
 func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil
+	}
+
+	// Set the TrainJob image on the launcher and the nodes, since mpirun on the launcher starts
+	// the MPI processes on the nodes, which must ship the same application and MPI versions.
+	for _, psName := range []string{constants.Launcher, constants.Node} {
+		runtime.SetContainerImageFromTrainer(info.FindContainerByPodSetName(psName, constants.Node), trainJob.Spec.Trainer)
 	}
 
 	// TrainJob contains the actual information for the Trainer.
@@ -241,7 +255,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 							WithValue("false"),
 						*corev1ac.EnvVar().
 							WithName(constants.PRTEEnvDefaultSlots).
-							WithValue(strconv.Itoa(int(*info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode))),
+							WithValue(strconv.Itoa(int(ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode, 1)))),
 						*corev1ac.EnvVar().
 							WithName(constants.PRTEEnvKeySSHArgs).
 							WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),

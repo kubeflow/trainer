@@ -88,6 +88,32 @@ func TestXGBoostValidate(t *testing.T) {
 			),
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
 		},
+		"trainer replicatedJob with multiple replicas is not supported": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							XGBoostPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithTemplateSpecObjApply(jobsetv1alpha2ac.JobSetSpec().
+					WithReplicatedJobs(jobsetv1alpha2ac.ReplicatedJob().
+						WithName(constants.Node).
+						WithReplicas(2).
+						WithTemplate(batchv1ac.JobTemplateSpec().
+							WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}),
+						),
+					),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "runtimeRef"), int32(2),
+					"trainer replicatedJob replicas must be 1 for the XGBoost runtime"),
+			},
+		},
 		"no error when env does not contain reserved names": {
 			runtimeInfo: runtime.NewInfo(
 				runtime.WithMLPolicySource(
@@ -558,7 +584,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						Obj(),
 				),
 				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.Node)),
+					WithContainers(corev1ac.Container().WithName(constants.Node).WithImage("test:runtime")),
 				),
 			),
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "gpu-job").
@@ -588,7 +614,8 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](2),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "xgboost/xgboost:latest",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To(constants.ContainerTrainerPort),
 							}},
@@ -906,7 +933,8 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](2),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "xgboost/xgboost:latest",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To(constants.ContainerTrainerPort),
 							}},
@@ -1001,7 +1029,8 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](2),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "xgboost/xgboost:latest",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To(constants.ContainerTrainerPort),
 							}},

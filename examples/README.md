@@ -6,16 +6,17 @@ This directory contains examples for using Kubeflow Trainer with different inter
 
 ```
 examples/
-├── pytorch/       # PyTorch SDK examples (AI Practitioners)
-├── deepspeed/     # DeepSpeed framework examples
-├── mlx/           # MLX framework examples
-├── torchtune/     # TorchTune fine-tuning examples
-├── megatron/      # Megatron-LM examples
-├── flux/          # Flux workload manager examples
-├── xgboost/       # XGBoost examples
-├── jax/           # JAX framework examples
-├── local/         # Local backend examples
-└── yaml/          # YAML examples for kubectl users (Platform Admins)
+├── pytorch/         # PyTorch SDK examples (AI Practitioners)
+├── deepspeed/       # DeepSpeed framework examples
+├── mlx/             # MLX framework examples
+├── torchtune/       # TorchTune fine-tuning examples
+├── megatron/        # Megatron-LM examples
+├── flux/            # Flux workload manager examples
+├── xgboost/         # XGBoost examples
+├── jax/             # JAX framework examples
+├── local/           # Local backend examples
+├── optimizationjob/ # Hyperparameter optimization with TrainJob trials
+└── yaml/            # YAML examples for kubectl users (Platform Admins)
 ```
 
 ## For AI Practitioners (Python SDK)
@@ -72,6 +73,16 @@ kubectl apply -f yaml/02-runtime-patches.yaml
 ```
 
 **[Browse YAML Examples](./yaml/)**
+
+## Hyperparameter Optimization
+
+Run a CPU-only random search with OptimizationJob and inspect its best trial:
+
+```bash
+kubectl apply -f optimizationjob/random-search.yaml
+```
+
+**[Browse OptimizationJob Examples](./optimizationjob/)** for prerequisites and monitoring commands.
 
 ## Documentation
 

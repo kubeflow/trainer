@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/util/tlsconfig"
 )
 
 // validate validates the configuration.
@@ -62,6 +63,11 @@ func validate(cfg *configapi.Configuration) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("statusServer", "burst"), *cfg.StatusServer.Burst, "must be greater than or equal to 0"))
 		}
 	}
+
+	// Validate TLS options: versions, cipher suites, and curve preferences
+	// must be recognized by this build, otherwise controller startup fails
+	// instead of silently ignoring the unrecognized values.
+	allErrs = append(allErrs, tlsconfig.Validate(cfg.TLS, field.NewPath("tls"))...)
 
 	return allErrs
 }

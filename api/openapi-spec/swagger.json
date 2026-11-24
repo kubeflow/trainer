@@ -12467,11 +12467,7 @@
           {
             "type": "number"
           }
-        ],
-        "x-kubernetes-v2-schema": {
-          "description": "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n``` \u003cquantity\u003e        ::= \u003csignedNumber\u003e\u003csuffix\u003e\n\n\t(Note that \u003csuffix\u003e may be empty, from the \"\" case in \u003cdecimalSI\u003e.)\n\n\u003cdigit\u003e           ::= 0 | 1 | ... | 9 \u003cdigits\u003e          ::= \u003cdigit\u003e | \u003cdigit\u003e\u003cdigits\u003e \u003cnumber\u003e          ::= \u003cdigits\u003e | \u003cdigits\u003e.\u003cdigits\u003e | \u003cdigits\u003e. | .\u003cdigits\u003e \u003csign\u003e            ::= \"+\" | \"-\" \u003csignedNumber\u003e    ::= \u003cnumber\u003e | \u003csign\u003e\u003cnumber\u003e \u003csuffix\u003e          ::= \u003cbinarySI\u003e | \u003cdecimalExponent\u003e | \u003cdecimalSI\u003e \u003cbinarySI\u003e        ::= Ki | Mi | Gi | Ti | Pi | Ei\n\n\t(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\n\u003cdecimalSI\u003e       ::= m | \"\" | k | M | G | T | P | E\n\n\t(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\n\u003cdecimalExponent\u003e ::= \"e\" \u003csignedNumber\u003e | \"E\" \u003csignedNumber\u003e ```\n\nNo matter which of the three exponent forms is used, no quantity may represent a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal places. Numbers larger or more precise will be capped or rounded up. (E.g.: 0.1m will rounded up to 1m.) This may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost - No fractional digits will be emitted - The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\" - 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.",
-          "type": "string"
-        }
+        ]
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup": {
         "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
@@ -13957,12 +13953,7 @@
           {
             "type": "string"
           }
-        ],
-        "x-kubernetes-v2-schema": {
-          "description": "IntOrString is a type that can hold an int32 or a string.  When used in JSON or YAML marshalling and unmarshalling, it produces or consumes the inner type.  This allows you to have, for example, a JSON field that can accept a name or number.",
-          "type": "string",
-          "format": "int-or-string"
-        }
+        ]
       },
       "jobset.v1alpha2.Coordinator": {
         "description": "Coordinator defines which pod can be marked as the coordinator for the JobSet workload.",
@@ -14893,6 +14884,47 @@
         "description": "JAXMLPolicySource represents a jax runtime configuration.",
         "type": "object"
       },
+      "trainer.v1alpha1.JobScheduling": {
+        "description": "JobScheduling defines scheduling configuration applied to individual Jobs (ReplicatedJob replicas), enabling each replica to be scheduled as its own independent gang. The controller compiles one PodGroupTemplate and PodGroup per Job, sized to that Job's own parallelism, rather than one PodGroup shared across all of the ReplicatedJob's replicas.",
+        "type": "object",
+        "properties": {
+          "disruptionMode": {
+            "description": "disruptionMode defines how the Pods within a single replica can be disrupted.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupDisruptionMode"
+              }
+            ]
+          },
+          "resourceClaims": {
+            "description": "resourceClaims defines the DRA ResourceClaims shared by all Pods in each Job's PodGroup. Requires the DRAWorkloadResourceClaims Kubernetes feature gate.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupResourceClaim"
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "schedulingConstraints": {
+            "description": "schedulingConstraints defines topology constraints applied to each replica of the targeted ReplicatedJob.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingConstraints"
+              }
+            ]
+          },
+          "schedulingPolicy": {
+            "description": "schedulingPolicy defines the scheduling policy applied to each replica of the targeted ReplicatedJob. Defaults to Gang when not specified.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingPolicy"
+              }
+            ]
+          }
+        }
+      },
       "trainer.v1alpha1.JobSetSpecPatch": {
         "description": "JobSetSpecPatch defines allowed patches for the JobSet spec.",
         "type": "object",
@@ -15319,6 +15351,7 @@
         "type": "object",
         "required": [
           "objectives",
+          "searchAlgorithm",
           "parameters",
           "trainJobTemplate"
         ],
@@ -15408,7 +15441,7 @@
         ],
         "properties": {
           "name": {
-            "description": "name is the name of the hyperparameter.",
+            "description": "name is the name of the hyperparameter. Only letters, digits and underscores are allowed, and it cannot start with a digit.",
             "type": "string"
           },
           "searchSpace": {
@@ -15546,6 +15579,10 @@
             ],
             "x-kubernetes-list-type": "map"
           },
+          "schedulerName": {
+            "description": "schedulerName patches the scheduler for the Pods in the target job templates. When omitted, the scheduler specified in the runtime template is preserved.",
+            "type": "string"
+          },
           "schedulingGates": {
             "description": "schedulingGates patches the scheduling gates for the Pods in the target job templates. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/",
             "type": "array",
@@ -15622,7 +15659,7 @@
         "type": "object",
         "properties": {
           "seed": {
-            "description": "seed is the seed for the random search algorithm.",
+            "description": "seed is the seed for the random search algorithm. It must be between 0 and 4294967295.",
             "type": "integer",
             "format": "int64"
           }
@@ -15646,6 +15683,55 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobTemplatePatch"
               }
             ]
+          }
+        }
+      },
+      "trainer.v1alpha1.ReplicatedJobScheduling": {
+        "description": "ReplicatedJobScheduling targets one or more ReplicatedJobs of the runtime template with level 2 scheduling configuration.",
+        "type": "object",
+        "required": [
+          "targetReplicatedJobs"
+        ],
+        "properties": {
+          "disruptionMode": {
+            "description": "disruptionMode defines how the Pods created by the targeted ReplicatedJobs can be disrupted.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadCompositePodGroupDisruptionMode"
+              }
+            ]
+          },
+          "job": {
+            "description": "job defines Job-level (level 3) scheduling configuration, where every replica of the targeted ReplicatedJob forms its own independent gang, so one PodGroup is created per Job instead of a single PodGroup shared across every replica. Without the TrainJobCompositePodGroup feature gate, targetReplicatedJobs must contain exactly one ReplicatedJob name and the level 2 schedulingPolicy, schedulingConstraints, and disruptionMode fields must not be set, since they configure a shared PodGroup that the job field replaces with one PodGroup per Job. Currently, the targeted ReplicatedJob must have at most 1 replica, since a distinct PodGroup can't be assigned to the Pods of each replica before k8s v1.38.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.JobScheduling"
+              }
+            ]
+          },
+          "schedulingConstraints": {
+            "description": "schedulingConstraints defines level 2 topology constraints for the Pods created by the targeted ReplicatedJobs.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadCompositePodGroupSchedulingConstraints"
+              }
+            ]
+          },
+          "schedulingPolicy": {
+            "description": "schedulingPolicy defines the level 2 scheduling policy for the Pods created by the targeted ReplicatedJobs. Defaults to Gang when not specified.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadCompositePodGroupSchedulingPolicy"
+              }
+            ]
+          },
+          "targetReplicatedJobs": {
+            "description": "targetReplicatedJobs is the list of ReplicatedJob names this policy applies to. When more than one name is listed, the targeted ReplicatedJobs share a single PodGroup. Every name must exist in the runtime template and must be unique across all replicatedJobs entries.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "x-kubernetes-list-type": "set"
           }
         }
       },
@@ -16167,6 +16253,44 @@
           }
         }
       },
+      "trainer.v1alpha1.TrainingRuntimeScheduling": {
+        "description": "TrainingRuntimeScheduling defines the Workload-Aware Scheduling configuration for a TrainJob. Unless the TrainJobCompositePodGroup feature gate is enabled, a runtime must configure scheduling using one of the following models, and each ReplicatedJob can be configured by exactly one of them, since composite Gang-of-Gangs PodGroup hierarchies linking a parent PodGroup to leaf PodGroups are not created without that gate:\n  - the TrainJob-level (level 1) model: set schedulingPolicy, schedulingConstraints,\n    and/or disruptionMode to configure a single PodGroup covering the whole\n    TrainJob, and leave replicatedJobs unset.\n  - the per-ReplicatedJob (level 2) model: set replicatedJobs and leave schedulingPolicy,\n    schedulingConstraints, and disruptionMode unset at the top level.\n    Every ReplicatedJob in the runtime template must then be targeted by exactly one\n    replicatedJobs entry, since there is no top-level policy for an untargeted\n    ReplicatedJob to fall back to.\n  - the per-Job (level 3) model: set job on a replicatedJobs entry, so every replica\n    (Job) of the targeted ReplicatedJob gets its own PodGroup. The entry must target\n    exactly one ReplicatedJob and leave its schedulingPolicy, schedulingConstraints, and\n    disruptionMode unset. Level 2 and level 3 entries can be combined for different\n    ReplicatedJobs of the same runtime.\n\nJobSet creates the ReplicatedJobs that set dependsOn only after their dependencies reach the required status, so a single TrainJob-level gang could never reach its minCount. A runtime using dependsOn must therefore use the per-ReplicatedJob model.",
+        "type": "object",
+        "properties": {
+          "disruptionMode": {
+            "description": "disruptionMode defines how the Pods of the entire TrainJob (level 1) can be disrupted. Mutually exclusive with replicatedJobs: see the type-level comment.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadCompositePodGroupDisruptionMode"
+              }
+            ]
+          },
+          "replicatedJobs": {
+            "description": "replicatedJobs specifies per-ReplicatedJob (level 2) scheduling configuration. Each entry targets one or more ReplicatedJobs of the runtime template. Without the TrainJobCompositePodGroup feature gate, this field is mutually exclusive with the TrainJob-level schedulingPolicy, schedulingConstraints, and disruptionMode fields. The item limit matches the upstream limit of PodGroupTemplates in a Workload.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/trainer.v1alpha1.ReplicatedJobScheduling"
+            },
+            "x-kubernetes-list-type": "atomic"
+          },
+          "schedulingConstraints": {
+            "description": "schedulingConstraints defines TrainJob-level (level 1) topology constraints for every Pod created by the TrainJob. Mutually exclusive with replicatedJobs: see the type-level comment.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadCompositePodGroupSchedulingConstraints"
+              }
+            ]
+          },
+          "schedulingPolicy": {
+            "description": "schedulingPolicy defines the TrainJob-level (level 1) scheduling policy for every Pod created by the TrainJob. Defaults to Gang when scheduling is set but schedulingPolicy is nil and replicatedJobs is not set. TrainJob-level gang scheduling, including the default, cannot be used with dependsOn. Mutually exclusive with replicatedJobs: see the type-level comment.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadCompositePodGroupSchedulingPolicy"
+              }
+            ]
+          }
+        }
+      },
       "trainer.v1alpha1.TrainingRuntimeSpec": {
         "description": "TrainingRuntimeSpec represents a specification of the desired training runtime.",
         "type": "object",
@@ -16184,6 +16308,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.PodGroupPolicy"
+              }
+            ]
+          },
+          "scheduling": {
+            "description": "scheduling defines the Workload-Aware Scheduling configuration for TrainJobs which reference this runtime. When set, the TrainJob controller creates a Workload and the corresponding PodGroups for every TrainJob. When nil, no scheduling objects are created and TrainJob behavior is unchanged. This field is mutually exclusive with podGroupPolicy. This is an alpha feature and requires enabling the TrainJobWorkloadAwareScheduling feature gate. This field embeds upstream scheduling.k8s.io/v1alpha3 types and is excluded from the Trainer API stability guarantees until the upstream scheduling APIs graduate. More info: https://github.com/kubeflow/trainer/tree/master/proposals/3015-workload-aware-scheduling",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainingRuntimeScheduling"
               }
             ]
           },

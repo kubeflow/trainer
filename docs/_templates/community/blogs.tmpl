@@ -1,0 +1,10 @@
+{#- Render all blog posts in talks.yaml as a searchable grid, newest first. -#}
+{%- import "community/macros.tmpl" as m -%}
+{%- set posts = data | selectattr("type", "equalto", "blog") | sort(attribute="date", reverse=True) | list -%}
+```{raw} html
+{% call m.directory(posts | length, "blog posts", "Search by title or publication...") -%}
+{%- for post in posts %}
+{{ m.blog_card(post, searchable=true) }}
+{%- endfor %}
+{%- endcall %}
+```

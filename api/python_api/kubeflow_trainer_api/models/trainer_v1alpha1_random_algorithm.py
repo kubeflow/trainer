@@ -40,7 +40,7 @@ class TrainerV1alpha1RandomAlgorithm(BaseModel):
     """
     RandomAlgorithm is the random search algorithm.
     """ # noqa: E501
-    seed: Optional[StrictInt] = Field(default=None, description="seed is the seed for the random search algorithm.")
+    seed: Optional[StrictInt] = Field(default=None, description="seed is the seed for the random search algorithm. It must be between 0 and 4294967295.")
     __properties: ClassVar[List[str]] = ["seed"]
 
     model_config = ConfigDict(

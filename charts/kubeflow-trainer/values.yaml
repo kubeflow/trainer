@@ -145,10 +145,12 @@ manager:
         trainingRuntime: 1
         clusterTrainingRuntime: 1
     certManagement:
+      # -- Enable automatic TLS certificate management.
       enable: true
-      # webhookServiceName and webhookSecretName are auto-generated if not specified
-      webhookServiceName: ""
-      webhookSecretName: ""
+      # -- Service name for TLS certificate DNS SAN. Defaults to controller manager service name if empty.
+      serviceName: ""
+      # -- Secret name for storing TLS certificates. Defaults to "kubeflow-trainer-webhook-cert" if empty.
+      secretName: ""
     clientConnection:
       # -- QPS rate limit for the manager's Kubernetes API client. Accepts fractional values (e.g. 0.5).
       qps: 50
@@ -157,9 +159,9 @@ manager:
     statusServer:
       # -- Port that the TrainJob status server serves on.
       port: 10443
-      # -- QPS rate limit for the TrainJob Status Server api client
+      # -- QPS rate limit for the TrainJob status server API client, used for both token reviews and status updates
       qps: 5
-      # -- Burst rate limit for the TrainJob Status Server api client
+      # -- Burst rate limit for the TrainJob status server API client, used for both token reviews and status updates
       burst: 10
     featureGates: {}
 

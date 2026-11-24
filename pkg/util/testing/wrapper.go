@@ -485,6 +485,15 @@ func (j *JobSetWrapper) EnvFrom(rJobName, containerName string, envFrom ...corev
 	return j
 }
 
+func (j *JobSetWrapper) SchedulerName(rJobName, schedulerName string) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.SchedulerName = schedulerName
+		}
+	}
+	return j
+}
+
 func (j *JobSetWrapper) ServiceAccountName(rJobName string, serviceAccountName string) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == rJobName {
@@ -632,6 +641,7 @@ type OptimizationJobWrapper struct {
 }
 
 // MakeOptimizationJobWrapper creates an OptimizationJob with the supplied namespace and name.
+// The spec is populated with a minimal valid random search so callers only override what they test.
 func MakeOptimizationJobWrapper(namespace, name string) *OptimizationJobWrapper {
 	return &OptimizationJobWrapper{
 		OptimizationJob: trainer.OptimizationJob{
@@ -643,7 +653,31 @@ func MakeOptimizationJobWrapper(namespace, name string) *OptimizationJobWrapper 
 				Namespace: namespace,
 				Name:      name,
 			},
-			Spec: trainer.OptimizationJobSpec{},
+			Spec: trainer.OptimizationJobSpec{
+				NumTrials:      1,
+				ParallelTrials: 1,
+				Objectives: []trainer.Objective{{
+					Metric:    "accuracy",
+					Direction: trainer.ObjectiveDirectionMaximize,
+				}},
+				SearchAlgorithm: &trainer.SearchAlgorithm{
+					Random: &trainer.RandomAlgorithm{},
+				},
+				Parameters: []trainer.Parameter{{
+					Name: "lr",
+					SearchSpace: &trainer.SearchSpace{
+						Uniform: trainer.UniformSpace{
+							Min: "0.001",
+							Max: "0.1",
+						},
+					},
+				}},
+				TrainJobTemplate: trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						RuntimeRef: trainer.RuntimeRef{Name: "runtime"},
+					},
+				},
+			},
 		},
 	}
 }
@@ -1272,6 +1306,15 @@ func (s *TrainingRuntimeSpecWrapper) Replicas(replicas int32, rJobNames ...strin
 	return s
 }
 
+func (s *TrainingRuntimeSpecWrapper) SchedulerName(rJobName, schedulerName string) *TrainingRuntimeSpecWrapper {
+	for i, rJob := range s.Template.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			s.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.SchedulerName = schedulerName
+		}
+	}
+	return s
+}
+
 func (s *TrainingRuntimeSpecWrapper) InitContainer(rJobName, containerName, image string, envs ...corev1.EnvVar) *TrainingRuntimeSpecWrapper {
 	for i, rJob := range s.Template.Spec.ReplicatedJobs {
 		if rJob.Name == rJobName {
@@ -1387,6 +1430,11 @@ func (s *TrainingRuntimeSpecWrapper) PodGroupPolicyCoschedulingSchedulingTimeout
 		})
 	}
 	s.PodGroupPolicy.Coscheduling.ScheduleTimeoutSeconds = &timeout
+	return s
+}
+
+func (s *TrainingRuntimeSpecWrapper) Scheduling(scheduling *trainer.TrainingRuntimeScheduling) *TrainingRuntimeSpecWrapper {
+	s.TrainingRuntimeSpec.Scheduling = scheduling
 	return s
 }
 

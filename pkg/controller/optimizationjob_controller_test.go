@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -32,10 +33,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2/ktesting"
+	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -432,7 +437,7 @@ func TestBuildSuggestionRequest_ReconstructsTrialHistory(t *testing.T) {
 	}
 }
 
-func TestReconcile_OptimizationJobReconciler(t *testing.T) {
+func TestReconcileOptimizationJob(t *testing.T) {
 	serviceName := optimizationjob.GetAlgorithmServiceName(getBaseOptJob())
 	completedTrial := func(name string, metrics []trainer.Metric) *trainer.TrainJob {
 		return &trainer.TrainJob{
@@ -471,7 +476,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 		wantRequestNumber     int32
 		failPatchDeploy       bool
 		failCreateTrainJob    bool
-		wantRequeue           bool
+		wantResult            reconcile.Result
 		wantErr               bool
 		getWantOptJob         func() *trainer.OptimizationJob
 		wantTrainJobs         int
@@ -517,8 +522,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				}
 				return []client.Object{job}
 			},
-			wantRequeue: false,
-			wantErr:     false,
+			wantErr: false,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
 				job.Spec.SearchAlgorithm = &trainer.SearchAlgorithm{
@@ -539,7 +543,6 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 		},
 		"deploy algorithm service and wait when not ready": {
 			getInitObjects: func() []client.Object { return []client.Object{getBaseOptJob()} },
-			wantRequeue:    false,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
 				return job
@@ -552,7 +555,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 					{{Name: "lr", Value: "0.03"}},
 				},
 			},
-			wantRequeue: false,
+			wantResult: ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
 				job.Status = &trainer.OptimizationJobStatus{
@@ -585,6 +588,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			wantRequestNumber:   2,
 			wantSuggestionCalls: 1,
 			wantTrainJobs:       2,
+			wantResult:          ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
 				job.Spec.ParallelTrials = 2
@@ -682,7 +686,6 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 					},
 				}
 			},
-			wantRequeue: false,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
 				job.Status = &trainer.OptimizationJobStatus{
@@ -792,7 +795,6 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 					failedTrial2,
 				}
 			},
-			wantRequeue: false,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
 				job.Spec.NumTrials = 2
@@ -895,7 +897,6 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 					},
 				}
 			},
-			wantRequeue: false,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
 				job.Spec.Objectives = []trainer.Objective{
@@ -956,7 +957,6 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			searchAlgorithmClient: &mockSearchAlgorithmClient{
 				mockedAssignments: [][]trainer.ParameterAssignment{{{Name: "lr", Value: "0.99"}}},
 			},
-			wantRequeue: false,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
 				job.Spec.NumTrials = 5
@@ -981,8 +981,7 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			searchAlgorithmClient: &mockSearchAlgorithmClient{
 				err: fmt.Errorf("connection refused"),
 			},
-			wantRequeue: false,
-			wantErr:     true,
+			wantErr: true,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
 				job.Status = &trainer.OptimizationJobStatus{
@@ -1003,7 +1002,6 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 		"fail on algorithm service deployment creation": {
 			getInitObjects:  func() []client.Object { return []client.Object{getBaseOptJob()} },
 			failPatchDeploy: true,
-			wantRequeue:     false,
 			wantErr:         true,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
@@ -1016,7 +1014,6 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				mockedAssignments: [][]trainer.ParameterAssignment{{{Name: "lr", Value: "0.03"}}},
 			},
 			failCreateTrainJob:  true,
-			wantRequeue:         false,
 			wantErr:             true,
 			wantSuggestionCalls: 1,
 			getWantOptJob: func() *trainer.OptimizationJob {
@@ -1036,7 +1033,6 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 		},
 		"optimizationjob status is nil": {
 			getInitObjects: func() []client.Object { return []client.Object{getBaseOptJob()} },
-			wantRequeue:    false,
 			wantErr:        false,
 			getWantOptJob: func() *trainer.OptimizationJob {
 				job := getBaseOptJob()
@@ -1058,7 +1054,6 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				}
 				return []client.Object{job, optDeploy, optSvc}
 			},
-			wantRequeue:       false,
 			wantErr:           false,
 			wantDeployDeleted: true,
 			wantSvcDeleted:    true,
@@ -1121,8 +1116,12 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 			r := &OptimizationJobReconciler{
 				Client:                mockCli,
 				Scheme:                testScheme,
+				Log:                   ctrl.Log.WithName("optimizationjob-controller"),
 				Recorder:              &events.FakeRecorder{},
 				SearchAlgorithmClient: algorithmClient,
+				APIReader:             mockCli,
+				clock:                 clocktesting.NewFakePassiveClock(time.Now()),
+				pendingTrials:         make(map[types.NamespacedName]*trialCreationExpectations),
 			}
 
 			runtimeKey := types.NamespacedName{
@@ -1168,8 +1167,8 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				}
 			}
 
-			if (res.RequeueAfter != 0) != tc.wantRequeue {
-				t.Errorf("Reconcile() returned RequeueAfter=%v, want requeue=%v", res.RequeueAfter, tc.wantRequeue)
+			if diff := cmp.Diff(tc.wantResult, res); len(diff) != 0 {
+				t.Errorf("Unexpected Reconcile() result (-want, +got):\n%s", diff)
 			}
 
 			if err != nil {
@@ -1226,6 +1225,821 @@ func TestReconcile_OptimizationJobReconciler(t *testing.T) {
 				if !apierrors.IsNotFound(getErr) {
 					t.Errorf("expected Service to be deleted, got err: %v", getErr)
 				}
+			}
+		})
+	}
+}
+
+func TestReconcileTrialCreationExpectations(t *testing.T) {
+	getBaseOptJob := func() *trainer.OptimizationJob {
+		return &trainer.OptimizationJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-optjob",
+				Namespace: "default",
+				UID:       types.UID("optjob-uid"),
+			},
+			Spec: trainer.OptimizationJobSpec{
+				NumTrials:      3,
+				ParallelTrials: 2,
+				SearchAlgorithm: &trainer.SearchAlgorithm{
+					Random: &trainer.RandomAlgorithm{},
+				},
+			},
+		}
+	}
+
+	makeTrainJob := func(name string) *trainer.TrainJob {
+		return &trainer.TrainJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: "default",
+				OwnerReferences: []metav1.OwnerReference{{
+					APIVersion: trainer.GroupVersion.String(),
+					Kind:       trainer.OptimizationJobKind,
+					Name:       "test-optjob",
+					UID:        "optjob-uid",
+					Controller: ptr.To(true),
+				}},
+			},
+		}
+	}
+
+	getAlgorithmServiceAndDeploy := func(optJob *trainer.OptimizationJob) (*corev1.Service, *appsv1.Deployment) {
+		svcName := optimizationjob.GetAlgorithmServiceName(optJob)
+		svc := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: svcName, Namespace: optJob.Namespace}}
+		deploy := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{Name: svcName, Namespace: optJob.Namespace},
+			Status:     appsv1.DeploymentStatus{AvailableReplicas: 1},
+		}
+		return svc, deploy
+	}
+
+	optJobKey := types.NamespacedName{Name: "test-optjob", Namespace: "default"}
+
+	cases := map[string]struct {
+		objs                []client.Object
+		omitOptJob          bool
+		cachedTrainJobs     sets.Set[string]
+		pendingTrials       map[string]time.Duration // Maps trial name to age offset
+		failCreate          map[int]bool             // call index -> persisted?
+		liveReadErr         error
+		wantResult          ctrl.Result
+		wantErr             bool
+		wantSuggestionCalls int
+		wantRequestNumber   *int32
+		wantPendingTrials   int
+		wantTrainJobs       *int
+	}{
+		"hidden trials hold the parallel budget": {
+			cachedTrainJobs:   sets.New[string](),
+			pendingTrials:     map[string]time.Duration{"trial-1": 0, "trial-2": 0},
+			wantResult:        ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
+			wantPendingTrials: 2,
+		},
+		"partially observed trials hold budget": {
+			cachedTrainJobs:   sets.New[string]("trial-1"),
+			pendingTrials:     map[string]time.Duration{"trial-2": 0},
+			wantResult:        ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
+			wantPendingTrials: 1,
+		},
+		"overdue trial that is still live retains slot": {
+			objs:              []client.Object{makeTrainJob("trial-1")},
+			cachedTrainJobs:   sets.New[string](),
+			pendingTrials:     map[string]time.Duration{"trial-1": -40 * time.Second},
+			wantResult:        ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
+			wantPendingTrials: 1,
+		},
+		"overdue trial that was deleted frees its slot": {
+			objs:                []client.Object{},
+			cachedTrainJobs:     sets.New[string](),
+			pendingTrials:       map[string]time.Duration{"trial-1": -40 * time.Second},
+			wantResult:          ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
+			wantSuggestionCalls: 1,
+			wantPendingTrials:   2,
+		},
+		"overdue trial owned by another UID frees slot": {
+			objs: []client.Object{
+				&trainer.TrainJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "trial-1",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: trainer.GroupVersion.String(),
+							Kind:       trainer.OptimizationJobKind,
+							Name:       "test-optjob",
+							UID:        "different-uid",
+							Controller: ptr.To(true),
+						}},
+					},
+				},
+			},
+			cachedTrainJobs:     sets.New[string](),
+			pendingTrials:       map[string]time.Duration{"trial-1": -40 * time.Second},
+			wantResult:          ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
+			wantSuggestionCalls: 1,
+			wantPendingTrials:   2,
+		},
+		"live-read error retains slot": {
+			cachedTrainJobs:   sets.New[string](),
+			pendingTrials:     map[string]time.Duration{"trial-1": -40 * time.Second},
+			liveReadErr:       fmt.Errorf("api server down"),
+			wantErr:           true,
+			wantPendingTrials: 1,
+		},
+		"create rejected clears slot and returns error": {
+			failCreate:          map[int]bool{1: false, 2: false},
+			wantSuggestionCalls: 1,
+			wantErr:             true,
+			wantPendingTrials:   0,
+			wantTrainJobs:       ptr.To(0),
+		},
+		"retry after create rejected succeeds when slot was cleared": {
+			wantSuggestionCalls: 1,
+			wantResult:          ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
+			wantPendingTrials:   2,
+			wantTrainJobs:       ptr.To(2),
+		},
+		"response lost after object was saved retains slot": {
+			failCreate:          map[int]bool{1: true, 2: true},
+			wantSuggestionCalls: 1,
+			wantErr:             false,
+			wantResult:          ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
+			wantPendingTrials:   2,
+			wantTrainJobs:       ptr.To(2),
+		},
+		"partial batch create failure retains succeeded trial": {
+			cachedTrainJobs:     sets.New[string](),
+			failCreate:          map[int]bool{2: false},
+			wantSuggestionCalls: 1,
+			wantErr:             true,
+			wantPendingTrials:   1,
+			wantTrainJobs:       ptr.To(1),
+		},
+		"retry while succeeded trial is still hidden delays spawning more trials": {
+			objs:              []client.Object{makeTrainJob("trial-1")},
+			cachedTrainJobs:   sets.New[string](),
+			pendingTrials:     map[string]time.Duration{"trial-1": 0},
+			wantResult:        ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
+			wantPendingTrials: 1,
+			wantTrainJobs:     ptr.To(1),
+		},
+		"retry after succeeded trial is observed by cache requests remaining trial": {
+			objs:                []client.Object{makeTrainJob("trial-1")},
+			cachedTrainJobs:     sets.New[string]("trial-1"),
+			pendingTrials:       map[string]time.Duration{"trial-1": 0},
+			wantResult:          ctrl.Result{RequeueAfter: trialCacheRequeueDelay},
+			wantSuggestionCalls: 1,
+			wantRequestNumber:   ptr.To[int32](1),
+			wantPendingTrials:   1,
+			wantTrainJobs:       ptr.To(2),
+		},
+		"expectations cleared on job Complete": {
+			objs: []client.Object{
+				&trainer.OptimizationJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-optjob",
+						Namespace: metav1.NamespaceDefault,
+						UID:       types.UID("optjob-uid"),
+					},
+					Spec: trainer.OptimizationJobSpec{
+						NumTrials:      3,
+						ParallelTrials: 2,
+						SearchAlgorithm: &trainer.SearchAlgorithm{
+							Random: &trainer.RandomAlgorithm{},
+						},
+					},
+					Status: &trainer.OptimizationJobStatus{
+						Conditions: []metav1.Condition{
+							{Type: constants.OptimizationJobComplete, Status: metav1.ConditionTrue},
+						},
+					},
+				},
+			},
+			pendingTrials:     map[string]time.Duration{"trial-1": 0},
+			wantPendingTrials: 0,
+		},
+		"expectations cleared on job Failed": {
+			objs: []client.Object{
+				&trainer.TrainJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "failed-trial",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: trainer.GroupVersion.String(),
+							Kind:       trainer.OptimizationJobKind,
+							Name:       "test-optjob",
+							UID:        "optjob-uid",
+							Controller: ptr.To(true),
+						}},
+					},
+					Status: trainer.TrainJobStatus{
+						Conditions: []metav1.Condition{
+							{Type: trainer.TrainJobFailed, Status: metav1.ConditionTrue},
+						},
+					},
+				},
+			},
+			pendingTrials:     map[string]time.Duration{"trial-1": 0},
+			wantPendingTrials: 0,
+		},
+		"expectations cleared on unsupported algorithm": {
+			objs: []client.Object{
+				&trainer.OptimizationJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-optjob",
+						Namespace: metav1.NamespaceDefault,
+						UID:       types.UID("optjob-uid"),
+					},
+					Spec: trainer.OptimizationJobSpec{
+						NumTrials:       3,
+						ParallelTrials:  2,
+						SearchAlgorithm: &trainer.SearchAlgorithm{},
+					},
+				},
+			},
+			pendingTrials:     map[string]time.Duration{"trial-1": 0},
+			wantPendingTrials: 0,
+		},
+		"expectations cleared when OptimizationJob not found": {
+			omitOptJob:        true,
+			pendingTrials:     map[string]time.Duration{"trial-1": 0},
+			wantPendingTrials: 0,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			optJob := getBaseOptJob()
+			svc, deploy := getAlgorithmServiceAndDeploy(optJob)
+
+			hasOptJob := false
+			for _, obj := range tc.objs {
+				if _, ok := obj.(*trainer.OptimizationJob); ok {
+					hasOptJob = true
+					break
+				}
+			}
+
+			initObjs := tc.objs
+			if !tc.omitOptJob && !hasOptJob {
+				initObjs = append(initObjs, optJob, svc, deploy)
+			} else if !tc.omitOptJob {
+				initObjs = append(initObjs, svc, deploy)
+			}
+
+			builder := utiltesting.NewClientBuilder().
+				WithStatusSubresource(&trainer.OptimizationJob{}, &trainer.TrainJob{}, &appsv1.Deployment{}).
+				WithObjects(initObjs...)
+
+			if err := SetupIndexes(ctx, utiltesting.AsIndex(builder)); err != nil {
+				t.Fatalf("Failed to setup indexes: %v", err)
+			}
+			baseClient := builder.Build()
+
+			cachedTrainJobs := tc.cachedTrainJobs
+			failCreate := tc.failCreate
+			liveReadErr := tc.liveReadErr
+			var createCalls int
+
+			clientWithInterceptors := interceptor.NewClient(baseClient, interceptor.Funcs{
+				List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+					if err := c.List(ctx, list, opts...); err != nil {
+						return err
+					}
+					if tjList, ok := list.(*trainer.TrainJobList); ok && cachedTrainJobs != nil {
+						var filtered []trainer.TrainJob
+						for _, tj := range tjList.Items {
+							if cachedTrainJobs.Has(tj.Name) {
+								filtered = append(filtered, tj)
+							}
+						}
+						tjList.Items = filtered
+					}
+					return nil
+				},
+				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					if _, ok := obj.(*trainer.TrainJob); ok {
+						createCalls++
+						if failCreate != nil {
+							if persisted, shouldFail := failCreate[createCalls]; shouldFail {
+								if persisted {
+									_ = c.Create(ctx, obj, opts...)
+								}
+								return fmt.Errorf("simulated Create error on call %d", createCalls)
+							}
+						}
+					}
+					return c.Create(ctx, obj, opts...)
+				},
+			})
+
+			var apiReader client.Reader = baseClient
+			if liveReadErr != nil {
+				apiReader = interceptor.NewClient(baseClient, interceptor.Funcs{
+					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, ok := obj.(*trainer.TrainJob); ok {
+							return liveReadErr
+						}
+						return c.Get(ctx, key, obj, opts...)
+					},
+				})
+			}
+
+			suggestions := &mockSearchAlgorithmClient{
+				mockedAssignments: [][]trainer.ParameterAssignment{
+					{{Name: "lr", Value: "0.01"}},
+					{{Name: "lr", Value: "0.02"}},
+				},
+			}
+
+			now := time.Now()
+			r := &OptimizationJobReconciler{
+				Client:                clientWithInterceptors,
+				Scheme:                baseClient.Scheme(),
+				Recorder:              &events.FakeRecorder{},
+				SearchAlgorithmClient: suggestions,
+				APIReader:             apiReader,
+				clock:                 clocktesting.NewFakePassiveClock(now),
+				pendingTrials:         make(map[types.NamespacedName]*trialCreationExpectations),
+			}
+
+			if len(tc.pendingTrials) > 0 {
+				r.pendingTrials[optJobKey] = &trialCreationExpectations{
+					uid:   optJob.UID,
+					names: make(map[string]time.Time),
+				}
+				for name, ageOffset := range tc.pendingTrials {
+					r.pendingTrials[optJobKey].names[name] = now.Add(ageOffset)
+				}
+			}
+
+			req := reconcile.Request{NamespacedName: optJobKey}
+			res, err := r.Reconcile(ctx, req)
+
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Reconcile() error = %v, wantErr %v", err, tc.wantErr)
+			}
+			if diff := cmp.Diff(tc.wantResult, res); len(diff) != 0 {
+				t.Errorf("Unexpected Reconcile() result (-want, +got): \n%s", diff)
+			}
+			if suggestions.calls != tc.wantSuggestionCalls {
+				t.Errorf("suggestion calls = %d, want %d", suggestions.calls, tc.wantSuggestionCalls)
+			}
+			if tc.wantRequestNumber != nil {
+				if suggestions.lastReq == nil {
+					t.Fatalf("lastReq is nil, want request number %d", *tc.wantRequestNumber)
+				}
+				if suggestions.lastReq.CurrentRequestNumber != *tc.wantRequestNumber {
+					t.Errorf("last request number = %d, want %d", suggestions.lastReq.CurrentRequestNumber, *tc.wantRequestNumber)
+				}
+			}
+
+			gotPending := 0
+			if exps, ok := r.pendingTrials[optJobKey]; ok {
+				gotPending = len(exps.names)
+			}
+			if diff := cmp.Diff(tc.wantPendingTrials, gotPending); len(diff) != 0 {
+				t.Errorf("Unexpected pending trials count (-want, +got): \n%s", diff)
+			}
+
+			if tc.wantTrainJobs != nil {
+				var trainJobs trainer.TrainJobList
+				if err := baseClient.List(ctx, &trainJobs, client.InNamespace("default")); err != nil {
+					t.Fatalf("Failed to list TrainJobs from baseClient: %v", err)
+				}
+				if len(trainJobs.Items) != *tc.wantTrainJobs {
+					t.Errorf("TrainJobs count in baseClient = %d, want %d", len(trainJobs.Items), *tc.wantTrainJobs)
+				}
+			}
+		})
+	}
+}
+
+func TestExpectTrialCreation(t *testing.T) {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	key := types.NamespacedName{Namespace: "default", Name: "test-optjob"}
+	otherKey := types.NamespacedName{Namespace: "default", Name: "other-optjob"}
+
+	cases := map[string]struct {
+		initPending map[types.NamespacedName]*trialCreationExpectations
+		key         types.NamespacedName
+		uid         types.UID
+		name        string
+		wantPending map[types.NamespacedName]*trialCreationExpectations
+	}{
+		"add trial to empty pendingTrials": {
+			key:  key,
+			uid:  "uid-1",
+			name: "trial-1",
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+			},
+		},
+		"add trial to existing expectation with same UID": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+			},
+			key:  key,
+			uid:  "uid-1",
+			name: "trial-2",
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now, "trial-2": now}},
+			},
+		},
+		"replace expectation if UID changes": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "old-uid", names: map[string]time.Time{"old-trial": now}},
+			},
+			key:  key,
+			uid:  "new-uid",
+			name: "new-trial",
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "new-uid", names: map[string]time.Time{"new-trial": now}},
+			},
+		},
+		"add trial for different key preserves existing": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+			},
+			key:  otherKey,
+			uid:  "uid-2",
+			name: "other-trial",
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				key:      {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+				otherKey: {uid: "uid-2", names: map[string]time.Time{"other-trial": now}},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			r := &OptimizationJobReconciler{
+				clock:         clocktesting.NewFakePassiveClock(now),
+				pendingTrials: tc.initPending,
+			}
+			r.expectTrialCreation(tc.key, tc.uid, tc.name)
+			if diff := cmp.Diff(tc.wantPending, r.pendingTrials, cmp.AllowUnexported(trialCreationExpectations{})); len(diff) != 0 {
+				t.Errorf("Unexpected pendingTrials (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestForgetTrialCreation(t *testing.T) {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	key := types.NamespacedName{Namespace: "default", Name: "test-optjob"}
+
+	cases := map[string]struct {
+		initPending map[types.NamespacedName]*trialCreationExpectations
+		key         types.NamespacedName
+		name        string
+		wantPending map[types.NamespacedName]*trialCreationExpectations
+	}{
+		"forget one of multiple trials leaves others": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now, "trial-2": now}},
+			},
+			key:  key,
+			name: "trial-1",
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-2": now}},
+			},
+		},
+		"forget last trial removes key from pendingTrials": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+			},
+			key:         key,
+			name:        "trial-1",
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{},
+		},
+		"forget nonexistent trial is no-op": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+			},
+			key:  key,
+			name: "nonexistent",
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+			},
+		},
+		"forget on nonexistent key is no-op": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{},
+			key:         key,
+			name:        "trial-1",
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			r := &OptimizationJobReconciler{
+				pendingTrials: tc.initPending,
+			}
+			r.forgetTrialCreation(tc.key, tc.name)
+			if diff := cmp.Diff(tc.wantPending, r.pendingTrials, cmp.AllowUnexported(trialCreationExpectations{})); len(diff) != 0 {
+				t.Errorf("Unexpected pendingTrials (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestObserveTrialCreations(t *testing.T) {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	key := types.NamespacedName{Namespace: "default", Name: "test-optjob"}
+
+	cases := map[string]struct {
+		initPending map[types.NamespacedName]*trialCreationExpectations
+		key         types.NamespacedName
+		uid         types.UID
+		trainJobs   []trainer.TrainJob
+		clockOffset time.Duration
+		wantOverdue []string
+		wantPending map[types.NamespacedName]*trialCreationExpectations
+	}{
+		"no expectations returns nil": {
+			key:         key,
+			uid:         "uid-1",
+			wantOverdue: nil,
+			wantPending: nil,
+		},
+		"UID mismatch deletes expectations and returns nil": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "old-uid", names: map[string]time.Time{"trial-1": now}},
+			},
+			key:         key,
+			uid:         "new-uid",
+			wantOverdue: nil,
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{},
+		},
+		"observed trial is removed from expectations": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now, "trial-2": now}},
+			},
+			key: key,
+			uid: "uid-1",
+			trainJobs: []trainer.TrainJob{
+				{ObjectMeta: metav1.ObjectMeta{Name: "trial-1"}},
+			},
+			wantOverdue: nil,
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-2": now}},
+			},
+		},
+		"all observed trials deletes expectations entry": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+			},
+			key: key,
+			uid: "uid-1",
+			trainJobs: []trainer.TrainJob{
+				{ObjectMeta: metav1.ObjectMeta{Name: "trial-1"}},
+			},
+			wantOverdue: nil,
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{},
+		},
+		"unobserved trial overdue returns overdue name": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+			},
+			key:         key,
+			uid:         "uid-1",
+			clockOffset: trialExpectationVerifyDelay + time.Second,
+			wantOverdue: []string{"trial-1"},
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+			},
+		},
+		"unobserved trial not yet overdue returns nil": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+			},
+			key:         key,
+			uid:         "uid-1",
+			clockOffset: trialExpectationVerifyDelay - time.Second,
+			wantOverdue: nil,
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			r := &OptimizationJobReconciler{
+				clock:         clocktesting.NewFakePassiveClock(now.Add(tc.clockOffset)),
+				pendingTrials: tc.initPending,
+			}
+			gotOverdue := r.observeTrialCreations(tc.key, tc.uid, tc.trainJobs)
+			if diff := cmp.Diff(tc.wantOverdue, gotOverdue); len(diff) != 0 {
+				t.Errorf("Unexpected overdue (-want, +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantPending, r.pendingTrials, cmp.AllowUnexported(trialCreationExpectations{})); len(diff) != 0 {
+				t.Errorf("Unexpected pendingTrials (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestVerifyPendingTrialCreations(t *testing.T) {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	optJob := &trainer.OptimizationJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-optjob",
+			Namespace: "default",
+			UID:       "optjob-uid",
+		},
+	}
+	key := client.ObjectKeyFromObject(optJob)
+
+	cases := map[string]struct {
+		objs        []client.Object
+		readerErr   error
+		overdue     []string
+		initPending map[types.NamespacedName]*trialCreationExpectations
+		optJobUID   types.UID
+		wantCount   int32
+		wantErr     bool
+		wantPending map[types.NamespacedName]*trialCreationExpectations
+	}{
+		"overdue trial NotFound releases expectation": {
+			overdue: []string{"trial-1"},
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "optjob-uid", names: map[string]time.Time{"trial-1": now}},
+			},
+			optJobUID:   "optjob-uid",
+			wantCount:   0,
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{},
+		},
+		"overdue trial live with matching owner UID is retained": {
+			objs: []client.Object{
+				&trainer.TrainJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "trial-1",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: trainer.GroupVersion.String(),
+							Kind:       trainer.OptimizationJobKind,
+							Name:       "test-optjob",
+							UID:        "optjob-uid",
+							Controller: ptr.To(true),
+						}},
+					},
+				},
+			},
+			overdue: []string{"trial-1"},
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "optjob-uid", names: map[string]time.Time{"trial-1": now}},
+			},
+			optJobUID: "optjob-uid",
+			wantCount: 1,
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "optjob-uid", names: map[string]time.Time{"trial-1": now}},
+			},
+		},
+		"overdue trial live with different owner UID releases expectation": {
+			objs: []client.Object{
+				&trainer.TrainJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "trial-1",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: trainer.GroupVersion.String(),
+							Kind:       trainer.OptimizationJobKind,
+							Name:       "test-optjob",
+							UID:        "different-uid",
+							Controller: ptr.To(true),
+						}},
+					},
+				},
+			},
+			overdue: []string{"trial-1"},
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "optjob-uid", names: map[string]time.Time{"trial-1": now}},
+			},
+			optJobUID:   "optjob-uid",
+			wantCount:   0,
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{},
+		},
+		"overdue trial live without controller owner releases expectation": {
+			objs: []client.Object{
+				&trainer.TrainJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "trial-1",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{{
+							UID: "optjob-uid",
+						}},
+					},
+				},
+			},
+			overdue: []string{"trial-1"},
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "optjob-uid", names: map[string]time.Time{"trial-1": now}},
+			},
+			optJobUID:   "optjob-uid",
+			wantCount:   0,
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{},
+		},
+		"live read error returns error without modifying expectations": {
+			readerErr: fmt.Errorf("api connection error"),
+			overdue:   []string{"trial-1"},
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "optjob-uid", names: map[string]time.Time{"trial-1": now}},
+			},
+			optJobUID: "optjob-uid",
+			wantErr:   true,
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "optjob-uid", names: map[string]time.Time{"trial-1": now}},
+			},
+		},
+		"pending trials UID mismatch returns 0": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "other-uid", names: map[string]time.Time{"trial-1": now}},
+			},
+			optJobUID: "optjob-uid",
+			wantCount: 0,
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "other-uid", names: map[string]time.Time{"trial-1": now}},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			baseClient := utiltesting.NewClientBuilder().WithObjects(tc.objs...).Build()
+			var reader client.Reader = baseClient
+			if tc.readerErr != nil {
+				reader = interceptor.NewClient(baseClient, interceptor.Funcs{
+					Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						return tc.readerErr
+					},
+				})
+			}
+			job := optJob.DeepCopy()
+			if tc.optJobUID != "" {
+				job.UID = tc.optJobUID
+			}
+			r := &OptimizationJobReconciler{
+				Client:        baseClient,
+				APIReader:     reader,
+				pendingTrials: tc.initPending,
+			}
+			gotCount, err := r.verifyPendingTrialCreations(ctx, job, tc.overdue)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("verifyPendingTrialCreations() error = %v, wantErr %v", err, tc.wantErr)
+			}
+			if gotCount != tc.wantCount {
+				t.Errorf("verifyPendingTrialCreations() count = %d, want %d", gotCount, tc.wantCount)
+			}
+			if diff := cmp.Diff(tc.wantPending, r.pendingTrials, cmp.AllowUnexported(trialCreationExpectations{})); len(diff) != 0 {
+				t.Errorf("Unexpected pendingTrials (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestClearTrialExpectations(t *testing.T) {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	key := types.NamespacedName{Namespace: "default", Name: "test-optjob"}
+	otherKey := types.NamespacedName{Namespace: "default", Name: "other-optjob"}
+
+	cases := map[string]struct {
+		initPending map[types.NamespacedName]*trialCreationExpectations
+		key         types.NamespacedName
+		wantPending map[types.NamespacedName]*trialCreationExpectations
+	}{
+		"clear existing key removes entry from map": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key:      {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+				otherKey: {uid: "uid-2", names: map[string]time.Time{"other-trial": now}},
+			},
+			key: key,
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				otherKey: {uid: "uid-2", names: map[string]time.Time{"other-trial": now}},
+			},
+		},
+		"clear nonexistent key is no-op": {
+			initPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+			},
+			key: otherKey,
+			wantPending: map[types.NamespacedName]*trialCreationExpectations{
+				key: {uid: "uid-1", names: map[string]time.Time{"trial-1": now}},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			r := &OptimizationJobReconciler{
+				pendingTrials: tc.initPending,
+			}
+			r.clearTrialExpectations(tc.key)
+			if diff := cmp.Diff(tc.wantPending, r.pendingTrials, cmp.AllowUnexported(trialCreationExpectations{})); len(diff) != 0 {
+				t.Errorf("Unexpected pendingTrials (-want, +got):\n%s", diff)
 			}
 		})
 	}

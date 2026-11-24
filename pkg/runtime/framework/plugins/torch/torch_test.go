@@ -362,7 +362,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "test:image",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -416,7 +417,7 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Obj(),
 				),
 				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.Node)),
+					WithContainers(corev1ac.Container().WithName(constants.Node).WithImage("test:runtime")),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -434,7 +435,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "test:image",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -508,7 +510,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "test:image",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -582,7 +585,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "test:image",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -656,7 +660,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "test:image",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -730,7 +735,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "test:image",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -804,7 +810,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "test:image",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -879,7 +886,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "test:image",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -953,7 +961,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "test:image",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -1027,7 +1036,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "test:image",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -1102,7 +1112,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "test:image",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -1176,7 +1187,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "test:image",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -1260,7 +1272,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](4),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -1351,7 +1364,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "ghcr.io/kubeflow/trainer/torchtune-trainer",
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
 									Name:  ptr.To(constants.TorchEnvNumNodes),
@@ -1435,7 +1449,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "ghcr.io/kubeflow/trainer/torchtune-trainer",
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
 									Name:  ptr.To(constants.TorchEnvNumNodes),
@@ -1519,7 +1534,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 						Count:             ptr.To[int32](2),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "ghcr.io/kubeflow/trainer/torchtune-trainer",
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
 									Name:  ptr.To(constants.TorchEnvNumNodes),
@@ -1858,7 +1874,8 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 							},
 						}},
 						Containers: []runtime.Container{{
-							Name: constants.Node,
+							Name:  constants.Node,
+							Image: "ghcr.io/kubeflow/trainer/torchtune-trainer",
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -2383,6 +2400,34 @@ func TestTorchValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Obj(),
 		},
+		"trainer replicatedJob with multiple replicas is not supported": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().TorchPolicy().Obj()).
+					Obj(),
+				),
+				runtime.WithTemplateSpecObjApply(jobsetv1alpha2ac.JobSetSpec().
+					WithReplicatedJobs(jobsetv1alpha2ac.ReplicatedJob().
+						WithName(constants.Node).
+						WithReplicas(2).
+						WithTemplate(batchv1ac.JobTemplateSpec().
+							WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}).
+							WithSpec(batchv1ac.JobSpec().
+								WithTemplate(corev1ac.PodTemplateSpec().
+									WithSpec(corev1ac.PodSpec()),
+								),
+							),
+						),
+					),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "runtimeRef"), int32(2),
+					"trainer replicatedJob replicas must be 1 for the Torch runtime"),
+			},
+		},
 		"envInjection target container does not exist": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
@@ -2697,6 +2742,44 @@ func TestTorchValidate(t *testing.T) {
 				),
 			},
 		},
+		"lora is rejected when multiple nodes are inherited from the runtime": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy().
+						Obj(),
+					).
+					Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 2, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					Container(
+						"ghcr.io/kubeflow/trainer/torchtune-trainer",
+						[]string{"tune", "run"},
+						[]string{
+							"model.lora_attn_modules=[q_proj, v_proj, output_proj]",
+						},
+						corev1.ResourceList{},
+					).
+					Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.3-70b",
+				).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("numNodes"),
+					int32(2),
+					"LoRA fine-tuning is not supported for multi-node training in TorchTune",
+				),
+			},
+		},
 		"lora is supported for single-node training in torchtune": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
@@ -2705,6 +2788,9 @@ func TestTorchValidate(t *testing.T) {
 						Obj(),
 					).
 					Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 2, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").

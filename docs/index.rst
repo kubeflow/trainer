@@ -12,7 +12,7 @@
    <div class="hero-badge">Open Source &middot; CNCF Project</div>
    <h1 class="hero-title">Kubeflow Trainer</h1>
    <img class="hero-logo" src="_images/trainer-logo.svg" alt="Kubeflow Trainer" />
-   <p class="hero-tagline">The Kubernetes-native platform for distributed AI training and LLM fine-tuning at any scale.</p>
+   <p class="hero-tagline">The Kubernetes-native platform for distributed AI training, optimization, and LLM fine-tuning at any scale.</p>
    <div class="hero-actions">
    <a href="getting-started/index.html" class="btn btn-primary">Get Started <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
    <a href="https://github.com/kubeflow/trainer" class="btn btn-secondary">GitHub</a>
@@ -23,7 +23,7 @@
 
    <section class="what-is">
    <h2 class="section-title">What is Kubeflow Trainer?</h2>
-   <p class="section-desc">Kubeflow Trainer is a Kubernetes-native platform for distributed AI model training and LLM fine-tuning. It provides a single TrainJob CRD and a unified Python SDK across PyTorch, JAX, DeepSpeed, MLX, HuggingFace, Megatron, and XGBoost. Train locally with Docker or scale to multi-node GPU clusters on any Kubernetes environment &mdash; without changing your code. It features distributed data caching with Apache Arrow and Apache DataFusion for zero-copy tensor streaming directly to GPU nodes.</p>
+   <p class="section-desc">Kubeflow Trainer is a Kubernetes-native distributed AI platform for scalable LLM fine-tuning, hyperparameter optimization, and training of AI models across a wide range of frameworks, including PyTorch, MLX, HuggingFace, DeepSpeed, Megatron-LM, JAX, XGBoost, and more. Train locally with Docker or scale to multi-node GPU clusters on any Kubernetes environment &mdash; without changing your code. It features distributed data caching with Apache Arrow and Apache DataFusion for zero-copy tensor streaming directly to GPU nodes.</p>
    </section>
 
    <section class="features">
@@ -63,7 +63,7 @@
    <div class="feature-card">
    <div class="feature-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--lp-blue)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
    <h3>Production Ready</h3>
-   <p>Used in production by organizations across the CNCF ecosystem. See <a href="https://github.com/kubeflow/trainer/blob/master/ADOPTERS.md">ADOPTERS.md</a> for adopters. Backed by the Kubeflow community with enterprise support.</p>
+   <p>Used in production by organizations across the CNCF ecosystem. See <a href="community/adopters.html">the adopters directory</a>. Backed by the Kubeflow community with enterprise support.</p>
    </div>
 
    </div>
@@ -103,8 +103,8 @@
    <strong>Operator Guides</strong>
    <p>Documentation for platform administrators deploying and managing Kubeflow Trainer</p>
    </a>
-   <a class="doc-card" href="contributor-guides/index.html">
-   <strong>Contributor Guides</strong>
+   <a class="doc-card" href="contributor-guides/contributing.html">
+   <strong>Contributor Guide</strong>
    <p>Architecture, development workflow, and how to extend Kubeflow Trainer</p>
    </a>
    <a class="doc-card" href="legacy-v1/index.html">
@@ -163,5 +163,6 @@
    getting-started/index
    user-guides/index
    operator-guides/index
-   contributor-guides/index
+   Contributor Guide <contributor-guides/contributing>
+   Community <community/index>
    legacy-v1/index

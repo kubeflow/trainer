@@ -1,10 +1,10 @@
 # Operator Guides
 
-*Documentation for platform administrators deploying and managing Kubeflow Trainer in production.*
+_Documentation for platform administrators deploying and managing Kubeflow Trainer in production._
 
 This section contains guides for installing, configuring, and operating Kubeflow Trainer in Kubernetes clusters.
 
-----
+---
 
 ## Installation & Migration
 
@@ -67,6 +67,13 @@ Customize training runtime configuration with RuntimePatches
 Use Kubernetes DRA to allocate hardware resources for TrainJobs
 ::::
 
+::::{grid-item-card} Workload-Aware Scheduling
+:link: workload-aware-scheduling
+:link-type: doc
+
+Workload-Aware Scheduling for TrainJobs with the Kubernetes Workload and PodGroup APIs
+::::
+
 :::::
 
 ## Advanced Configuration
@@ -90,7 +97,7 @@ Integrate with Kueue, Slurm Bridge, KAI Scheduler, Coscheduling, and Volcano
 
 :::::
 
-----
+---
 
 ```{toctree}
 :hidden:
@@ -103,6 +110,7 @@ ml-policy
 job-template
 runtime-patches
 dynamic-resource-allocation
+workload-aware-scheduling
 extension-framework
 job-scheduling/index
 ```

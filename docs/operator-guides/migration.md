@@ -236,13 +236,12 @@ The `TrainJob` provides:
 - `trainer.numNodes`: specifies the number of training nodes.
 - `trainer.numProcPerNode`: specifies the number of MPI processes or slots per node and overrides
   the value configured in the runtime. For MPI, this must be an integer.
-- `trainer.image`: specifies the container image used by the runtime's trainer container, typically
-  the launcher. It does not replace the runtime's worker/node image.
+- `trainer.image`: specifies the container image of the launcher and of the worker nodes, so all
+  MPI processes run the same application and MPI versions.
 - `trainer.command`: specifies the training command.
 
-To use a custom MPI image for worker nodes, the platform administrator must create a
-`TrainingRuntime` or `ClusterTrainingRuntime` whose node containers provide the required SSH
-environment.
+The worker nodes keep the command of the runtime, which starts the SSH server, so a custom image
+must provide the SSH environment that the runtime expects.
 
 The MPI runtime provides the distributed-training environment, including the launcher/worker
 topology, SSH communication configuration, and hostfile generation. The MPI plugin configures

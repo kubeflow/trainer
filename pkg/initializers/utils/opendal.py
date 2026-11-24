@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Optional
 
 import opendal
+from opendal.exceptions import NotFound
 
 
 class OpenDALStorage(ABC):
@@ -86,21 +87,18 @@ class S3Storage(OpenDALStorage):
             destination = Path(destination_path)
             destination.mkdir(parents=True, exist_ok=True)
 
-            # List all objects with the given prefix
-            entries = self.op.list(prefix, recursive=True)
+            keys = self._resolve_keys(prefix)
+            base = prefix.rstrip("/")
 
-            for entry in entries:
-                if entry.metadata.is_dir:
-                    continue
-
-                key = entry.path
+            downloaded = 0
+            for key in keys:
                 if ignore_patterns:
                     if any(fnmatch.fnmatch(key, p) for p in ignore_patterns):
                         logging.info(f"Skipping ignored file: {key}")
                         continue
 
                 # Create relative path from the prefix
-                relative_path = key[len(prefix) :].lstrip("/")
+                relative_path = key[len(base) :].lstrip("/")
                 if not relative_path:
                     # If prefix matches exactly, use the filename
                     relative_path = Path(key).name
@@ -115,9 +113,56 @@ class S3Storage(OpenDALStorage):
                 data = self.op.read(key)
                 with open(file_destination_path, "wb") as f:
                     f.write(data)
+                downloaded += 1
+
+            if downloaded == 0:
+                logging.warning(
+                    f"All {len(keys)} objects under s3://{self.bucket}/{prefix} "
+                    "were skipped by the ignore patterns, nothing was downloaded"
+                )
 
         except Exception as e:
             logging.error(f"Unexpected error downloading files: {e}")
             raise
 
         logging.info("Files have been downloaded")
+
+    def _resolve_keys(self, prefix: str) -> list[str]:
+        """Return the object keys that the prefix refers to.
+
+        OpenDAL lists by prefix, like S3 ListObjectsV2, so listing "models/llama"
+        would also return "models/llama-2/...". Follow the OpenDAL convention
+        instead: a path without a trailing "/" names an object, and a path with
+        one names a directory. A path without a trailing "/" that is not an object
+        falls back to the directory with the same name, and the exact object takes
+        precedence when both exist.
+        """
+        base = prefix.rstrip("/")
+
+        if base and not prefix.endswith("/") and self._is_object(base):
+            return [base]
+
+        directory = f"{base}/" if base else "/"
+        keys = [
+            entry.path
+            for entry in self.op.list(directory, recursive=True)
+            if not entry.metadata.is_dir
+        ]
+        if keys:
+            return keys
+
+        location = f"s3://{self.bucket}/{base}"
+        if base and not prefix.endswith("/"):
+            message = f"No object at {location} and no objects under {location}/"
+        else:
+            message = f"No objects under {location}/"
+        raise FileNotFoundError(
+            f"{message}. Objects are matched by their exact key or by directory, "
+            "not by a partial name prefix."
+        )
+
+    def _is_object(self, key: str) -> bool:
+        try:
+            return bool(self.op.stat(key).is_file)
+        except NotFound:
+            return False

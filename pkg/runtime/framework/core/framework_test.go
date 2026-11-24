@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"testing"
@@ -31,11 +32,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
@@ -47,6 +51,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
@@ -128,6 +133,9 @@ func TestNew(t *testing.T) {
 					&volcano.Volcano{},
 					&jobset.JobSet{},
 					&mpi.MPI{},
+				},
+				componentDeleterPlugins: []framework.ComponentDeleterPlugin{
+					&volcano.Volcano{},
 				},
 				trainJobStatusPlugin: &jobset.JobSet{},
 			},
@@ -1012,7 +1020,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithArgs("args:openssh").
 														WithCommand("command:openssh").
 														WithResources(nodeContainerRequests("1", "4Gi")).
-														WithImage("test:openssh").
+														WithImage("test:trainjob").
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -1111,7 +1119,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
 							Containers: []runtime.Container{{
-								Name: constants.Node,
+								Name:  constants.Node,
+								Image: "test:trainjob",
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 									*corev1ac.VolumeMount().
 										WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -1201,7 +1210,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
 							Containers: []runtime.Container{{
-								Name: constants.Node,
+								Name:  constants.Node,
+								Image: "test:trainjob",
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 									*corev1ac.VolumeMount().
 										WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -1398,7 +1408,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 						corev1.ResourceCPU:    resource.MustParse("1"),
 						corev1.ResourceMemory: resource.MustParse("4Gi"),
 					}).
-					Container(constants.Node, constants.Node, "test:openssh", []string{"command:openssh"}, []string{"args:openssh"}, corev1.ResourceList{
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"command:openssh"}, []string{"args:openssh"}, corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("1"),
 						corev1.ResourceMemory: resource.MustParse("4Gi"),
 					}).
@@ -1498,6 +1508,7 @@ test-job-node-0-1.test-job slots=1
 								corev1.ResourceMemory: resource.MustParse("8Gi"),
 							},
 							Containers: []runtime.Container{{
+								Name: constants.Node,
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 									*corev1ac.VolumeMount().
 										WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -1805,6 +1816,8 @@ test-job-node-0-1.test-job slots=1
 								corev1.ResourceMemory: resource.MustParse("8Gi"),
 							},
 							Containers: []runtime.Container{{
+								Name:  constants.Node,
+								Image: "test:trainjob",
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 									*corev1ac.VolumeMount().
 										WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -1923,6 +1936,7 @@ test-job-node-0-1.test-job slots=1
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
 							Containers: []runtime.Container{{
+								Name: constants.Node,
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 									*corev1ac.VolumeMount().
 										WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -2125,6 +2139,8 @@ test-job-node-0-1.test-job slots=1
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
 							Containers: []runtime.Container{{
+								Name:  constants.Node,
+								Image: "test:trainjob",
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 									*corev1ac.VolumeMount().
 										WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -2358,6 +2374,101 @@ test-job-node-0-1.test-job slots=1
 			}
 
 			if diff := cmp.Diff(tc.wantObjs, resultObjs, cmpOpts...); len(diff) != 0 {
+				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRunComponentDeleterPlugins(t *testing.T) {
+	ownedPodGroup := &volcanov1beta1.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-trainjob",
+			Namespace: metav1.NamespaceDefault,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         trainer.GroupVersion.String(),
+					Kind:               trainer.TrainJobKind,
+					Name:               "test-trainjob",
+					UID:                "1",
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+		},
+	}
+	failedTrainJob := &trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob", Namespace: metav1.NamespaceDefault, UID: "1"},
+		Status: trainer.TrainJobStatus{
+			Conditions: []metav1.Condition{
+				{Type: trainer.TrainJobFailed, Status: metav1.ConditionTrue},
+			},
+		},
+	}
+	runningTrainJob := &trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob", Namespace: metav1.NamespaceDefault, UID: "1"},
+	}
+
+	errGetPodGroup := errors.New("error when getting existing PodGroup")
+
+	cases := map[string]struct {
+		registry  fwkplugins.Registry
+		objs      []client.Object
+		trainJob  *trainer.TrainJob
+		withError bool
+		wantObjs  []client.Object
+		wantError error
+	}{
+		"empty registry returns nothing": {
+			registry: fwkplugins.Registry{},
+			trainJob: failedTrainJob,
+			wantObjs: nil,
+		},
+		"failed trainjob: volcano returns its PodGroup": {
+			registry: fwkplugins.NewRegistry(),
+			objs:     []client.Object{ownedPodGroup},
+			trainJob: failedTrainJob,
+			wantObjs: []client.Object{ownedPodGroup},
+		},
+		"running trainjob: nothing to delete": {
+			registry: fwkplugins.NewRegistry(),
+			objs:     []client.Object{ownedPodGroup},
+			trainJob: runningTrainJob,
+			wantObjs: nil,
+		},
+		"a plugin's Get error is propagated and no objects are returned": {
+			registry:  fwkplugins.NewRegistry(),
+			objs:      []client.Object{ownedPodGroup},
+			trainJob:  failedTrainJob,
+			withError: true,
+			wantObjs:  nil,
+			wantError: errGetPodGroup,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			clientBuilder := testingutil.WithVolcanoPodGroupRESTMapping(testingutil.NewClientBuilder().WithObjects(tc.objs...))
+			if tc.withError {
+				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						return errGetPodGroup
+					},
+				})
+			}
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			gotObjs, err := fwk.RunComponentDeleterPlugins(ctx, tc.trainJob)
+			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantObjs, gotObjs, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion")); len(diff) != 0 {
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
 			}
 		})
@@ -2754,6 +2865,83 @@ func TestRunPreComponentBuilderPlugins(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo, testingutil.PodSetEndpointsCmpOpts); len(diff) != 0 {
 				t.Errorf("Unexpected runtimeInfo (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRunEnforceSchedulingPlugins(t *testing.T) {
+	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
+	cases := map[string]struct {
+		registry        fwkplugins.Registry
+		runtimeInfo     *runtime.Info
+		trainJob        *trainer.TrainJob
+		wantRuntimeInfo *runtime.Info
+	}{
+		"WorkloadAwareScheduling plugin is applied to runtime.Info": {
+			registry: fwkplugins.NewRegistry(),
+			runtimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](1)}},
+				},
+			},
+			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault, UID: "uid"}},
+			wantRuntimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:            constants.Node,
+						Count:           ptr.To[int32](1),
+						SchedulingGroup: corev1ac.PodSchedulingGroup().WithPodGroupName("test-job-e2577dd78b-b6ff97ef4e"),
+					}},
+				},
+			},
+		},
+		"an empty registry": {
+			runtimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](1)}},
+				},
+			},
+			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault, UID: "uid"}},
+			wantRuntimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					Scheduling: &trainer.TrainingRuntimeScheduling{},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{Name: constants.Node, Count: ptr.To[int32](1)}},
+				},
+			},
+		},
+		"runtime.Info is nil": {
+			registry: fwkplugins.NewRegistry(),
+			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault, UID: "uid"}},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+			clientBuilder := testingutil.WithWorkloadRESTMapping(testingutil.NewClientBuilder())
+
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = fwk.RunEnforceSchedulingPlugins(tc.runtimeInfo, tc.trainJob); err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo); len(diff) != 0 {
+				t.Errorf("Unexpected runtime.Info (-want,+got): %s", diff)
 			}
 		})
 	}

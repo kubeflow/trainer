@@ -20,6 +20,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 10
     groups:
       kubernetes:
@@ -41,6 +43,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   # Docker base images
@@ -49,6 +53,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   - package-ecosystem: "docker"
@@ -56,6 +62,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   - package-ecosystem: "docker"
@@ -63,6 +71,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   - package-ecosystem: "docker"
@@ -70,6 +80,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   - package-ecosystem: "docker"
@@ -77,6 +89,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   - package-ecosystem: "docker"
@@ -84,6 +98,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   - package-ecosystem: "docker"
@@ -91,6 +107,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   # Python dependencies
@@ -99,6 +117,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   - package-ecosystem: "pip"
@@ -106,6 +126,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   - package-ecosystem: "pip"
@@ -113,6 +135,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   - package-ecosystem: "uv"
@@ -120,6 +144,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   - package-ecosystem: "uv"
@@ -127,6 +153,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   - package-ecosystem: "uv"
@@ -134,6 +162,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   # Rust dependencies
@@ -142,6 +172,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5
 
   - package-ecosystem: "cargo"
@@ -149,4 +181,6 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 2
     open-pull-requests-limit: 5

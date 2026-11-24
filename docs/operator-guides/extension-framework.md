@@ -1,10 +1,10 @@
 # Kubeflow Trainer Extension Framework
 
-This guide describes the Kubeflow Trainer Extension Framework's core concepts and its four execution phases: startup, pre-execution, build, and post-execution.
+This guide describes the Kubeflow Trainer Extension Framework's core concepts and its five execution phases: startup, pre-execution, build, deleter, and post-execution.
 
 ## Overview
 
-The Kubeflow Trainer Extension Framework is an internal mechanism that enables flexible expansion of Runtime and TrainJob combinations in the Kubeflow ecosystem. The framework provides extension points and manages component lifecycle through four phases.
+The Kubeflow Trainer Extension Framework is an internal mechanism that enables flexible expansion of Runtime and TrainJob combinations in the Kubeflow ecosystem. The framework provides extension points and manages component lifecycle through five phases.
 
 ![Kubeflow Trainer Extension Framework Architecture](images/KubeflowTrainerExtensionFrameworkOverview.drawio.svg)
 
@@ -28,6 +28,7 @@ The Kubeflow Trainer Extension Framework follows a structured, step-by-step exec
 - **Startup Phase**: Executes once during the initialization of the `kubeflow-trainer-controller-manager`. This phase sets up necessary internal components.
 - **PreExecution Phase**: Triggered when a TrainJob is created or updated. This phase validates and prepares the job for execution.
 - **Build Phase**: Builds and deploys the required Kubernetes resources for training jobs.
+- **Deleter Phase**: Runs on every reconcile to remove resources a plugin no longer needs for the TrainJob, independently of the Build Phase.
 - **PostExecution Phase**: Runs after the job has been built and executed, checking the status and applying relevant conditions to the job.
 
 ### APIs and Extension Points
@@ -73,6 +74,16 @@ In each phase, there are two types of components:
   - **EnforceMLPolicy**: Configures Machine Learning-specific parameters from the `TrainingRuntime.spec.mlPolicy` to adjust the deployment of training resources.
   - **ComponentBuilder**: Builds Kubernetes resources using the `RuntimeInfo` and TrainJob objects, allowing for a dynamic, runtime-specific deployment configuration.
 
-### 4. PostExecution Phase
+### 4. Deleter Phase
+
+**Purpose**: Removes resources that a plugin determines are no longer needed for the TrainJob, such as a gang-scheduling `PodGroup` once the TrainJob is finished or suspended. The Build Phase only applies resources, so a dedicated phase keeps the lifecycle clear: removing a resource because of the TrainJob's state is not mixed into the code that builds it.
+
+- **Internal API**:
+  - **TrainJobController**: Deletes the resources identified by the `ComponentDeleter` extension point.
+
+- **Extension Point**:
+  - **ComponentDeleter**: Returns the Kubernetes resources that should be removed for a TrainJob. This phase runs on every reconcile regardless of the TrainJob's status, so each plugin decides for itself whether its resource should currently exist, independently of whether the Build Phase ran.
+
+### 5. PostExecution Phase
 
 **Purpose**: After the TrainJob has been executed, the framework checks the state of the job and applies terminal conditions if necessary.

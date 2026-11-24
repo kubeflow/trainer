@@ -385,9 +385,10 @@ status:
 
 ## 7. Reconciliation & Architecture (Phase 1)
 
-### 7.1 Prerequisites
+### 7.1 Feature Gate & Prerequisites
 
-- TrainJob Feature Flag (Hard Dependency): The unified `TrainJob` API feature flag MUST be enabled in the cluster/controller environment.
+- **Feature Gate:** The `OptimizationJob` API is guarded by the `OptimizationJob` feature gate, which is alpha and disabled by default. When the gate is disabled, the `OptimizationJob` controller is not registered and the validating webhook rejects the creation of new `OptimizationJob` objects. Updates and deletions are still allowed, so existing `OptimizationJobs` can be removed after the gate is disabled. The CRD and RBAC are installed regardless of the gate.
+- **TrainJobStatus (Hard Dependency):** The `OptimizationJob` feature gate requires the `TrainJobStatus` feature gate from [KEP-2779](https://github.com/kubeflow/trainer/tree/master/proposals/2779-trainjob-progress), because trials report their objective metrics through the TrainJob status server. The controller manager fails at startup when `OptimizationJob` is enabled while `TrainJobStatus` is disabled.
 
 ### 7.2. gRPC API Strategy & Adapter Pattern
 

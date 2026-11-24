@@ -50,6 +50,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.FluxMLPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Initializer"):
 		return &trainerv1alpha1.InitializerApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JobScheduling"):
+		return &trainerv1alpha1.JobSchedulingApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JobSetSpecPatch"):
 		return &trainerv1alpha1.JobSetSpecPatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JobSetTemplatePatch"):
@@ -98,6 +100,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.RandomAlgorithmApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ReplicatedJobPatch"):
 		return &trainerv1alpha1.ReplicatedJobPatchApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ReplicatedJobScheduling"):
+		return &trainerv1alpha1.ReplicatedJobSchedulingApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Result"):
 		return &trainerv1alpha1.ResultApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimePatch"):
@@ -118,6 +122,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.TrainerStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntime"):
 		return &trainerv1alpha1.TrainingRuntimeApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntimeScheduling"):
+		return &trainerv1alpha1.TrainingRuntimeSchedulingApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntimeSpec"):
 		return &trainerv1alpha1.TrainingRuntimeSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntimeSpecPatch"):

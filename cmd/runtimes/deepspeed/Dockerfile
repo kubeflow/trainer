@@ -14,7 +14,7 @@
 
 FROM mpioperator/base:v0.8.2 AS mpi
 # Ubuntu 26.04 is the first Ubuntu LTS that packages Open MPI 5 (5.0.10), 22.04 ships 4.1.2.
-FROM nvidia/cuda:13.4.2-devel-ubuntu26.04
+FROM nvidia/cuda:13.4.3-devel-ubuntu26.04
 
 # Ubuntu 26.04 marks the system Python as externally managed (PEP 668).
 # Dependencies are installed into the mpiuser site directory, as on previous releases.

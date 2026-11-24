@@ -1,0 +1,42 @@
+{#- Render the adopters directory from adopters.yaml, with linked entries from talks.yaml. -#}
+{%- import "community/macros.tmpl" as m -%}
+{%- set talks = load("talks.yaml") | sort(attribute="date", reverse=True) -%}
+```{raw} html
+{% call m.directory(data | length, "organizations", "Search by organization, use case, talk, or contact...") -%}
+{%- for adopter in data | sort(attribute="name") %}
+{%- set ns = namespace(talks=[]) %}
+{%- for talk in talks if adopter.name in (talk.adopters or []) %}
+{%- set ns.talks = ns.talks + [talk] %}
+{%- endfor %}
+{%- set contacts = adopter.contacts or [] %}
+{%- set search = ([adopter.name, adopter.type, adopter.description] + (ns.talks | map(attribute="title") | list) + contacts) | select | join(" ") | lower %}
+<div class="adopter-card" data-search="{{ search | e }}">
+<div class="adopter-header">
+<p class="adopter-name"><a href="{{ adopter.url | e }}">{{ adopter.name | e }}</a></p>
+<span class="adopter-badge adopter-badge-{{ adopter.type | lower | replace(' ', '-') | e }}">{{ adopter.type | e }}</span>
+</div>
+{%- if adopter.description %}
+<p class="adopter-description">{{ adopter.description | e }}</p>
+{%- endif %}
+{%- if ns.talks or contacts %}
+<div class="adopter-footer">
+{%- if ns.talks %}
+<div class="adopter-talks">
+<p class="adopter-label">Talks, Case Studies &amp; Tutorials</p>
+<ul>
+{%- for talk in ns.talks %}
+{{ m.talk_link(talk) }}
+{%- endfor %}
+</ul>
+</div>
+{%- endif %}
+{%- if contacts %}
+<p class="adopter-contacts"><span class="adopter-label">Contact{{ "s" if contacts | length > 1 }}:</span>
+{%- for handle in contacts %} <a class="adopter-contact" href="https://github.com/{{ handle | e }}">{{ m.github_icon() }}@{{ handle | e }}</a>{% endfor %}</p>
+{%- endif %}
+</div>
+{%- endif %}
+</div>
+{%- endfor %}
+{%- endcall %}
+```
