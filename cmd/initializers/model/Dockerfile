@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM python:3.14-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 COPY --from=ghcr.io/astral-sh/uv:0.7 /uv /uvx /bin/
 
