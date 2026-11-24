@@ -162,12 +162,35 @@ func WithPodSet(
 			Volumes:           podSpecApply.Volumes,
 			SchedulingGroup:   podSpecApply.SchedulingGroup,
 			ResourceClaims:    podSpecApply.ResourceClaims,
-			SinglePodRequests: resourcehelpers.PodRequests(&corev1.Pod{Spec: typedPodSpec}, resourcehelpers.PodResourcesOptions{}),
+			SinglePodRequests: podRequests(typedPodSpec),
 			InitContainers:    slices.Collect(toPodSetContainer(podSpecApply.InitContainers...)),
 			Containers:        slices.Collect(toPodSetContainer(podSpecApply.Containers...)),
 		}
 		o.templateSpec.PodSets = append(o.templateSpec.PodSets, ps)
 	}
+}
+
+// podRequests returns the resources requested by a single Pod created from the podSpec.
+// The API server defaults the request of a container resource that only sets a limit to that
+// limit when it creates the Pod, but not in the Pod template, so the same is done here.
+// REF: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits
+func podRequests(podSpec corev1.PodSpec) corev1.ResourceList {
+	pod := &corev1.Pod{Spec: *podSpec.DeepCopy()}
+	for _, containers := range [][]corev1.Container{pod.Spec.InitContainers, pod.Spec.Containers} {
+		for i := range containers {
+			res := &containers[i].Resources
+			for name, limit := range res.Limits {
+				if _, ok := res.Requests[name]; ok {
+					continue
+				}
+				if res.Requests == nil {
+					res.Requests = make(corev1.ResourceList, len(res.Limits))
+				}
+				res.Requests[name] = limit.DeepCopy()
+			}
+		}
+	}
+	return resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{})
 }
 
 func toPodSetContainer(containerApply ...corev1ac.ContainerApplyConfiguration) iter.Seq[Container] {
