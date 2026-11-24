@@ -79,6 +79,16 @@ impl IndexableMemTable {
         let _ = stream
             .map_ok(|batch| {
                 let num_rows = batch.num_rows() as u64;
+
+                // A scan can yield an empty batch, for example when every row of a
+                // data file is dropped by an Iceberg delete file. An empty batch owns
+                // no rows and so has no index range: recording one would underflow
+                // `current_end` and leave the index vectors unsorted, which breaks the
+                // binary searches in `fetch_partitions`.
+                if num_rows == 0 {
+                    return;
+                }
+
                 let current_end = current_start + num_rows - 1;
 
                 start_indices.push(current_start);
@@ -117,10 +127,16 @@ async fn fetch_partitions(
         return vec![];
     }
 
+    // Find the number of batches that start at or before the query end
+    let starting_within_range = start_indices.partition_point(|&batch_start| batch_start <= end);
+
+    // If no batch starts at or before the query end, no overlap
+    if starting_within_range == 0 {
+        return vec![];
+    }
+
     // Find LAST batch where batch_start <= end
-    let last = start_indices
-        .partition_point(|&batch_start| batch_start <= end)
-        .saturating_sub(1);
+    let last = starting_within_range - 1;
 
     // Verify we have valid range
     if first > last {
@@ -404,6 +420,70 @@ mod tests {
         let result = fetch_partitions(batches, &[0, 4], &[3, 7], 2, 5).await;
 
         assert_eq!(result.len(), 2, "Expected both batches for boundary query");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_load_skips_leading_empty_batch() -> Result<(), Box<dyn std::error::Error>> {
+        let schema = create_schema();
+        let mut batches = vec![RecordBatch::new_empty(schema.clone())];
+        batches.extend(create_test_batches()?);
+
+        let ctx = SessionContext::new();
+        let mem_table = MemTable::try_new(schema.clone(), vec![batches])?;
+        let table = IndexableMemTable::load(Arc::new(mem_table), None, &ctx.state(), 0).await?;
+
+        assert_eq!(table.batches.len(), 2, "empty batch should not be indexed");
+        assert_eq!(table.start_indices, vec![0, 4]);
+        assert_eq!(table.end_indices, vec![3, 7]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_load_skips_interleaved_empty_batch() -> Result<(), Box<dyn std::error::Error>> {
+        let schema = create_schema();
+        let populated = create_test_batches()?;
+        let batches = vec![
+            populated[0].clone(),
+            RecordBatch::new_empty(schema.clone()),
+            populated[1].clone(),
+        ];
+
+        let ctx = SessionContext::new();
+        let mem_table = MemTable::try_new(schema.clone(), vec![batches])?;
+        let table = IndexableMemTable::load(Arc::new(mem_table), None, &ctx.state(), 10).await?;
+
+        assert_eq!(table.batches.len(), 2, "empty batch should not be indexed");
+        assert_eq!(table.start_indices, vec![10, 14]);
+        assert_eq!(table.end_indices, vec![13, 17]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_fetch_partitions_query_below_all_batches()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Batches hold global rows 10-13 and 14-17, the query asks for rows 0-5.
+        let batches = create_test_batches()?;
+        let result = fetch_partitions(batches, &[10, 14], &[13, 17], 0, 5).await;
+
+        assert!(
+            result.is_empty(),
+            "a query below every batch must not select any batch"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_fetch_partitions_query_above_all_batches()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Batches hold global rows 10-13 and 14-17, the query asks for rows 20-25.
+        let batches = create_test_batches()?;
+        let result = fetch_partitions(batches, &[10, 14], &[13, 17], 20, 25).await;
+
+        assert!(
+            result.is_empty(),
+            "a query above every batch must not select any batch"
+        );
         Ok(())
     }
 }
