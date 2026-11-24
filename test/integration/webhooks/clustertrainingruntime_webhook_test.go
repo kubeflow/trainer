@@ -76,6 +76,26 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 						Obj()
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create ClusterTrainingRuntime with a negative mlPolicy.numNodes",
+				func() *trainer.ClusterTrainingRuntime {
+					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							WithMLPolicy(testingutil.MakeMLPolicyWrapper().WithNumNodes(-3).Obj()).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed to create ClusterTrainingRuntime with a zero mlPolicy.numNodes",
+				func() *trainer.ClusterTrainingRuntime {
+					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							WithMLPolicy(testingutil.MakeMLPolicyWrapper().WithNumNodes(0).Obj()).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed()),
 			ginkgo.Entry("Should fail to create ClusterTrainingRuntime with a negative coscheduling timeout",
 				func() *trainer.ClusterTrainingRuntime {
 					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)

@@ -110,6 +110,7 @@ spec:
                       numNodes is the number of training nodes.
                       Defaults to 1.
                     format: int32
+                    minimum: 0
                     type: integer
                   torch:
                     description: torch defines the configuration for the PyTorch runtime.
