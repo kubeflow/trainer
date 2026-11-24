@@ -120,3 +120,4 @@ webhooks:
     - optimizationjobs
     operations:
     - CREATE
+    - UPDATE
