@@ -9,7 +9,9 @@ to manually parse or scrape container logs to monitor training health and perfor
 
 :::{important}
 The TrainJob progress feature was introduced in Kubeflow Trainer v2.2.0. The `TrainJobStatus`
-feature is a Beta feature and enabled by default, so no configuration is required for normal use.
+feature is Beta and enabled by default, so no configuration is required for normal use.
+On earlier releases where it was Alpha (such as v2.2.0–v2.4.x), enable it explicitly via
+`--feature-gates=TrainJobStatus=true` or Helm (`manager.config.featureGates.TrainJobStatus=true`).
 :::
 
 :::{note}
@@ -22,7 +24,14 @@ to understand the basics of Kubeflow Trainer.
 - Kubeflow Trainer v2.2.0 or later installed on your cluster.
 - For SDK-based progress reporting: Kubeflow SDK `>= 0.5.0`.
 
-`TrainJobStatus` is a Beta feature and is enabled by default, so no configuration is required for normal use.
+`TrainJobStatus` is a Beta feature and is enabled by default, so no configuration is required for normal use
+(earlier releases where it was Alpha require `--feature-gates=TrainJobStatus=true` or
+`manager.config.featureGates.TrainJobStatus=true` in Helm).
+
+Before disabling `TrainJobStatus`, ensure dependent Alpha features such as `OptimizationJob` are
+also disabled (`OptimizationJob=false`), or the controller will fail its startup feature-gate
+dependency check and exit.
+
 Administrators can opt out by passing `--feature-gates=TrainJobStatus=false` to the controller at startup,
 or with Helm by passing `--set manager.config.featureGates.TrainJobStatus=false` (or in `values.yaml`):
 
