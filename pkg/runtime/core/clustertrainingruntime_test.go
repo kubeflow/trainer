@@ -43,6 +43,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/features"
+	jobruntimes "github.com/kubeflow/trainer/v2/pkg/runtime"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -57,6 +58,7 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 		clusterTrainingRuntime *trainer.ClusterTrainingRuntime
 		wantObjs               []runtime.Object
 		wantError              error
+		wantValidationError    bool
 	}{
 		"succeeded to build PodGroup and JobSet with NumNodes from the Runtime and container from the Trainer.": {
 			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").RuntimeSpec(
@@ -145,6 +147,32 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 				Obj(),
 			wantError: errorNotFoundSpecifiedClusterTrainingRuntime,
 		},
+		"TrainJob that is not valid for the runtime returns a ValidationError": {
+			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Spec).
+					JobSetSpec(
+						testingutil.MakeJobSetWrapper("", "").
+							// The dataset-initializer job has no container named dataset-initializer.
+							ReplaceContainer(constants.DatasetInitializer, constants.DatasetInitializer, "renamed", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+							Obj().Spec,
+					).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job-4").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Initializer(
+					testingutil.MakeTrainJobInitializerWrapper().
+						DatasetInitializer(
+							testingutil.MakeTrainJobDatasetInitializerWrapper().
+								StorageUri("hf://test/dataset").
+								Obj(),
+						).
+						Obj(),
+				).
+				Obj(),
+			wantValidationError: true,
+		},
 	}
 	cmpOpts := []cmp.Option{
 		cmpopts.SortSlices(func(a, b runtime.Object) bool {
@@ -179,7 +207,12 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 			}
 
 			objs, err := clTrainingRuntime.NewObjects(ctx, tc.trainJob)
-			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+			if tc.wantValidationError {
+				var validationErr *jobruntimes.ValidationError
+				if !errors.As(err, &validationErr) {
+					t.Errorf("Expected a ValidationError, got: %v", err)
+				}
+			} else if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}
 
