@@ -50,6 +50,9 @@ const (
 	schedulingJobClaimErrorMsg         = "must have a Pod resourceClaim with the same name, resourceClaimName, and resourceClaimTemplateName in the targeted ReplicatedJob"
 	schedulingTrainJobPriorityErrorMsg = "must match %q of the other ReplicatedJobs sharing the TrainJob-level PodGroup"
 	schedulingGroupPriorityErrorMsg    = "priorityClassName %q must match %q of the other ReplicatedJobs sharing this PodGroup"
+
+	volcanoPriorityClassNameErrorMsg         = "must not be set on this replicatedJob: the Volcano PodGroup carries a single priority for the whole gang, so only the replicatedJob labelled with the %q ancestor may set it"
+	volcanoPriorityClassNameMismatchErrorMsg = "must match %q of the other replicatedJobs: the Volcano PodGroup carries a single priority for the whole gang"
 )
 
 var (
@@ -86,6 +89,7 @@ func (w *TrainingRuntimeValidator) ValidateCreate(ctx context.Context, obj *trai
 	}
 	allErrs := validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs)
 	allErrs = append(allErrs, validateScheduling(ctx, &obj.Spec, nil)...)
+	allErrs = append(allErrs, validateVolcanoPriorityClassName(&obj.Spec, nil)...)
 	return warnings, allErrs.ToAggregate()
 }
 
@@ -247,11 +251,72 @@ func validateScheduling(ctx context.Context, newSpec, oldSpec *trainer.TrainingR
 	return allErrs
 }
 
+// validateVolcanoPriorityClassName ensures that a runtime gang-scheduled by Volcano declares one
+// priorityClassName for the gang.
+//
+// The Volcano PodGroup built from these replicatedJobs carries exactly one priorityClassName for the
+// whole gang, and the plugin propagates it to every Pod template. When a replicatedJob is labelled
+// as the trainer ancestor, it is the single source of truth and no other replicatedJob may set a
+// value. Otherwise every replicatedJob that sets a value must set the same one.
+//
+// On update, a replicatedJob whose priorityClassName is unchanged is not reported, so a runtime
+// stored before this rule existed stays updatable as long as its priority classes don't change.
+//
+// Runtimes using spec.scheduling (Workload-Aware Scheduling) are covered by validateScheduling,
+// which requires the replicatedJobs sharing a PodGroup to use the same priorityClassName instead.
+func validateVolcanoPriorityClassName(newSpec, oldSpec *trainer.TrainingRuntimeSpec) field.ErrorList {
+	if newSpec.PodGroupPolicy == nil || newSpec.PodGroupPolicy.Volcano == nil {
+		return nil
+	}
+	oldPriorityClassNames := map[string]string{}
+	if oldSpec != nil {
+		for _, rJob := range oldSpec.Template.Spec.ReplicatedJobs {
+			oldPriorityClassNames[rJob.Name] = rJob.Template.Spec.Template.Spec.PriorityClassName
+		}
+	}
+	rJobs := newSpec.Template.Spec.ReplicatedJobs
+	hasTrainer := slices.ContainsFunc(rJobs, func(rJob jobsetv1alpha2.ReplicatedJob) bool {
+		return rJob.Template.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer
+	})
+
+	rJobsPath := field.NewPath("spec", "template", "spec", "replicatedJobs")
+	var allErrs field.ErrorList
+	first := ""
+	for idx, rJob := range rJobs {
+		priorityClassName := rJob.Template.Spec.Template.Spec.PriorityClassName
+		if priorityClassName == "" {
+			continue
+		}
+		var msg string
+		switch {
+		case hasTrainer && rJob.Template.Labels[constants.LabelTrainJobAncestor] != constants.AncestorTrainer:
+			msg = fmt.Sprintf(volcanoPriorityClassNameErrorMsg, constants.AncestorTrainer)
+		case !hasTrainer && first != "" && priorityClassName != first:
+			msg = fmt.Sprintf(volcanoPriorityClassNameMismatchErrorMsg, first)
+		}
+		if first == "" {
+			first = priorityClassName
+		}
+		if msg == "" {
+			continue
+		}
+		if oldName, ok := oldPriorityClassNames[rJob.Name]; ok && oldName == priorityClassName {
+			continue
+		}
+		allErrs = append(allErrs, field.Invalid(
+			rJobsPath.Index(idx).Child("template", "spec", "template", "spec", "priorityClassName"),
+			priorityClassName, msg,
+		))
+	}
+	return allErrs
+}
+
 func (w *TrainingRuntimeValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.TrainingRuntime) (admission.Warnings, error) {
 	log := ctrl.LoggerFrom(ctx).WithName("trainingruntime-webhook")
 	log.V(5).Info("Validating update", "trainingRuntime", klog.KObj(newObj))
 	allErrs := validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs)
 	allErrs = append(allErrs, validateScheduling(ctx, &newObj.Spec, &oldObj.Spec)...)
+	allErrs = append(allErrs, validateVolcanoPriorityClassName(&newObj.Spec, &oldObj.Spec)...)
 	return nil, allErrs.ToAggregate()
 }
 

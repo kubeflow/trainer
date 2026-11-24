@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -44,6 +45,7 @@ import (
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
@@ -111,23 +113,51 @@ func (v *Volcano) Validate(ctx context.Context, info *runtime.Info, _, newObj *t
 	jobSetSpec, ok := runtime.TemplateSpecApply[v1alpha2.JobSetSpecApplyConfiguration](info)
 	if ok && jobSetSpec != nil {
 		for _, rj := range jobSetSpec.ReplicatedJobs {
-			if rj.Template != nil && rj.Template.Spec != nil && rj.Template.Spec.Template != nil && rj.Template.Spec.Template.Spec != nil {
-				priorityClassName := rj.Template.Spec.Template.Spec.PriorityClassName
-				if priorityClassName != nil {
-					pcName := *priorityClassName
-					// Every name, including the built-in system-cluster-critical and
-					// system-node-critical, must resolve to a PriorityClass object.
-					var pc schedulingv1.PriorityClass
-					if err := v.client.Get(ctx, types.NamespacedName{Name: pcName}, &pc); err != nil {
-						allErrs = append(allErrs, field.Invalid(specPath.Child("templateSpec").Child("priorityClassName"),
-							pcName, fmt.Sprintf("PriorityClass %q doesn't exist: %v", pcName, err)))
-					}
+			if spec := podSpecOf(rj); spec != nil && spec.PriorityClassName != nil {
+				pcName := *spec.PriorityClassName
+				// Every name, including the built-in system-cluster-critical and
+				// system-node-critical, must resolve to a PriorityClass object.
+				var pc schedulingv1.PriorityClass
+				if err := v.client.Get(ctx, types.NamespacedName{Name: pcName}, &pc); err != nil {
+					allErrs = append(allErrs, field.Invalid(specPath.Child("templateSpec").Child("priorityClassName"),
+						pcName, fmt.Sprintf("PriorityClass %q doesn't exist: %v", pcName, err)))
 				}
 			}
 		}
 	}
 
 	return nil, allErrs
+}
+
+// podSpecOf returns the Pod spec of a replicatedJob, or nil when the template is incomplete.
+func podSpecOf(rj v1alpha2.ReplicatedJobApplyConfiguration) *corev1ac.PodSpecApplyConfiguration {
+	if rj.Template == nil || rj.Template.Spec == nil || rj.Template.Spec.Template == nil {
+		return nil
+	}
+	return rj.Template.Spec.Template.Spec
+}
+
+// trainerPriorityClassName returns the priorityClassName for the gang, or an empty string when
+// none is set.
+//
+// It is the value of the replicatedJob whose PodSet is labelled as the trainer ancestor (PodSet.Name
+// matches ReplicatedJob.Name). Only runtimes with no trainer ancestor fall back to the first
+// replicatedJob that declares a value; the webhook requires all their values to be equal, so the
+// choice is not arbitrary.
+func trainerPriorityClassName(info *runtime.Info, jobSetSpec *v1alpha2.JobSetSpecApplyConfiguration) string {
+	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
+	for _, rj := range jobSetSpec.ReplicatedJobs {
+		if trainerPS != nil && ptr.Deref(rj.Name, "") != trainerPS.Name {
+			continue
+		}
+		if spec := podSpecOf(rj); spec != nil && ptr.Deref(spec.PriorityClassName, "") != "" {
+			return *spec.PriorityClassName
+		}
+		if trainerPS != nil {
+			return ""
+		}
+	}
+	return ""
 }
 
 func (v *Volcano) EnforcePodGroupPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
@@ -138,6 +168,20 @@ func (v *Volcano) EnforcePodGroupPolicy(info *runtime.Info, trainJob *trainer.Tr
 		info.Scheduler.PodAnnotations = map[string]string{}
 	}
 	info.Scheduler.PodAnnotations[volcanov1beta1.KubeGroupNameAnnotationKey] = trainJob.Name
+
+	// A PodGroup carries one priorityClassName for the whole gang. Give every Pod template the
+	// gang's value too, so no Pod is left at the cluster default priority and an easy preemption
+	// victim. This runs before any component is built and also while the TrainJob is suspended,
+	// so the JobSet is created with the final templates and resuming does not change them.
+	if jobSetSpec, ok := runtime.TemplateSpecApply[v1alpha2.JobSetSpecApplyConfiguration](info); ok && jobSetSpec != nil {
+		if priorityClassName := trainerPriorityClassName(info, jobSetSpec); priorityClassName != "" {
+			for _, rj := range jobSetSpec.ReplicatedJobs {
+				if spec := podSpecOf(rj); spec != nil {
+					spec.WithPriorityClassName(priorityClassName)
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -186,16 +230,10 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 		pg.Spec.WithQueue(queue)
 	}
 
-	// Configure priorityClassName from the Pod template
-	jobSetSpec, ok := runtime.TemplateSpecApply[v1alpha2.JobSetSpecApplyConfiguration](info)
-	if ok && jobSetSpec != nil {
-		for _, rj := range jobSetSpec.ReplicatedJobs {
-			if rj.Template != nil && rj.Template.Spec != nil && rj.Template.Spec.Template != nil && rj.Template.Spec.Template.Spec != nil {
-				priorityClassName := rj.Template.Spec.Template.Spec.PriorityClassName
-				if priorityClassName != nil {
-					pg.Spec.WithPriorityClassName(*priorityClassName)
-				}
-			}
+	// The gang's priorityClassName; EnforcePodGroupPolicy already copied it to every Pod template.
+	if jobSetSpec, ok := runtime.TemplateSpecApply[v1alpha2.JobSetSpecApplyConfiguration](info); ok && jobSetSpec != nil {
+		if priorityClassName := trainerPriorityClassName(info, jobSetSpec); priorityClassName != "" {
+			pg.Spec.WithPriorityClassName(priorityClassName)
 		}
 	}
 
