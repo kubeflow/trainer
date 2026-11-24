@@ -79,6 +79,11 @@ data:
       qps: {{ .Values.manager.config.statusServer.qps }}
       burst: {{ .Values.manager.config.statusServer.burst }}
 
+    {{ with .Values.manager.config.tls }}
+    # TLS configuration
+    tls: {{ toYaml . | nindent 6 }}
+    {{ end }}
+
     {{ with .Values.manager.config.featureGates }}
     # Feature gates
     featureGates: {{ toYaml . | nindent 6 }}
