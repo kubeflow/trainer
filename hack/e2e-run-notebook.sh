@@ -46,24 +46,17 @@ print_results() {
         # Always show TrainJob status
         kubectl describe trainjob
         kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
+        kubectl wait trainjob --for=condition=Complete --all --timeout 30s
 
-        # Show pod details and logs. MPI runtimes create "launcher" and "node"
-        # jobs, so select all training pods by jobset-name instead of only
-        # trainer-node.
-        if kubectl get pods -l jobset.sigs.k8s.io/jobset-name --no-headers 2>/dev/null | grep -q .; then
+        # Only check pod logs if pods exist (not for local backends)
+        if kubectl get pods -l jobset.sigs.k8s.io/replicatedjob-name=trainer-node --no-headers 2>/dev/null | grep -q .; then
             echo "Found training pods - showing pod details and logs"
             kubectl get pods
-            for pod in $(kubectl get pods -l jobset.sigs.k8s.io/jobset-name -o name); do
-                echo "----- describe ${pod} -----"
-                kubectl describe "${pod}" || true
-                echo "----- logs ${pod} -----"
-                kubectl logs "${pod}" --all-containers --prefix --tail=-1 || true
-            done
+            kubectl describe pod
+            kubectl logs -l jobset.sigs.k8s.io/replicatedjob-name=trainer-node,batch.kubernetes.io/job-completion-index=0 --tail -1
         else
             echo "No training pods found (local backend used - training runs outside Kubernetes)"
         fi
-
-        kubectl wait trainjob --for=condition=Complete --all --timeout 30s
     else
         echo "Skipping kubectl commands (not a Kubernetes test)"
     fi
