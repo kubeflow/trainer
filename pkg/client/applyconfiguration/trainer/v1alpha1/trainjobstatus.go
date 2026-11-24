@@ -39,7 +39,7 @@ type TrainJobStatusApplyConfiguration struct {
 	// status, or if no status has been observed yet (for example,
 	// immediately after the TrainJob is created).
 	//
-	// This is an alpha feature and requires enabling the TrainJobStatus feature gate.
+	// This is a beta feature enabled by default and can be disabled through the TrainJobStatus feature gate.
 	TrainerStatus *TrainerStatusApplyConfiguration `json:"trainerStatus,omitempty"`
 }
 

@@ -7,7 +7,7 @@ explains the API, metric reporting, and failure behavior.
 ## Prerequisites
 
 - Kubeflow Trainer 2.4 or later with the OptimizationJob CRD and controller enabled.
-- The `OptimizationJob` and `TrainJobStatus` feature gates enabled on the Trainer controller.
+- The `OptimizationJob` alpha feature gate enabled on the Trainer controller (`TrainJobStatus` is required and enabled by default).
 - The default `torch-distributed` ClusterTrainingRuntime installed.
 - `kubectl` configured for the target cluster and namespace.
 - Capacity for two concurrent CPU trials and the search algorithm Pod, and access to the

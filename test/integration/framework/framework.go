@@ -108,9 +108,9 @@ func (f *Framework) RunManager(cfg *rest.Config, startControllers bool) (context
 	})
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), "failed to create manager")
 
-	// Alpha feature gates exercised by the integration suites. TrainJobStatus is disabled while
-	// the runtimes are built, so the trainjobstatus plugin, which requires the status server
-	// configuration, is not registered.
+	// Feature gates exercised by the integration suites. TrainJobStatus (Beta, enabled by default)
+	// is temporarily disabled while the runtimes are built, so the trainjobstatus plugin, which
+	// requires the status server configuration, is not registered.
 	gomega.ExpectWithOffset(1, utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
 		string(features.TrainJobDynamicResourceAllocation): true,
 		string(features.TrainJobStatus):                    false,

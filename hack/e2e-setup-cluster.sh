@@ -191,7 +191,7 @@ if [ "${INSTALL_METHOD}" = "kustomize" ]; then
       # enable feature flags
       - op: add
         path: /spec/template/spec/containers/0/args/-
-        value: --feature-gates=TrainJobStatus=true,OptimizationJob=true
+        value: --feature-gates=OptimizationJob=true
     target:
       kind: Deployment
       name: kubeflow-trainer-controller-manager
@@ -255,7 +255,6 @@ elif [ "${INSTALL_METHOD}" = "helm" ]; then
     --set runtimes.mlxDistributed.image.tag=${CI_IMAGE_TAG} \
     --set runtimes.deepspeedDistributed.image.tag=${CI_IMAGE_TAG} \
     --set image.tag=${CI_IMAGE_TAG} \
-    --set manager.config.featureGates.TrainJobStatus=true \
     --set manager.config.featureGates.OptimizationJob=true \
     --wait
 fi
