@@ -77,13 +77,6 @@ class Kaggle(utils.ModelProvider):
                 output_dir=utils.MODEL_PATH,
             )
             logging.info("Model successfully downloaded")
-        except FileExistsError as e:
-            # kagglehub may raise FileExistsError on reruns when checking cache
-            # This is expected behavior when model already exists
-            logging.info(
-                f"Model already exists at {utils.MODEL_PATH}. "
-                f"Skipping download (FileExistsError: {e})"
-            )
         except Exception as e:
             logging.error(f"Model download failed: {e}")
             raise
