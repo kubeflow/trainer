@@ -17,9 +17,11 @@ limitations under the License.
 package networkpolicy
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"net/netip"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -82,13 +84,14 @@ func (p *NetworkPolicy) Name() string { return Name }
 func (p *NetworkPolicy) BuildOrder() int { return -1 }
 
 func (p *NetworkPolicy) ReconcilerBuilders() []runtime.ReconcilerBuilder {
-	if !ptr.Deref(p.config.Enabled, false) {
-		return nil
-	}
 	return []runtime.ReconcilerBuilder{
 		func(b *builder.Builder, _ client.Client, _ cache.Cache) *builder.Builder {
+			// Keep opt-out cleanup cached without retaining full policy specs.
 			b = b.Watches(&networkingv1.NetworkPolicy{}, handler.EnqueueRequestForOwner(
-				p.client.Scheme(), p.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner()))
+				p.client.Scheme(), p.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner()), builder.OnlyMetadata)
+			if !ptr.Deref(p.config.Enabled, false) {
+				return b
+			}
 			return b.Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(p.infrastructureChanged)).
 				Watches(&discoveryv1.EndpointSlice{}, handler.EnqueueRequestsFromMapFunc(p.infrastructureChanged))
 		},
@@ -113,7 +116,8 @@ func (p *NetworkPolicy) Build(ctx context.Context, _ *runtime.Info, trainJob *tr
 	}
 	var objects []apiruntime.ApplyConfiguration
 	for i, name := range policyNames(trainJob)[:len(peers)] {
-		existing := &networkingv1.NetworkPolicy{}
+		existing := &metav1.PartialObjectMetadata{}
+		existing.SetGroupVersionKind(networkingv1.SchemeGroupVersion.WithKind("NetworkPolicy"))
 		err := p.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: name}, existing)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
@@ -149,7 +153,8 @@ func (p *NetworkPolicy) Delete(ctx context.Context, trainJob *trainer.TrainJob) 
 	}
 	var objects []client.Object
 	for _, name := range policyNames(trainJob) {
-		policy := &networkingv1.NetworkPolicy{}
+		policy := &metav1.PartialObjectMetadata{}
+		policy.SetGroupVersionKind(networkingv1.SchemeGroupVersion.WithKind("NetworkPolicy"))
 		err := p.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: name}, policy)
 		if apierrors.IsNotFound(err) {
 			continue
@@ -219,10 +224,13 @@ func (p *NetworkPolicy) serviceEgress(ctx context.Context, key client.ObjectKey,
 	if err := p.client.Get(ctx, key, service); err != nil {
 		return nil, fmt.Errorf("discovering network dependency %s: %w", key, err)
 	}
-	slices := &discoveryv1.EndpointSliceList{}
-	if err := p.client.List(ctx, slices, client.InNamespace(key.Namespace), client.MatchingLabels{discoveryv1.LabelServiceName: key.Name}); err != nil {
+	endpointSlices := &discoveryv1.EndpointSliceList{}
+	if err := p.client.List(ctx, endpointSlices, client.InNamespace(key.Namespace), client.MatchingLabels{discoveryv1.LabelServiceName: key.Name}); err != nil {
 		return nil, err
 	}
+	slices.SortFunc(endpointSlices.Items, func(a, b discoveryv1.EndpointSlice) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
 	var rules []networkingv1.NetworkPolicyEgressRule
 	add := func(addresses []string, port int32) error {
 		rule := networkingv1.NetworkPolicyEgressRule{Ports: []networkingv1.NetworkPolicyPort{{Protocol: ptr.To(corev1.ProtocolTCP), Port: ptr.To(intstr.FromInt32(port))}}}
@@ -254,7 +262,7 @@ func (p *NetworkPolicy) serviceEgress(ctx context.Context, key client.ObjectKey,
 			}
 		}
 	}
-	for _, slice := range slices.Items {
+	for _, slice := range endpointSlices.Items {
 		for _, port := range slice.Ports {
 			if ptr.Deref(port.Name, "") != portName || port.Port == nil || ptr.Deref(port.Protocol, corev1.ProtocolTCP) != corev1.ProtocolTCP {
 				continue

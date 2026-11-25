@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -135,7 +136,16 @@ func TestNetworkPolicyConfiguredRules(t *testing.T) {
 
 func TestNetworkPolicyOwnershipAndOptOut(t *testing.T) {
 	job := &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "alpha", Namespace: "team-a", UID: "uid"}}
-	c := utiltesting.NewClientBuilder().WithObjects(networkDependencies()...).Build()
+	c := utiltesting.NewClientBuilder().WithObjects(networkDependencies()...).WithInterceptorFuncs(interceptor.Funcs{
+		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, object client.Object, opts ...client.GetOption) error {
+			if strings.HasPrefix(key.Name, "trainjob-") {
+				if _, ok := object.(*metav1.PartialObjectMetadata); !ok {
+					t.Errorf("policy ownership and cleanup must use metadata reads, got %T", object)
+				}
+			}
+			return c.Get(ctx, key, object, opts...)
+		},
+	}).Build()
 	enabled := &NetworkPolicy{client: c, config: configapi.NetworkPolicyConfig{Enabled: ptr.To(true)}}
 	objects, err := enabled.Build(context.Background(), nil, job)
 	if err != nil {
@@ -235,6 +245,45 @@ func TestNetworkPolicyInfrastructureEgress(t *testing.T) {
 	}
 }
 
+func TestNetworkPolicyServiceEgressStableOrder(t *testing.T) {
+	dependencies := networkDependencies()
+	extra := dependencies[1].(*discoveryv1.EndpointSlice).DeepCopy()
+	extra.Name = "kubernetes-extra"
+	extra.Endpoints = []discoveryv1.Endpoint{{Addresses: []string{"192.0.2.12"}}}
+	dependencies = append(dependencies, extra)
+	reverse := false
+	c := utiltesting.NewClientBuilder().WithObjects(dependencies...).WithInterceptorFuncs(interceptor.Funcs{
+		List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			if err := c.List(ctx, list, opts...); err != nil {
+				return err
+			}
+			if endpointSlices, ok := list.(*discoveryv1.EndpointSliceList); ok {
+				if reverse {
+					slices.Reverse(endpointSlices.Items)
+				}
+				reverse = !reverse
+			}
+			return nil
+		},
+	}).Build()
+	p := &NetworkPolicy{client: c}
+	key := client.ObjectKey{Namespace: "default", Name: "kubernetes"}
+	first, err := p.serviceEgress(context.Background(), key, "https")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first) != 3 {
+		t.Fatalf("egress rules = %d, want the Service and both EndpointSlices", len(first))
+	}
+	second, err := p.serviceEgress(context.Background(), key, "https")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(first, second); diff != "" {
+		t.Fatalf("EndpointSlice list order changed the policy rules (-first +second):\n%s", diff)
+	}
+}
+
 func TestNetworkPolicyServiceDiscoveryErrors(t *testing.T) {
 	for name, interceptors := range map[string]interceptor.Funcs{
 		"get": {Get: func(context.Context, client.WithWatch, client.ObjectKey, client.Object, ...client.GetOption) error {
@@ -296,12 +345,8 @@ func TestNetworkPolicyReconcilerBuilders(t *testing.T) {
 	for _, enabled := range []bool{false, true} {
 		t.Run(fmt.Sprint(enabled), func(t *testing.T) {
 			p := &NetworkPolicy{config: configapi.NetworkPolicyConfig{Enabled: ptr.To(enabled)}}
-			want := 0
-			if enabled {
-				want = 1
-			}
-			if got := len(p.ReconcilerBuilders()); got != want {
-				t.Fatalf("watch builders = %d, want %d", got, want)
+			if got := len(p.ReconcilerBuilders()); got != 1 {
+				t.Fatalf("watch builders = %d, want 1 for policy repair or opt-out cleanup", got)
 			}
 		})
 	}

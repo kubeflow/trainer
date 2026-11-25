@@ -809,11 +809,8 @@ func TestApplyNetworkPolicyCache(t *testing.T) {
 			options := ctrl.Options{}
 			ApplyNetworkPolicyCache(&options, &configapi.Configuration{NetworkPolicy: tc.policy})
 			if tc.policy == nil || !ptr.Deref(tc.policy.Enabled, false) {
-				if len(options.Cache.ByObject) != 0 || options.Client.Cache == nil {
-					t.Fatal("disabled isolation must use direct cleanup reads without adding caches")
-				}
-				if diff := cmp.Diff([]client.Object{&networkingv1.NetworkPolicy{}}, options.Client.Cache.DisableFor); diff != "" {
-					t.Fatal(diff)
+				if len(options.Cache.ByObject) != 0 || options.Client.Cache != nil {
+					t.Fatal("disabled isolation must not scope infrastructure caches or bypass policy metadata caching")
 				}
 				return
 			}

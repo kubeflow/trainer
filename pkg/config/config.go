@@ -24,7 +24,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/rest"
@@ -148,8 +147,6 @@ func Load(scheme *runtime.Scheme, configFile string) (ctrl.Options, configapi.Co
 // ApplyNetworkPolicyCache configures infrastructure watches after feature gates are resolved.
 func ApplyNetworkPolicyCache(o *ctrl.Options, cfg *configapi.Configuration) {
 	if cfg.NetworkPolicy == nil || !ptr.Deref(cfg.NetworkPolicy.Enabled, false) {
-		// Opt-out cleanup must not start a cluster-wide NetworkPolicy informer.
-		o.Client.Cache = &client.CacheOptions{DisableFor: []client.Object{&networkingv1.NetworkPolicy{}}}
 		return
 	}
 	namespaces := map[string]cache.Config{corev1.NamespaceDefault: {}, cert.GetOperatorNamespace(): {}}
