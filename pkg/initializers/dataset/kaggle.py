@@ -87,6 +87,13 @@ class Kaggle(utils.DatasetProvider):
         try:
             download_func(handle=handle, output_dir=utils.DATASET_PATH)
             logging.info("Download completed successfully")
+        except FileExistsError as e:
+            # kagglehub raises FileExistsError on competition reruns when checking cache
+            # This is expected behavior when dataset already exists
+            logging.info(
+                f"Dataset already exists at {utils.DATASET_PATH}. "
+                f"Skipping download (FileExistsError: {e})"
+            )
         except Exception as e:
             logging.error(f"Download failed: {e}")
             raise
