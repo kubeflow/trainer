@@ -317,6 +317,13 @@ impl FlightService for WorkerService {
 
         info!("start_index received in worker: {:?}", start_index);
 
+        // Invalidate readiness before any fallible step, so a metadata-read
+        // failure cannot leave the previous assignment queryable as ready.
+        // `deregister_table` on a missing name is a no-op.
+        self.ctx
+            .deregister_table("memtable")
+            .map_err(|e| Status::internal(format!("Failed to clear table: {}", e)))?;
+
         let data_loader = DataLoader::new(
             self.metadata_loc.clone(),
             self.table_name.clone(),
