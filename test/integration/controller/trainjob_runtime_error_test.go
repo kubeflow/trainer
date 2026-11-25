@@ -30,6 +30,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
+	"github.com/kubeflow/trainer/v2/test/integration/framework"
 	"github.com/kubeflow/trainer/v2/test/util"
 )
 
@@ -51,6 +52,15 @@ var _ = ginkgo.Describe("TrainJob runtime resource creation error handling [Bug 
 		corev1.ResourceMemory: resource.MustParse("2Gi"),
 	}
 
+	ginkgo.BeforeAll(func() {
+		fwk = &framework.Framework{}
+		cfg = fwk.Init()
+		ctx, k8sClient = fwk.RunManager(cfg, true)
+	})
+	ginkgo.AfterAll(func() {
+		fwk.Teardown()
+	})
+
 	ginkgo.BeforeEach(func() {
 		ns = &corev1.Namespace{
 			TypeMeta: metav1.TypeMeta{
@@ -70,20 +80,28 @@ var _ = ginkgo.Describe("TrainJob runtime resource creation error handling [Bug 
 	})
 
 	ginkgo.It("Should surface runtime resource creation errors in TrainJob status", func() {
-		// Create a ClusterTrainingRuntime with an invalid/empty template
-		// This will cause the JobSet plugin to fail during Build() phase
+		// Create a ClusterTrainingRuntime WITHOUT MLPolicy
+		// This will cause validation/build to fail
 		invalidRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("invalid-runtime").
 			RuntimeSpec(trainer.TrainingRuntimeSpec{
-				MLPolicy: &trainer.MLPolicy{
-					NumNodes: ptr.To[int32](1),
-					MLPolicySource: trainer.MLPolicySource{
-						Torch: &trainer.TorchMLPolicySource{},
-					},
-				},
-				// Empty template - this will cause Build() to fail when trying to create JobSet
+				// No MLPolicy - this is required and will cause failure
 				Template: trainer.JobSetTemplateSpec{
 					Spec: jobsetv1alpha2.JobSetSpec{
-						ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{},
+						ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+							{
+								Name: "worker",
+								Template: batchv1.JobTemplateSpec{
+									Spec: batchv1.JobSpec{
+										Template: corev1.PodTemplateSpec{
+											Spec: corev1.PodSpec{
+												// Invalid: no containers specified
+												Containers: []corev1.Container{},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			}).
@@ -105,49 +123,45 @@ var _ = ginkgo.Describe("TrainJob runtime resource creation error handling [Bug 
 		trainJobKey := client.ObjectKeyFromObject(trainJob)
 		gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
-		// Wait for reconciliation
+		// Wait for reconciliation to surface the error
 		gomega.Eventually(func(g gomega.Gomega) {
 			gotTrainJob := &trainer.TrainJob{}
 			g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
 
-			// BUG REPRODUCTION:
-			// The TrainJob status conditions should indicate runtime resource creation failure,
-			// but currently it doesn't. The error is only available as an ephemeral Event.
-			//
-			// This assertion WILL FAIL with current code, demonstrating the bug.
-			// Expected: A condition like {Type: "RuntimeResourcesReady", Status: False, Reason: "ResourceCreationFailed"}
-			// Actual: No such condition exists
+			// With the fix applied, the TrainJob status should contain a condition
+			// indicating runtime resource creation failure
 			g.Expect(gotTrainJob.Status.Conditions).Should(
 				gomega.ContainElement(
 					gomega.And(
-						gomega.HaveField("Type", gomega.Equal("RuntimeResourcesReady")),
+						gomega.HaveField("Type", gomega.Equal(trainer.TrainJobRuntimeResourcesReady)),
 						gomega.HaveField("Status", gomega.Equal(metav1.ConditionFalse)),
-						gomega.HaveField("Reason", gomega.ContainSubstring("Failed")),
+						gomega.HaveField("Reason", gomega.Equal(trainer.TrainJobRuntimeResourcesCreationFailedReason)),
 					),
 				),
-				"TrainJob status should have a RuntimeResourcesReady=False condition when runtime resource creation fails. "+
-					"Currently errors are only emitted as Events (see trainjob_controller.go:112 TODO comment).",
+				"TrainJob status should have a RuntimeResourcesReady=False condition when runtime resource creation fails.",
 			)
 
 		}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
-		// Additional verification: Check that an Event was created (current behavior)
-		eventList := &corev1.EventList{}
-		gomega.Expect(k8sClient.List(ctx, eventList, client.InNamespace(ns.Name))).Should(gomega.Succeed())
+		// Additional verification: Check that an Event was created
+		// Poll with Eventually to handle race condition - Event might not be ready immediately
+		gomega.Eventually(func(g gomega.Gomega) {
+			eventList := &corev1.EventList{}
+			g.Expect(k8sClient.List(ctx, eventList, client.InNamespace(ns.Name))).Should(gomega.Succeed())
 
-		// Current behavior: Error is in Events, not Status
-		foundEvent := false
-		for _, event := range eventList.Items {
-			if event.InvolvedObject.Name == trainJob.Name &&
-				event.Reason == "TrainJobResourcesCreationFailed" {
-				foundEvent = true
-				ginkgo.GinkgoWriter.Printf("Found event (current behavior): %s - %s\n", event.Reason, event.Message)
+			// Find the error event
+			foundEvent := false
+			for _, event := range eventList.Items {
+				if event.InvolvedObject.Name == trainJob.Name &&
+					event.Reason == "TrainJobResourcesCreationFailed" {
+					foundEvent = true
+					ginkgo.GinkgoWriter.Printf("Found event: %s - %s\n", event.Reason, event.Message)
+				}
 			}
-		}
 
-		// This demonstrates the current behavior - error is in Events only
-		gomega.Expect(foundEvent).Should(gomega.BeTrue(),
-			"Error should be in Events (current behavior), but should ALSO be in Status.Conditions (expected behavior)")
+			g.Expect(foundEvent).Should(gomega.BeTrue(),
+				"Error should be in Events as well as Status.Conditions")
+		}, util.Timeout, util.Interval).Should(gomega.Succeed())
 	})
 
 	ginkgo.It("Should allow users to check runtime resource creation status without parsing Events", func() {
