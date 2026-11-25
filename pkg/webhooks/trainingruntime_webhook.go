@@ -42,6 +42,7 @@ const (
 	rJobReplicasErrorMsg       = "must be greater than or equal to 1"
 	rJobContainerNamesErrorMsg = "must contain the required container for the ancestor: %s"
 	rJobContainerClaimErrorMsg = "references resourceClaim %q which is not defined in the Pod's resourceClaims"
+	rJobTrainerNameErrorMsg    = "must be %q for the replicatedJob labeled %s=%s in the Torch, JAX, and XGBoost runtimes"
 
 	schedulingFeatureGateErrorMsg      = "TrainJobWorkloadAwareScheduling feature gate is disabled"
 	schedulingTargetNotFoundErrorMsg   = "must reference a replicatedJob in spec.template.spec.replicatedJobs"
@@ -85,6 +86,7 @@ func (w *TrainingRuntimeValidator) ValidateCreate(ctx context.Context, obj *trai
 		))
 	}
 	allErrs := validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs)
+	allErrs = append(allErrs, validateTrainerReplicatedJobName(&obj.Spec, nil)...)
 	allErrs = append(allErrs, validateScheduling(ctx, &obj.Spec, nil)...)
 	return warnings, allErrs.ToAggregate()
 }
@@ -148,6 +150,30 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 					fmt.Sprintf(rJobContainerNamesErrorMsg, labelAncestor),
 				))
 			}
+		}
+	}
+	return allErrs
+}
+
+// validateTrainerReplicatedJobName validates that the trainer replicatedJob of the Torch, JAX, and XGBoost
+// runtimes is named node, since these plugins build the coordinator address from the hostname of the
+// first node Pod: <trainjob>-node-0-0.<trainjob>.
+// On update, the validation is skipped when the old runtime already failed it, so a runtime created before
+// this validation existed can still be updated, for example to remove its finalizers.
+func validateTrainerReplicatedJobName(newSpec, oldSpec *trainer.TrainingRuntimeSpec) field.ErrorList {
+	if oldSpec != nil && len(validateTrainerReplicatedJobName(oldSpec, nil)) > 0 {
+		return nil
+	}
+	mlPolicy := newSpec.MLPolicy
+	if mlPolicy == nil || (mlPolicy.Torch == nil && mlPolicy.JAX == nil && mlPolicy.XGBoost == nil) {
+		return nil
+	}
+	rJobsPath := field.NewPath("spec", "template", "spec", "replicatedJobs")
+	var allErrs field.ErrorList
+	for idx, rJob := range newSpec.Template.Spec.ReplicatedJobs {
+		if rJob.Template.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer && rJob.Name != constants.Node {
+			allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("name"), rJob.Name,
+				fmt.Sprintf(rJobTrainerNameErrorMsg, constants.Node, constants.LabelTrainJobAncestor, constants.AncestorTrainer)))
 		}
 	}
 	return allErrs
@@ -251,6 +277,7 @@ func (w *TrainingRuntimeValidator) ValidateUpdate(ctx context.Context, oldObj, n
 	log := ctrl.LoggerFrom(ctx).WithName("trainingruntime-webhook")
 	log.V(5).Info("Validating update", "trainingRuntime", klog.KObj(newObj))
 	allErrs := validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs)
+	allErrs = append(allErrs, validateTrainerReplicatedJobName(&newObj.Spec, &oldObj.Spec)...)
 	allErrs = append(allErrs, validateScheduling(ctx, &newObj.Spec, &oldObj.Spec)...)
 	return nil, allErrs.ToAggregate()
 }

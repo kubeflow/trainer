@@ -64,6 +64,12 @@ TrainJob into the corresponding `ReplicatedJob`:
   trainer.kubeflow.org/trainjob-ancestor-step: model-initializer
   ```
 
+:::{note}
+For the Torch, JAX, and XGBoost runtimes, the `ReplicatedJob` with the `trainer` ancestor label
+must be named `node`, since these runtimes build the coordinator address from the hostname of its
+first Pod. The runtime webhook rejects other names.
+:::
+
 The complete example might look as follows:
 
 ```yaml

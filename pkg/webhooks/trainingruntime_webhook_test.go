@@ -193,6 +193,78 @@ func TestValidateReplicatedJobs(t *testing.T) {
 	}
 }
 
+func TestValidateTrainerReplicatedJobName(t *testing.T) {
+	// runtimeSpec returns the default runtime spec with the given MLPolicy source,
+	// and with the trainer replicatedJob (index 2, "node" by default) renamed to trainerRJobName.
+	runtimeSpec := func(mlPolicySource *trainer.MLPolicySource, trainerRJobName string) *trainer.TrainingRuntimeSpec {
+		spec := testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj().Spec
+		if mlPolicySource != nil {
+			spec.MLPolicy = testingutil.MakeMLPolicyWrapper().WithMLPolicySource(*mlPolicySource).Obj()
+		}
+		spec.Template.Spec.ReplicatedJobs[2].Name = trainerRJobName
+		return &spec
+	}
+	trainerRJobNamePath := field.NewPath("spec", "template", "spec", "replicatedJobs").Index(2).Child("name")
+
+	cases := map[string]struct {
+		newSpec   *trainer.TrainingRuntimeSpec
+		oldSpec   *trainer.TrainingRuntimeSpec
+		wantError field.ErrorList
+	}{
+		"torch runtime with the trainer replicatedJob named node": {
+			newSpec: runtimeSpec(testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj(), constants.Node),
+		},
+		"torch runtime with the trainer replicatedJob not named node": {
+			newSpec: runtimeSpec(testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj(), "trainer"),
+			wantError: field.ErrorList{
+				field.Invalid(trainerRJobNamePath, "trainer", ""),
+			},
+		},
+		"jax runtime with the trainer replicatedJob not named node": {
+			newSpec: runtimeSpec(testingutil.MakeMLPolicySourceWrapper().JAXPolicy().Obj(), "trainer"),
+			wantError: field.ErrorList{
+				field.Invalid(trainerRJobNamePath, "trainer", ""),
+			},
+		},
+		"xgboost runtime with the trainer replicatedJob not named node": {
+			newSpec: runtimeSpec(testingutil.MakeMLPolicySourceWrapper().XGBoostPolicy().Obj(), "trainer"),
+			wantError: field.ErrorList{
+				field.Invalid(trainerRJobNamePath, "trainer", ""),
+			},
+		},
+		"mpi runtime with the trainer replicatedJob named launcher": {
+			newSpec: runtimeSpec(
+				testingutil.MakeMLPolicySourceWrapper().
+					MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(false)).
+					Obj(),
+				constants.Launcher,
+			),
+		},
+		"runtime without mlPolicy with the trainer replicatedJob not named node": {
+			newSpec: runtimeSpec(nil, "trainer"),
+		},
+		"update renaming the trainer replicatedJob of a torch runtime away from node is rejected": {
+			newSpec: runtimeSpec(testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj(), "trainer"),
+			oldSpec: runtimeSpec(testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj(), constants.Node),
+			wantError: field.ErrorList{
+				field.Invalid(trainerRJobNamePath, "trainer", ""),
+			},
+		},
+		"update of a torch runtime whose trainer replicatedJob was already not named node is allowed": {
+			newSpec: runtimeSpec(testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj(), "trainer"),
+			oldSpec: runtimeSpec(testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj(), "trainer"),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			gotErr := validateTrainerReplicatedJobName(tc.newSpec, tc.oldSpec)
+			if diff := cmp.Diff(tc.wantError, gotErr, cmpopts.IgnoreFields(field.Error{}, "Detail")); len(diff) != 0 {
+				t.Errorf("validateTrainerReplicatedJobName() mismatch (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestTrainingRuntimeValidateUpdate(t *testing.T) {
 	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobWorkloadAwareScheduling, true)
@@ -241,6 +313,23 @@ func TestTrainingRuntimeValidateUpdate(t *testing.T) {
 				}
 				return obj
 			}(),
+		},
+		"update to a torch runtime whose trainer replicatedJob is not named node is rejected": {
+			oldObj: testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj(),
+			newObj: func() *trainer.TrainingRuntime {
+				obj := testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj()
+				obj.Spec.MLPolicy = testingutil.MakeMLPolicyWrapper().
+					WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj()).
+					Obj()
+				for i := range obj.Spec.Template.Spec.ReplicatedJobs {
+					obj.Spec.Template.Spec.ReplicatedJobs[i].Replicas = 1
+				}
+				obj.Spec.Template.Spec.ReplicatedJobs[2].Name = "trainer"
+				return obj
+			}(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "template", "spec", "replicatedJobs").Index(2).Child("name"), "trainer", ""),
+			},
 		},
 		"leaving a ReplicatedJob untargeted is rejected": {
 			oldObj: testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").
