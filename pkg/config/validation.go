@@ -32,6 +32,16 @@ func validate(cfg *configapi.Configuration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("webhook", "port"), *cfg.Webhook.Port, "must be between 1 and 65535"))
 	}
 
+	if cfg.Health.HealthProbeBindAddress != "" && cfg.Health.HealthProbeBindAddress != "0" {
+		readinessPath := healthEndpointPath(cfg.Health.ReadinessEndpointName)
+		livenessPath := healthEndpointPath(cfg.Health.LivenessEndpointName)
+		// Controller-runtime registers both the exact path and the path with a trailing slash.
+		if readinessPath == livenessPath || readinessPath+"/" == livenessPath || livenessPath+"/" == readinessPath {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("health", "livenessEndpointName"),
+				cfg.Health.LivenessEndpointName, "conflicts with health.readinessEndpointName"))
+		}
+	}
+
 	// Validate client connection QPS and Burst
 	if cfg.ClientConnection != nil {
 		if cfg.ClientConnection.QPS != nil && *cfg.ClientConnection.QPS < 0 {
