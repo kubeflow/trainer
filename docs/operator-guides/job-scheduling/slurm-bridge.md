@@ -1,94 +1,58 @@
 # Slurm Bridge
 
-This guide describes how to schedule Kubeflow TrainJobs with
-[Slurm Bridge](https://github.com/SlinkyProject/slurm-bridge) using Trainer's Coscheduling
-`PodGroupPolicy`.
-
-Trainer creates one `PodGroup` for the TrainJob and adds every generated Pod to
-that group. Slurm Bridge submits the group as one external Slurm job, waits for Slurm to allocate
-nodes, and then binds the Pods to those nodes.
-
-Slurm applies its configured topology, priority, and backfill policies to the job. When `kubelet`
-and `slurmd` run on the same compute nodes, Kubernetes and native Slurm workloads can share the
-same pool.
-
-This integration uses the scheduler-plugins `scheduling.x-k8s.io/v1alpha1` API. It does not require
-the native Kubernetes 1.36 Workload APIs or their feature gates.
-
-Slurm Bridge also supports the native Kubernetes PodGroup API on Kubernetes 1.36 and later. See the
-Slurm Bridge
-[PodGroup comparison](https://github.com/SlinkyProject/slurm-bridge/blob/main/docs/workload.md#podgroup-coscheduling)
-for the distinction between the two APIs.
+Slurm Bridge schedules a multi-node TrainJob as one Slurm job. Trainer creates a Kubernetes
+Workload and a native PodGroup for the TrainJob. Bridge submits the gang to Slurm and binds the
+Pods to the nodes Slurm allocates. Slurm applies its configured priority, backfill, and topology
+policies to the job. On hybrid nodes, native Slurm jobs and Kubernetes workloads can take turns
+using the same hardware. See the [Bridge architecture](https://github.com/SlinkyProject/slurm-bridge/blob/v1.3.0/docs/architecture.md).
 
 ## Prerequisites
 
-- [Kubeflow Trainer installed](../installation.md).
-- [Slurm Bridge installed and connected to Slurm](https://github.com/SlinkyProject/slurm-bridge/blob/main/docs/quickstart.md).
-- `kubelet` and `slurmd` running on the compute nodes used by Slurm Bridge.
-- Matching Kubernetes and Slurm node names. If the names differ, label each Kubernetes Node with
-  `slinky.slurm.net/slurm-nodename: <slurm-node-name>`.
+This walkthrough was tested on Kubernetes 1.37.0 with Kubeflow Trainer 2.4.0, Slurm Bridge 1.3.0,
+and Slurm 26.05.6. Bridge requires Slurm 25.11 or later with the `v0.0.44` REST data parser.
+See the [Bridge compatibility matrix](https://github.com/SlinkyProject/slurm-bridge/blob/v1.3.0/README.md#compatibility) for the Kubernetes and Slurm versions Bridge supports.
 
-Review the [Slurm Bridge compatibility requirements](https://github.com/SlinkyProject/slurm-bridge#compatibility)
-before selecting Kubernetes, Slurm, Slurm Bridge, and scheduler-plugins versions.
+- Enable the Kubernetes `GenericWorkload` feature gate and serve the native Workload and PodGroup APIs.
+- [Install Kubeflow Trainer](../installation.md) with
+  `manager.config.featureGates.TrainJobWorkloadAwareScheduling=true` in the Trainer Helm values.
+  See the [Workload-Aware Scheduling guide](../workload-aware-scheduling.md#prerequisites) for
+  cluster configuration.
+- [Install Slurm Bridge and connect it to Slurm](https://github.com/SlinkyProject/slurm-bridge/blob/v1.3.0/docs/quickstart.md).
+- A Slurm partition with at least two eligible Kubernetes workers. These can be **external nodes**
+  registered by Bridge or **hybrid nodes** running both `kubelet` and `slurmd`. If a hybrid
+  node's names differ, set its Kubernetes Node label `slinky.slurm.net/slurm-nodename` to the
+  Slurm node name. See [Bridge node configuration](https://github.com/SlinkyProject/slurm-bridge/blob/v1.3.0/docs/config.md#nodes).
 
-## Install the Coscheduling API and Controller
-
-Install the scheduler-plugins `PodGroup` CRD and CoScheduling controller:
-
-```bash
-helm install --repo https://scheduler-plugins.sigs.k8s.io scheduler-plugins scheduler-plugins \
-  --namespace scheduler-plugins --create-namespace \
-  --set 'plugins.enabled={CoScheduling}' \
-  --set 'scheduler.replicaCount=0'
-```
-
-The scheduler replica count must remain zero. Slurm Bridge schedules the Pods; the
-scheduler-plugins installation supplies only the `PodGroup` API and controller required by the
-integration.
-
-Trainer discovers the scheduler-plugins API when its controller starts. Install the `PodGroup` CRD
-before installing Trainer or restart the Trainer controller after installing the CRD.
-
-Verify that the API is available:
+Check that the output lists both `workloads` and `podgroups` at `scheduling.k8s.io/v1beta1`:
 
 ```bash
-kubectl api-resources --api-group=scheduling.x-k8s.io
+kubectl api-resources --api-group=scheduling.k8s.io
 ```
-
-```console
-NAME            SHORTNAMES   APIVERSION                     NAMESPACED   KIND
-elasticquotas   eq,eqs       scheduling.x-k8s.io/v1alpha1   true         ElasticQuota
-podgroups       pg,pgs       scheduling.x-k8s.io/v1alpha1   true         PodGroup
-```
-
-```bash
-kubectl get pods -n scheduler-plugins
-```
-
-```console
-NAME                                           READY   STATUS    RESTARTS   AGE
-scheduler-plugins-controller-7469c866f-ngc7t   1/1     Running   0          21m
-```
-
-The API resource output should include `podgroups`.
 
 ## Create a Slurm-enabled Runtime
 
-Create a dedicated runtime with the Coscheduling policy:
+Save the following as `runtime.yaml`. The TrainJob-level gang policy groups all training Pods.
+Setting `schedulerName` on the Pod template routes this runtime's Pods to Bridge even outside
+its managed namespaces. To route a whole namespace, add `slurm-training` to the existing
+`admission.managedNamespaces` list. If your site uses `admission.managedNamespaceSelector`,
+label the namespace to match that selector instead. Within a managed namespace, admission redirects
+Pods that select `default-scheduler` to Bridge and preserves other scheduler names.
+See the [Bridge Helm values](https://github.com/SlinkyProject/slurm-bridge/blob/v1.3.0/helm/slurm-bridge/values.yaml).
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
-  name: torch-distributed-slurm
+  name: torch-slurm-gang
   labels:
     trainer.kubeflow.org/framework: torch
 spec:
   mlPolicy:
     numNodes: 1
     torch: {}
-  podGroupPolicy:
-    coscheduling: {}
+  scheduling:
+    schedulingPolicy:
+      gang: {}
   template:
     spec:
       replicatedJobs:
@@ -99,64 +63,45 @@ spec:
                 trainer.kubeflow.org/trainjob-ancestor-step: trainer
             spec:
               template:
+                metadata:
+                  annotations:
+                    slurmjob.slinky.slurm.net/partition: slurm-bridge
                 spec:
+                  schedulerName: slurm-bridge-scheduler
                   containers:
                     - name: node
-                      image: pytorch/pytorch:2.15.0-cuda13.4-cudnn9-runtime
+                      image: python:3.12-slim
 ```
+
+Set the partition annotation to your site's Slurm partition. For additional placement requirements,
+use Slurm constraints on the Pod template. Bridge rejects Pod node selectors by default, and a
+native PodGroup with `schedulingConstraints.topology` fails Slurm registration.
+See [Bridge workload annotations](https://github.com/SlinkyProject/slurm-bridge/blob/v1.3.0/docs/workload.md#annotations).
 
 ```bash
 kubectl apply -f runtime.yaml
+kubectl create namespace slurm-training
 ```
-
-Trainer calculates the `PodGroup` member count and resources from the runtime.
-
-:::{note}
-Trainer sets a default `scheduleTimeoutSeconds` on the generated scheduler-plugins `PodGroup`.
-Slurm Bridge ignores that field, so it does not limit how long the external Slurm job can remain
-pending.
-:::
-
-## Route TrainJobs to Slurm Bridge
-
-Create a dedicated namespace for Slurm-scheduled TrainJobs:
-
-```bash
-kubectl create namespace trainer-slurm
-```
-
-Add the namespace to an existing Slurm Bridge helm installation:
-
-```bash
-helm upgrade slurm-bridge oci://ghcr.io/slinkyproject/charts/slurm-bridge \
-  --namespace slurm \
-  --reuse-values \
-  --set 'admission.managedNamespaces={trainer-slurm}'
-```
-
-See the
-[Slurm Bridge Helm values](https://github.com/SlinkyProject/slurm-bridge/blob/main/helm/slurm-bridge/values.yaml)
-for additional configuration options.
-
-The Slurm Bridge admission controller changes `spec.schedulerName` from `default-scheduler` to
-`slurm-bridge-scheduler` for Pods in the managed namespace. Pods that explicitly select another
-scheduler are not rewritten.
 
 ## Run a TrainJob
 
-Create a TrainJob that uses the Slurm-enabled runtime:
+Save the following as `trainjob.yaml`. This CPU-only example uses Python to print each worker's
+Trainer-assigned rank and keeps the workers running for a minute so you can inspect the allocation.
+For a training run, set `spec.trainer.image` on the TrainJob to an image containing your framework
+and code, and replace the example command with your training entry point. See the
+[PyTorch guide](../../user-guides/pytorch.md) for distributed training examples.
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: TrainJob
 metadata:
   name: pytorch-slurm
-  namespace: trainer-slurm
+  namespace: slurm-training
 spec:
   runtimeRef:
     apiGroup: trainer.kubeflow.org
     kind: ClusterTrainingRuntime
-    name: torch-distributed-slurm
+    name: torch-slurm-gang
   trainer:
     numNodes: 2
     command:
@@ -166,7 +111,7 @@ spec:
         import os
         import time
 
-        print(f"Training node {os.environ['PET_NODE_RANK']} is running")
+        print(f"Training node {os.environ['PET_NODE_RANK']} is running", flush=True)
         time.sleep(60)
     resourcesPerNode:
       requests:
@@ -179,66 +124,47 @@ spec:
 
 ```bash
 kubectl apply -f trainjob.yaml
-kubectl get podgroups.scheduling.x-k8s.io pytorch-slurm -n trainer-slurm
 ```
 
-The generated `PodGroup` has the same name and namespace as the TrainJob.
+Trainer sets the generated PodGroup's `gang.minCount` to two. Bridge requests exclusive nodes by
+default, so Slurm must have two eligible nodes available at the same time. Ordinary CPU requests
+reserve capacity in Slurm. To pin a container to the CPUs Slurm allocated, use
+[Bridge CPU DRA](https://github.com/SlinkyProject/slurm-bridge/blob/v1.3.0/docs/workload.md#cpu-dra).
 
-:::{note}
-Slurm Bridge uses exclusive whole-node allocations by default. Native Kubernetes CPU requests
-reserve CPU capacity in Slurm but do not constrain the container to Slurm's allocated CPU set. Use
-[Slurm Bridge CPU DRA](https://github.com/SlinkyProject/slurm-bridge/blob/main/docs/workload.md#cpu-dra)
-when aligned CPU isolation is required.
-:::
+## Verify the allocation
 
-## Verify the TrainJob
-
-Check the Trainer resources and scheduler-plugins PodGroup:
+While the TrainJob is active, inspect its Workload and PodGroup. Trainer generates their names
+and sets the TrainJob as their owner.
 
 ```bash
-kubectl get trainjobs,jobsets,jobs -n trainer-slurm
+kubectl get workloads.scheduling.k8s.io,podgroups.scheduling.k8s.io -n slurm-training
+kubectl get pods -n slurm-training -l jobset.sigs.k8s.io/jobset-name=pytorch-slurm \
+  -o custom-columns='POD:.metadata.name,SCHEDULER:.spec.schedulerName,GROUP:.spec.schedulingGroup.podGroupName,SLURM-JOB:.metadata.labels.scheduler\.slinky\.slurm\.net/slurm-jobid,NODE:.spec.nodeName'
+```
+
+In this Kind run, Slurm job 8 allocated two nodes to the same PodGroup:
+
+```console
+POD                            SCHEDULER                GROUP                                 SLURM-JOB   NODE
+pytorch-slurm-node-0-0-279p6   slurm-bridge-scheduler   pytorch-slurm-b23d449c91-d1826bca72   8           trainer-bridge13-worker2
+pytorch-slurm-node-0-1-vslng   slurm-bridge-scheduler   pytorch-slurm-b23d449c91-d1826bca72   8           trainer-bridge13-worker3
+```
+
+On a Slurm client, run `squeue -j <job-id>` with the ID from your Pods to see the two-node
+allocation. A pending job can already have an ID while the Pods are waiting for nodes. If the ID
+is empty, first check that the Pods selected the Bridge scheduler.
+
+After the TrainJob completes, Trainer removes its native Workload and PodGroup. Check completion
+and read the ranks from the Pods. The JobSet should report `Completed` and its Job should show
+`2/2` completions.
+
+```bash
+kubectl wait -n slurm-training --for=condition=Complete trainjob/pytorch-slurm --timeout=5m
+kubectl get trainjobs,jobsets,jobs -n slurm-training
+kubectl logs -n slurm-training -l jobset.sigs.k8s.io/jobset-name=pytorch-slurm
 ```
 
 ```console
-NAME                                          STATE      AGE
-trainjob.trainer.kubeflow.org/pytorch-slurm   Complete   76s
-
-NAME                                   TERMINALSTATE   RESTARTS   COMPLETED   SUSPENDED   AGE
-jobset.jobset.x-k8s.io/pytorch-slurm   Completed       0          True        false       76s
-
-NAME                             STATUS     COMPLETIONS   DURATION   AGE
-job.batch/pytorch-slurm-node-0   Complete   2/2           71s        76s
+Training node 0 is running
+Training node 1 is running
 ```
-
-```bash
-kubectl get podgroups.scheduling.x-k8s.io -n trainer-slurm
-```
-
-```console
-NAME            PHASE      MINMEMBER   RUNNING   SUCCEEDED   FAILED   AGE
-pytorch-slurm   Finished   2                     2                    81s
-```
-
-Inspect the scheduler, Slurm job ID, allocated Slurm node, and bound Kubernetes Node:
-
-```bash
-kubectl get pods \
-  -n trainer-slurm \
-  -l jobset.sigs.k8s.io/jobset-name=pytorch-slurm \
-  -o custom-columns='NAME:.metadata.name,SCHEDULER:.spec.schedulerName,SLURM-JOB:.metadata.labels.scheduler\.slinky\.slurm\.net/slurm-jobid,SLURM-NODE:.metadata.annotations.slinky\.slurm\.net/slurm-node,NODE:.spec.nodeName'
-```
-
-```console
-NAME                           SCHEDULER                SLURM-JOB   SLURM-NODE                   NODE
-pytorch-slurm-node-0-0-6cv72   slurm-bridge-scheduler   2           trainer-guide-3951-worker4   trainer-guide-3951-worker4
-pytorch-slurm-node-0-1-kjn4j   slurm-bridge-scheduler   2           trainer-guide-3951-worker5   trainer-guide-3951-worker5
-```
-
-The `scheduler.slinky.slurm.net/slurm-jobid` label confirms that Slurm Bridge submitted the external
-job. Non-empty Slurm and Kubernetes node columns confirm allocation. Use `squeue -j <job-id>` while
-the external job is pending or running to see its entry in Slurm.
-
-## Next Steps
-
-- Review Slurm Bridge [workload and resource support](https://github.com/SlinkyProject/slurm-bridge/blob/main/docs/workload.md).
-- Review the [Slurm Bridge architecture](https://github.com/SlinkyProject/slurm-bridge/blob/main/docs/architecture.md).

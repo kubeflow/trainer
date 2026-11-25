@@ -25,7 +25,7 @@ Job queueing and resource management with Kueue
 :link: slurm-bridge
 :link-type: doc
 
-Schedule TrainJobs on hybrid Kubernetes and Slurm clusters
+Schedule a TrainJob as one Slurm allocation
 ::::
 
 ::::{grid-item-card} KAI Scheduler

@@ -15,7 +15,7 @@ Kubeflow Trainer integrates with the following frameworks for job scheduling:
 | Framework | Capabilities | Configuration |
 | --------- | ------------ | ------------- |
 | [Kueue](https://kueue.sigs.k8s.io/docs/tasks/run/trainjobs/) | Job queueing, quota-based admission, workload priorities | `kueue.x-k8s.io/queue-name` label on the TrainJob |
-| [Slurm Bridge](slurm-bridge.md) | Scheduling on hybrid Kubernetes and Slurm clusters | `PodGroupPolicy` in the runtime |
+| [Slurm Bridge](slurm-bridge.md) | Gang scheduling through Slurm | `spec.scheduling` in the runtime and `schedulerName` on the Pod template |
 | [KAI Scheduler](kai.md) | Gang scheduling, queue-based resource management | `schedulerName` in the runtime |
 | [Coscheduling](coscheduling.md) | Gang scheduling | `PodGroupPolicy` in the runtime |
 | [Volcano Scheduler](volcano.md) | Gang scheduling, queue-based resource management, network topology-aware scheduling | `PodGroupPolicy` in the runtime |
@@ -33,10 +33,9 @@ represents plugin configuration to enable gang scheduling using that specific in
 specify one of the supported policies in the `PodGroupPolicy` API to enable gang scheduling with
 supported plugins.
 
-The `coscheduling` and `volcano` policies are direct `PodGroupPolicy` sources. Slurm Bridge requires
-the `coscheduling` policy to create a PodGroup for gang scheduling. Kueue and KAI Scheduler use
-different mechanisms: Kueue admits the TrainJob with its own quota and suspend mechanism, and KAI
-Scheduler creates its PodGroup with the `podgrouper` component.
+The `coscheduling` and `volcano` policies are direct `PodGroupPolicy` sources. Kueue admits
+the TrainJob with its own quota and suspend mechanism, and KAI Scheduler creates its PodGroup
+with the `podgrouper` component.
 
 ## Next Steps
 
