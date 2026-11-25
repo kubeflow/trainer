@@ -14,6 +14,8 @@
 
 import logging
 import os
+import shutil
+import tempfile
 from urllib.parse import urlparse
 
 import kagglehub
@@ -73,10 +75,28 @@ class Kaggle(utils.ModelProvider):
         if self.config.access_token:
             os.environ["KAGGLE_API_TOKEN"] = self.config.access_token
 
-        # Download model using kagglehub
-        kagglehub.model_download(
-            handle=model_handle,
-            output_dir=utils.MODEL_PATH,
-        )
+        # Use staging directory for download
+        staging_dir = tempfile.mkdtemp(prefix="kaggle_model_")
+        try:
+            # Download model using kagglehub to staging
+            kagglehub.model_download(
+                handle=model_handle,
+                output_dir=staging_dir,
+            )
+
+            # Move from staging to final destination
+            for item in os.listdir(staging_dir):
+                src = os.path.join(staging_dir, item)
+                dst = os.path.join(utils.MODEL_PATH, item)
+                shutil.move(src, dst)
+
+            logging.info("Model successfully downloaded and moved to destination")
+        except Exception as e:
+            logging.error(f"Model download failed: {e}")
+            raise
+        finally:
+            # Clean up staging directory
+            if os.path.exists(staging_dir):
+                shutil.rmtree(staging_dir)
 
         logging.info("Model has been downloaded")

@@ -339,7 +339,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "huggingface-hub", specifier = ">=2.3.0,<2.4" },
-    { name = "kagglehub", specifier = ">=1.0.0,<2.0" },
+    { name = "kagglehub", specifier = ">=1.0.2,<2.0" },
     { name = "opendal", specifier = ">=0.47.12" },
 ]
 

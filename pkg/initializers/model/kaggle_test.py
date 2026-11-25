@@ -107,22 +107,36 @@ def test_download_model(test_name, test_case):
 
     with patch(
         "pkg.initializers.model.kaggle.kagglehub.model_download"
-    ) as mock_download, patch.dict("os.environ", {}, clear=True):
+    ) as mock_download, patch(
+        "pkg.initializers.model.kaggle.tempfile.mkdtemp"
+    ) as mock_mkdtemp, patch(
+        "pkg.initializers.model.kaggle.os.listdir"
+    ) as mock_listdir, patch(
+        "pkg.initializers.model.kaggle.shutil.move"
+    ) as mock_move, patch(
+        "pkg.initializers.model.kaggle.shutil.rmtree"
+    ) as mock_rmtree, patch(
+        "pkg.initializers.model.kaggle.os.path.exists"
+    ) as mock_exists, patch.dict(
+        "os.environ", {}, clear=True
+    ):
+        # Setup mocks for staging directory operations
+        mock_mkdtemp.return_value = "/tmp/kaggle_model_test789"
+        mock_listdir.return_value = ["model.pth", "config.json"]
+        mock_exists.return_value = True
 
         # Execute download
         kaggle_model_instance.download_model()
 
-        # Verify token was set if provided
-        if test_case["should_set_token"]:
-            # Token should be set in environment during download
-            # We can't easily verify this in the test, but we can verify the download was called
-            pass
-
-        # Verify download was called with correct parameters
-        mock_download.assert_called_once_with(
-            handle=test_case["expected_handle"],
-            output_dir=utils.MODEL_PATH,
-        )
+        # Verify download was called with staging directory
+        mock_download.assert_called_once()
+        call_args = mock_download.call_args
+        assert call_args.kwargs["handle"] == test_case["expected_handle"]
+        assert call_args.kwargs["output_dir"] == "/tmp/kaggle_model_test789"
+        # Verify move was called for each file
+        assert mock_move.call_count == 2
+        # Verify cleanup was called
+        mock_rmtree.assert_called_once_with("/tmp/kaggle_model_test789")
 
     print("Test execution completed")
 
