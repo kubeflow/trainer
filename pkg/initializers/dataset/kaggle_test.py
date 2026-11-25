@@ -124,37 +124,31 @@ def test_download_dataset(test_name, test_case):
     ) as mock_dataset_download, patch(
         "pkg.initializers.dataset.kaggle.kagglehub.competition_download"
     ) as mock_competition_download, patch(
-        "pkg.initializers.dataset.kaggle.tempfile.mkdtemp"
-    ) as mock_mkdtemp, patch(
-        "pkg.initializers.dataset.kaggle.os.listdir"
-    ) as mock_listdir, patch(
-        "pkg.initializers.dataset.kaggle.shutil.move"
-    ) as mock_move, patch(
-        "pkg.initializers.dataset.kaggle.shutil.rmtree"
-    ) as mock_rmtree, patch(
-        "pkg.initializers.dataset.kaggle.os.path.exists"
-    ) as mock_exists, patch.dict(
+        "pkg.initializers.dataset.kaggle.os.makedirs"
+    ) as mock_makedirs, patch.dict(
         "os.environ", {}, clear=True
-    ):
-        # Setup mocks for staging directory operations
-        mock_mkdtemp.return_value = "/tmp/kaggle_dataset_test123"
-        mock_listdir.return_value = ["file1.csv", "file2.csv"]
-        mock_exists.return_value = True
-
+    ) as mock_env:
         # Execute download
         kaggle_dataset_instance.download_dataset()
 
-        # Verify correct download function was called with staging directory
+        # Verify token handling
+        if test_case["should_set_token"]:
+            assert (
+                mock_env.get("KAGGLE_API_TOKEN") == test_case["config"]["access_token"]
+            )
+        else:
+            assert "KAGGLE_API_TOKEN" not in mock_env
+
+        # Verify makedirs was called to ensure destination exists
+        mock_makedirs.assert_called_once_with(utils.DATASET_PATH, exist_ok=True)
+
+        # Verify correct download function was called
         if test_case["resource_type"] == "datasets":
             mock_dataset_download.assert_called_once()
             call_args = mock_dataset_download.call_args
             assert call_args.kwargs["handle"] == test_case["expected_handle"]
-            assert call_args.kwargs["output_dir"] == "/tmp/kaggle_dataset_test123"
+            assert call_args.kwargs["output_dir"] == utils.DATASET_PATH
             mock_competition_download.assert_not_called()
-            # Verify move was called for each file
-            assert mock_move.call_count == 2
-            # Verify cleanup was called
-            mock_rmtree.assert_called_once_with("/tmp/kaggle_dataset_test123")
 
     print("Test execution completed")
 
@@ -201,37 +195,31 @@ def test_download_competition(test_name, test_case):
     ) as mock_dataset_download, patch(
         "pkg.initializers.dataset.kaggle.kagglehub.competition_download"
     ) as mock_competition_download, patch(
-        "pkg.initializers.dataset.kaggle.tempfile.mkdtemp"
-    ) as mock_mkdtemp, patch(
-        "pkg.initializers.dataset.kaggle.os.listdir"
-    ) as mock_listdir, patch(
-        "pkg.initializers.dataset.kaggle.shutil.move"
-    ) as mock_move, patch(
-        "pkg.initializers.dataset.kaggle.shutil.rmtree"
-    ) as mock_rmtree, patch(
-        "pkg.initializers.dataset.kaggle.os.path.exists"
-    ) as mock_exists, patch.dict(
+        "pkg.initializers.dataset.kaggle.os.makedirs"
+    ) as mock_makedirs, patch.dict(
         "os.environ", {}, clear=True
-    ):
-        # Setup mocks for staging directory operations
-        mock_mkdtemp.return_value = "/tmp/kaggle_competition_test456"
-        mock_listdir.return_value = ["train.csv", "test.csv", "sample_submission.csv"]
-        mock_exists.return_value = True
-
+    ) as mock_env:
         # Execute download
         kaggle_dataset_instance.download_dataset()
 
-        # Verify correct download function was called with staging directory
+        # Verify token handling
+        if test_case["should_set_token"]:
+            assert (
+                mock_env.get("KAGGLE_API_TOKEN") == test_case["config"]["access_token"]
+            )
+        else:
+            assert "KAGGLE_API_TOKEN" not in mock_env
+
+        # Verify makedirs was called to ensure destination exists
+        mock_makedirs.assert_called_once_with(utils.DATASET_PATH, exist_ok=True)
+
+        # Verify correct download function was called
         if test_case["resource_type"] == "competitions":
             mock_competition_download.assert_called_once()
             call_args = mock_competition_download.call_args
             assert call_args.kwargs["handle"] == test_case["expected_competition"]
-            assert call_args.kwargs["output_dir"] == "/tmp/kaggle_competition_test456"
+            assert call_args.kwargs["output_dir"] == utils.DATASET_PATH
             mock_dataset_download.assert_not_called()
-            # Verify move was called for each file
-            assert mock_move.call_count == 3
-            # Verify cleanup was called
-            mock_rmtree.assert_called_once_with("/tmp/kaggle_competition_test456")
 
     print("Test execution completed")
 
@@ -245,8 +233,18 @@ def test_download_competition(test_name, test_case):
             "Invalid Kaggle dataset URI",
         ),
         (
+            "Dataset without dataset name",
+            "kaggle://datasets/user",
+            "Invalid Kaggle dataset URI",
+        ),
+        (
             "Invalid resource type",
             "kaggle://models/username/model",
+            "Invalid Kaggle resource type",
+        ),
+        (
+            "Unknown resource type",
+            "kaggle://foo/bar",
             "Invalid Kaggle resource type",
         ),
         (
@@ -255,7 +253,7 @@ def test_download_competition(test_name, test_case):
             "Invalid Kaggle dataset URI",
         ),
         (
-            "Unknown resource type",
+            "Unknown resource type notebooks",
             "kaggle://notebooks/username/notebook",
             "Invalid Kaggle resource type",
         ),

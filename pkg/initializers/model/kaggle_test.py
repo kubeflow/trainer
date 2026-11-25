@@ -108,35 +108,29 @@ def test_download_model(test_name, test_case):
     with patch(
         "pkg.initializers.model.kaggle.kagglehub.model_download"
     ) as mock_download, patch(
-        "pkg.initializers.model.kaggle.tempfile.mkdtemp"
-    ) as mock_mkdtemp, patch(
-        "pkg.initializers.model.kaggle.os.listdir"
-    ) as mock_listdir, patch(
-        "pkg.initializers.model.kaggle.shutil.move"
-    ) as mock_move, patch(
-        "pkg.initializers.model.kaggle.shutil.rmtree"
-    ) as mock_rmtree, patch(
-        "pkg.initializers.model.kaggle.os.path.exists"
-    ) as mock_exists, patch.dict(
+        "pkg.initializers.model.kaggle.os.makedirs"
+    ) as mock_makedirs, patch.dict(
         "os.environ", {}, clear=True
-    ):
-        # Setup mocks for staging directory operations
-        mock_mkdtemp.return_value = "/tmp/kaggle_model_test789"
-        mock_listdir.return_value = ["model.pth", "config.json"]
-        mock_exists.return_value = True
-
+    ) as mock_env:
         # Execute download
         kaggle_model_instance.download_model()
 
-        # Verify download was called with staging directory
+        # Verify token handling
+        if test_case["should_set_token"]:
+            assert (
+                mock_env.get("KAGGLE_API_TOKEN") == test_case["config"]["access_token"]
+            )
+        else:
+            assert "KAGGLE_API_TOKEN" not in mock_env
+
+        # Verify makedirs was called to ensure destination exists
+        mock_makedirs.assert_called_once_with(utils.MODEL_PATH, exist_ok=True)
+
+        # Verify download was called with correct parameters
         mock_download.assert_called_once()
         call_args = mock_download.call_args
         assert call_args.kwargs["handle"] == test_case["expected_handle"]
-        assert call_args.kwargs["output_dir"] == "/tmp/kaggle_model_test789"
-        # Verify move was called for each file
-        assert mock_move.call_count == 2
-        # Verify cleanup was called
-        mock_rmtree.assert_called_once_with("/tmp/kaggle_model_test789")
+        assert call_args.kwargs["output_dir"] == utils.MODEL_PATH
 
     print("Test execution completed")
 

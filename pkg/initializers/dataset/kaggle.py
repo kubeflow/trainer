@@ -14,8 +14,6 @@
 
 import logging
 import os
-import shutil
-import tempfile
 from urllib.parse import urlparse
 
 import kagglehub
@@ -38,7 +36,6 @@ class Kaggle(utils.DatasetProvider):
         self.config = types.KaggleDatasetInitializer(**config_dict)
 
     def download_dataset(self):
-        # Parse kaggle://datasets/username/dataset-name or kaggle://competitions/competition-name
         storage_uri_parsed = urlparse(self.config.storage_uri)
 
         # urlparse treats the part after :// as netloc, so we need to combine netloc and path
@@ -55,93 +52,43 @@ class Kaggle(utils.DatasetProvider):
             )
 
         if resource_type == "datasets":
-            # path should be username/dataset-name
             if not path or "/" not in path:
                 raise ValueError(
                     f"Invalid Kaggle dataset URI: {self.config.storage_uri}. "
                     f"Expected format: kaggle://datasets/<username>/<dataset>"
                 )
-            # Use path as the dataset handle: username/dataset-name
-            dataset_handle = path
-
-            logging.info(f"Downloading Kaggle dataset: {dataset_handle}")
-            logging.info("-" * 40)
-
-            # Set authentication if provided
-            if self.config.access_token:
-                os.environ["KAGGLE_API_TOKEN"] = self.config.access_token
-
-            # Use staging directory for download
-            staging_dir = tempfile.mkdtemp(prefix="kaggle_dataset_")
-            try:
-                # Download dataset using kagglehub to staging
-                kagglehub.dataset_download(
-                    handle=dataset_handle,
-                    output_dir=staging_dir,
-                )
-
-                # Move from staging to final destination
-                for item in os.listdir(staging_dir):
-                    src = os.path.join(staging_dir, item)
-                    dst = os.path.join(utils.DATASET_PATH, item)
-                    shutil.move(src, dst)
-
-                logging.info("Dataset successfully downloaded and moved to destination")
-            except Exception as e:
-                logging.error(f"Dataset download failed: {e}")
-                raise
-            finally:
-                # Clean up staging directory
-                if os.path.exists(staging_dir):
-                    shutil.rmtree(staging_dir)
+            download_func = kagglehub.dataset_download
+            handle = path
+            logging.info(f"Downloading Kaggle dataset: {handle}")
 
         elif resource_type == "competitions":
-            # path should be competition-name
             if not path:
                 raise ValueError(
                     f"Invalid Kaggle competition URI: {self.config.storage_uri}. "
                     f"Expected format: kaggle://competitions/<competition>"
                 )
-            # Use path as the competition name
-            competition_name = path
-
-            logging.info(f"Downloading Kaggle competition: {competition_name}")
-            logging.info("-" * 40)
-
-            # Set authentication if provided
-            if self.config.access_token:
-                os.environ["KAGGLE_API_TOKEN"] = self.config.access_token
-
-            # Use staging directory for download
-            staging_dir = tempfile.mkdtemp(prefix="kaggle_competition_")
-            try:
-                # Download competition data using kagglehub to staging
-                kagglehub.competition_download(
-                    handle=competition_name,
-                    output_dir=staging_dir,
-                )
-
-                # Move from staging to final destination
-                for item in os.listdir(staging_dir):
-                    src = os.path.join(staging_dir, item)
-                    dst = os.path.join(utils.DATASET_PATH, item)
-                    shutil.move(src, dst)
-
-                logging.info(
-                    "Competition data successfully downloaded and moved to destination"
-                )
-            except Exception as e:
-                logging.error(f"Competition download failed: {e}")
-                raise
-            finally:
-                # Clean up staging directory
-                if os.path.exists(staging_dir):
-                    shutil.rmtree(staging_dir)
+            download_func = kagglehub.competition_download
+            handle = path
+            logging.info(f"Downloading Kaggle competition: {handle}")
 
         else:
             raise ValueError(
                 f"Invalid Kaggle resource type: {resource_type}. "
                 f"Expected 'datasets' or 'competitions'"
             )
+
+        logging.info("-" * 40)
+
+        if self.config.access_token:
+            os.environ["KAGGLE_API_TOKEN"] = self.config.access_token
+
+        os.makedirs(utils.DATASET_PATH, exist_ok=True)
+
+        try:
+            download_func(handle=handle, output_dir=utils.DATASET_PATH)
+            logging.info("Download completed successfully")
+        except Exception as e:
+            logging.error(f"Download failed: {e}")
+            raise
 
         logging.info("Dataset has been downloaded")

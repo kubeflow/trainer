@@ -81,6 +81,9 @@ class CacheDatasetInitializer:
 
 
 # Configuration for the Kaggle dataset initializer.
+# Note: Unlike HuggingFace and S3 providers, Kaggle does not support ignore_patterns
+# because kagglehub downloads entire resources (datasets/competitions/models) atomically.
+# Selective file filtering is not supported by the Kaggle API.
 @dataclass
 class KaggleDatasetInitializer:
     storage_uri: str
@@ -88,6 +91,9 @@ class KaggleDatasetInitializer:
 
 
 # Configuration for the Kaggle model initializer.
+# Note: Unlike HuggingFace and S3 providers, Kaggle does not support ignore_patterns
+# because kagglehub downloads entire resources (datasets/competitions/models) atomically.
+# Selective file filtering is not supported by the Kaggle API.
 @dataclass
 class KaggleModelInitializer:
     storage_uri: str
