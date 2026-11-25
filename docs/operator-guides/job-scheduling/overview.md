@@ -33,9 +33,11 @@ represents plugin configuration to enable gang scheduling using that specific in
 specify one of the supported policies in the `PodGroupPolicy` API to enable gang scheduling with
 supported plugins.
 
-The `coscheduling` and `volcano` policies are direct `PodGroupPolicy` sources. Kueue admits
-the TrainJob with its own quota and suspend mechanism, and KAI Scheduler creates its PodGroup
-with the `podgrouper` component.
+The `coscheduling` and `volcano` policies are direct `PodGroupPolicy` sources. Slurm Bridge uses
+native Kubernetes [Workload-Aware Scheduling](../workload-aware-scheduling.md) through the runtime's
+`spec.scheduling` field. Trainer rejects runtimes that set both `spec.scheduling` and
+`spec.podGroupPolicy`. Kueue admits the TrainJob with its own quota and suspend mechanism, and
+KAI Scheduler creates its PodGroup with the `podgrouper` component.
 
 ## Next Steps
 

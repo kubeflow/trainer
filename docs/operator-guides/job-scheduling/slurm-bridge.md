@@ -12,18 +12,19 @@ This walkthrough was tested on Kubernetes 1.37.0 with Kubeflow Trainer 2.4.0, Sl
 and Slurm 26.05.6. Bridge requires Slurm 25.11 or later with the `v0.0.44` REST data parser.
 See the [Bridge compatibility matrix](https://github.com/SlinkyProject/slurm-bridge/blob/v1.3.0/README.md#compatibility) for the Kubernetes and Slurm versions Bridge supports.
 
-- Enable the Kubernetes `GenericWorkload` feature gate and serve the native Workload and PodGroup APIs.
+- Use a Kubernetes 1.37 or later cluster that serves the native Workload and PodGroup APIs. See the
+  [Workload-Aware Scheduling guide](../workload-aware-scheduling.md#prerequisites) for the required
+  feature gates and API configuration.
 - [Install Kubeflow Trainer](../installation.md) with
   `manager.config.featureGates.TrainJobWorkloadAwareScheduling=true` in the Trainer Helm values.
-  See the [Workload-Aware Scheduling guide](../workload-aware-scheduling.md#prerequisites) for
-  cluster configuration.
 - [Install Slurm Bridge and connect it to Slurm](https://github.com/SlinkyProject/slurm-bridge/blob/v1.3.0/docs/quickstart.md).
 - A Slurm partition with at least two eligible Kubernetes workers. These can be **external nodes**
   registered by Bridge or **hybrid nodes** running both `kubelet` and `slurmd`. If a hybrid
   node's names differ, set its Kubernetes Node label `slinky.slurm.net/slurm-nodename` to the
   Slurm node name. See [Bridge node configuration](https://github.com/SlinkyProject/slurm-bridge/blob/v1.3.0/docs/config.md#nodes).
 
-Check that the output lists both `workloads` and `podgroups` at `scheduling.k8s.io/v1beta1`:
+Run `kubectl api-resources` to verify that your cluster serves the required APIs. The output must
+list both `workloads` and `podgroups` at `scheduling.k8s.io/v1beta1`.
 
 ```bash
 kubectl api-resources --api-group=scheduling.k8s.io
@@ -33,7 +34,10 @@ kubectl api-resources --api-group=scheduling.k8s.io
 
 Save the following as `runtime.yaml`. The TrainJob-level gang policy groups all training Pods.
 Setting `schedulerName` on the Pod template routes this runtime's Pods to Bridge even outside
-its managed namespaces. To route a whole namespace, add `slurm-training` to the existing
+its managed namespaces. Use the name configured in `schedulerConfig.schedulerName` in the Bridge
+Helm values. The example uses the default, `slurm-bridge-scheduler`.
+
+To route a whole namespace, add `slurm-training` to the existing
 `admission.managedNamespaces` list. If your site uses `admission.managedNamespaceSelector`,
 label the namespace to match that selector instead. Within a managed namespace, admission redirects
 Pods that select `default-scheduler` to Bridge and preserves other scheduler names.
@@ -86,7 +90,7 @@ kubectl create namespace slurm-training
 ## Run a TrainJob
 
 Save the following as `trainjob.yaml`. This CPU-only example uses Python to print each worker's
-Trainer-assigned rank and keeps the workers running for a minute so you can inspect the allocation.
+Trainer-assigned rank and keeps the workers running for five minutes so you can inspect the allocation.
 For a training run, set `spec.trainer.image` on the TrainJob to an image containing your framework
 and code, and replace the example command with your training entry point. See the
 [PyTorch guide](../../user-guides/pytorch.md) for distributed training examples.
@@ -112,7 +116,7 @@ spec:
         import time
 
         print(f"Training node {os.environ['PET_NODE_RANK']} is running", flush=True)
-        time.sleep(60)
+        time.sleep(300)
     resourcesPerNode:
       requests:
         cpu: "1"
@@ -159,7 +163,7 @@ and read the ranks from the Pods. The JobSet should report `Completed` and its J
 `2/2` completions.
 
 ```bash
-kubectl wait -n slurm-training --for=condition=Complete trainjob/pytorch-slurm --timeout=5m
+kubectl wait -n slurm-training --for=condition=Complete trainjob/pytorch-slurm --timeout=10m
 kubectl get trainjobs,jobsets,jobs -n slurm-training
 kubectl logs -n slurm-training -l jobset.sigs.k8s.io/jobset-name=pytorch-slurm
 ```
