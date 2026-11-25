@@ -391,7 +391,6 @@ mod tests {
 
     /// A non-empty batch still has to be routed, and an unknown worker id is still
     /// an error rather than something to skip over.
-
     #[tokio::test]
     async fn test_send_record_batch_rejects_unknown_worker() -> Result<()> {
         let schema = assignment_schema();
