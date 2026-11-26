@@ -418,12 +418,9 @@ type EnvInjectionTarget struct {
 type JAXMLPolicySource struct{}
 
 // XGBoostMLPolicySource represents an XGBoost runtime configuration.
-// The number of workers per node is automatically derived from container GPU resources:
-//   - GPU training: 1 worker per GPU (from resourcesPerNode)
-//   - CPU training: 1 worker per node (each worker utilizes all available CPU cores
-//     via XGBoost's multi-threaded execution, controlled by the nthread parameter)
-//
-// DMLC_NUM_WORKER = numNodes × workersPerNode (where workersPerNode = GPU count or 1)
+// Each node runs one XGBoost worker, so DMLC_NUM_WORKER = numNodes. On CPU nodes the worker
+// uses all available CPU cores via XGBoost's multi-threaded execution, controlled by the
+// nthread parameter. On GPU nodes XGBoost uses one GPU per worker.
 type XGBoostMLPolicySource struct{}
 
 // MPIMLPolicySource represents a MPI runtime configuration.

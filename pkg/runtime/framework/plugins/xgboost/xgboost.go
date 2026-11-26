@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
@@ -101,20 +100,9 @@ func (x *XGBoost) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 
 		numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
 
-		// Auto-derive numWorkersPerNode from GPU resources.
-		// GPU training: 1 worker per GPU | CPU training: 1 worker per node.
-		numWorkersPerNode := int32(1)
-		// Step 1: Get resources from Runtime (ClusterTrainingRuntime template).
-		resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
-		// Step 2: Override with TrainJob resources if specified.
-		if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
-			resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
-		}
-		// Step 3: Derive GPU count from the final resolved resources.
-		if gpuCount := runtime.GetNumGPUPerNode(&resourcesPerNode); gpuCount > 0 {
-			numWorkersPerNode = int32(gpuCount)
-		}
-		totalWorkers := numNodes * numWorkersPerNode
+		// Each node pod runs a single XGBoost worker, so DMLC_NUM_WORKER is the number of nodes.
+		// DMLC_TASK_ID comes from the Job completion index, which only covers one process per pod.
+		numWorkers := numNodes
 
 		// Build tracker URI: <trainjob-name>-node-0-0.<trainjob-name>
 		trackerURI := fmt.Sprintf("%s-%s-0-0.%s",
@@ -136,10 +124,10 @@ func (x *XGBoost) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 				WithValueFrom(corev1ac.EnvVarSource().
 					WithFieldRef(corev1ac.ObjectFieldSelector().
 						WithFieldPath(constants.JobCompletionIndexFieldPath))),
-			// DMLC_NUM_WORKER - Total number of workers.
+			// DMLC_NUM_WORKER - Total number of workers, one per node.
 			*corev1ac.EnvVar().
 				WithName(constants.XGBoostEnvNumWorker).
-				WithValue(fmt.Sprintf("%d", totalWorkers)),
+				WithValue(fmt.Sprintf("%d", numWorkers)),
 		)
 
 		// Add container port for tracker communication.
