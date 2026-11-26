@@ -22,7 +22,38 @@ import (
 	"testing"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 )
+
+func TestTrainJobStatusFeatureGate(t *testing.T) {
+	spec, ok := defaultFeatureGates[TrainJobStatus]
+	if !ok {
+		t.Fatal("TrainJobStatus feature gate is not registered")
+	}
+
+	if !spec.Default {
+		t.Error("TrainJobStatus feature gate should be enabled by default")
+	}
+
+	if spec.PreRelease != featuregate.Beta {
+		t.Errorf("TrainJobStatus feature gate stage = %q, want %q", spec.PreRelease, featuregate.Beta)
+	}
+
+	if spec.LockToDefault {
+		t.Error("TrainJobStatus feature gate should not be locked to default in Beta")
+	}
+
+	gate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
+	if !gate.Enabled(TrainJobStatus) {
+		t.Error("TrainJobStatus should be enabled on default gate")
+	}
+	if err := gate.SetFromMap(map[string]bool{string(TrainJobStatus): false}); err != nil {
+		t.Fatalf("Unexpected error disabling TrainJobStatus: %v", err)
+	}
+	if gate.Enabled(TrainJobStatus) {
+		t.Error("TrainJobStatus should be disabled after opt-out")
+	}
+}
 
 func TestOptimizationJobDependencies(t *testing.T) {
 	cases := map[string]struct {
@@ -31,12 +62,16 @@ func TestOptimizationJobDependencies(t *testing.T) {
 		wantError    bool
 	}{
 		"disabled by default": {},
-		"enabled with TrainJobStatus": {
+		"enabled with default TrainJobStatus": {
+			featureGates: map[string]bool{string(OptimizationJob): true},
+			wantEnabled:  true,
+		},
+		"enabled with explicit TrainJobStatus": {
 			featureGates: map[string]bool{string(OptimizationJob): true, string(TrainJobStatus): true},
 			wantEnabled:  true,
 		},
 		"requires TrainJobStatus": {
-			featureGates: map[string]bool{string(OptimizationJob): true},
+			featureGates: map[string]bool{string(OptimizationJob): true, string(TrainJobStatus): false},
 			wantError:    true,
 		},
 	}

@@ -40,13 +40,58 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
+func singleNodeTrainerInfo() *runtime.Info {
+	return &runtime.Info{
+		TemplateSpec: runtime.TemplateSpec{
+			PodSets: []runtime.PodSet{
+				{
+					Name:     "trainer",
+					Ancestor: ptr.To(constants.AncestorTrainer),
+					Count:    ptr.To[int32](1),
+					Containers: []runtime.Container{
+						{Name: constants.Node},
+					},
+				},
+			},
+		},
+	}
+}
+
 func TestEnforcePodSpec(t *testing.T) {
 	cases := map[string]struct {
-		info      *runtime.Info
-		trainJob  *trainer.TrainJob
-		wantInfo  *runtime.Info
-		wantError error
+		cfgOverride func(*configapi.Configuration) *configapi.Configuration
+		info        *runtime.Info
+		trainJob    *trainer.TrainJob
+		wantInfo    *runtime.Info
+		wantError   error
 	}{
+		"returns error when configuration is nil": {
+			cfgOverride: func(*configapi.Configuration) *configapi.Configuration { return nil },
+			info:        singleNodeTrainerInfo(),
+			trainJob:    utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantInfo:    singleNodeTrainerInfo(),
+			wantError:   errMissingStatusServerPort,
+		},
+		"returns error when StatusServer configuration is nil": {
+			cfgOverride: func(cfg *configapi.Configuration) *configapi.Configuration {
+				cfg.StatusServer = nil
+				return cfg
+			},
+			info:      singleNodeTrainerInfo(),
+			trainJob:  utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantInfo:  singleNodeTrainerInfo(),
+			wantError: errMissingStatusServerPort,
+		},
+		"returns error when CertManagement configuration is nil": {
+			cfgOverride: func(cfg *configapi.Configuration) *configapi.Configuration {
+				cfg.CertManagement = nil
+				return cfg
+			},
+			info:      singleNodeTrainerInfo(),
+			trainJob:  utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantInfo:  singleNodeTrainerInfo(),
+			wantError: errMissingCertManagementService,
+		},
 		"does nothing if no trainer pods": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
@@ -278,6 +323,9 @@ func TestEnforcePodSpec(t *testing.T) {
 					Burst: ptr.To[int32](10),
 				},
 			}
+			if tc.cfgOverride != nil {
+				cfg = tc.cfgOverride(cfg)
+			}
 
 			p, err := New(ctx, cli, nil, cfg)
 			if err != nil {
@@ -307,12 +355,28 @@ func TestBuild(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		info      *runtime.Info
-		trainJob  *trainer.TrainJob
-		objs      []client.Object
-		wantObjs  []apiruntime.Object
-		wantError string
+		cfgOverride func(*configapi.Configuration) *configapi.Configuration
+		info        *runtime.Info
+		trainJob    *trainer.TrainJob
+		objs        []client.Object
+		wantObjs    []apiruntime.Object
+		wantError   string
 	}{
+		"returns error when configuration is nil": {
+			cfgOverride: func(*configapi.Configuration) *configapi.Configuration { return nil },
+			info:        &runtime.Info{},
+			trainJob:    utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantError:   "missing cert management secret name",
+		},
+		"returns error when CertManagement configuration is nil": {
+			cfgOverride: func(cfg *configapi.Configuration) *configapi.Configuration {
+				cfg.CertManagement = nil
+				return cfg
+			},
+			info:      &runtime.Info{},
+			trainJob:  utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantError: "missing cert management secret name",
+		},
 		"no action when info is nil": {
 			info:     nil,
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
@@ -469,6 +533,9 @@ func TestBuild(t *testing.T) {
 					QPS:   ptr.To[float32](5),
 					Burst: ptr.To[int32](10),
 				},
+			}
+			if tc.cfgOverride != nil {
+				cfg = tc.cfgOverride(cfg)
 			}
 
 			p, err := New(ctx, cli, nil, cfg)

@@ -18,6 +18,7 @@ package trainjobstatus
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -55,6 +56,12 @@ const (
 
 	// Server tls config
 	caCertKey = "ca.crt"
+)
+
+var (
+	errMissingStatusServerPort      = errors.New("missing status server port")
+	errMissingCertManagementService = errors.New("missing cert management service name")
+	errMissingCertManagementSecret  = errors.New("missing cert management secret name")
 )
 
 type Status struct {
@@ -115,8 +122,11 @@ func (p *Status) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 }
 
 func (p *Status) createEnvVars(trainJob *trainer.TrainJob) ([]corev1ac.EnvVarApplyConfiguration, error) {
-	if p.cfg.StatusServer.Port == nil {
-		return nil, fmt.Errorf("missing status server port")
+	if p.cfg == nil || p.cfg.StatusServer == nil || p.cfg.StatusServer.Port == nil {
+		return nil, errMissingStatusServerPort
+	}
+	if p.cfg.CertManagement == nil || p.cfg.CertManagement.ServiceName == "" {
+		return nil, errMissingCertManagementService
 	}
 	svc := fmt.Sprintf("https://%s.%s.svc:%d", p.cfg.CertManagement.ServiceName, cert.GetOperatorNamespace(), *p.cfg.StatusServer.Port)
 	path := statusserver.StatusUrl(trainJob.Namespace, trainJob.Name)
@@ -173,6 +183,9 @@ func createTokenVolume(trainJob *trainer.TrainJob) corev1ac.VolumeApplyConfigura
 
 // buildStatusServerCaCrtConfigMap creates a ConfigMap that will copy the ca.crt from the TLS secret
 func (p *Status) buildStatusServerCaCrtConfigMap(ctx context.Context, trainJob *trainer.TrainJob) (*corev1ac.ConfigMapApplyConfiguration, error) {
+	if p.cfg == nil || p.cfg.CertManagement == nil || p.cfg.CertManagement.SecretName == "" {
+		return nil, errMissingCertManagementSecret
+	}
 	configMapName := fmt.Sprintf("%s-tls-config", trainJob.Name)
 
 	// Get the CA cert from the TLS secret

@@ -146,6 +146,8 @@ func wantDRATorchJobSet(requests corev1.ResourceList, numProcPerNode string) *te
 func TestTrainingRuntimeNewObjects(t *testing.T) {
 	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobDynamicResourceAllocation, true)
+	// TrainJobStatus requires status server config and TLS secret; tested separately in plugins/trainjobstatus.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobStatus, false)
 	resRequests := corev1.ResourceList{
 		corev1.ResourceCPU: resource.MustParse("1"),
 	}

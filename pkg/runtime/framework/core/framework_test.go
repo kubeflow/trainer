@@ -63,6 +63,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/trainjobstatus"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/xgboost"
 	index "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
@@ -86,15 +87,16 @@ func TestNew(t *testing.T) {
 			wantFramework: &Framework{
 				registry: fwkplugins.NewRegistry(),
 				plugins: map[string]framework.Plugin{
-					coscheduling.Name: &coscheduling.CoScheduling{},
-					flux.Name:         &flux.Flux{},
-					volcano.Name:      &volcano.Volcano{},
-					mpi.Name:          &mpi.MPI{},
-					plainml.Name:      &plainml.PlainML{},
-					torch.Name:        &torch.Torch{},
-					jobset.Name:       &jobset.JobSet{},
-					jax.Name:          &jax.Jax{},
-					xgboost.Name:      &xgboost.XGBoost{},
+					coscheduling.Name:   &coscheduling.CoScheduling{},
+					flux.Name:           &flux.Flux{},
+					volcano.Name:        &volcano.Volcano{},
+					mpi.Name:            &mpi.MPI{},
+					plainml.Name:        &plainml.PlainML{},
+					torch.Name:          &torch.Torch{},
+					jobset.Name:         &jobset.JobSet{},
+					jax.Name:            &jax.Jax{},
+					trainjobstatus.Name: &trainjobstatus.Status{},
+					xgboost.Name:        &xgboost.XGBoost{},
 				},
 				enforceMLPlugins: []framework.EnforceMLPolicyPlugin{
 					&flux.Flux{},
@@ -107,6 +109,9 @@ func TestNew(t *testing.T) {
 				enforcePodGroupPolicyPlugins: []framework.EnforcePodGroupPolicyPlugin{
 					&coscheduling.CoScheduling{},
 					&volcano.Volcano{},
+				},
+				enforcePodSpecPlugins: []framework.EnforcePodSpecPlugin{
+					&trainjobstatus.Status{},
 				},
 				customValidationPlugins: []framework.CustomValidationPlugin{
 					&flux.Flux{},
@@ -133,6 +138,7 @@ func TestNew(t *testing.T) {
 					&volcano.Volcano{},
 					&jobset.JobSet{},
 					&mpi.MPI{},
+					&trainjobstatus.Status{},
 				},
 				componentDeleterPlugins: []framework.ComponentDeleterPlugin{
 					&volcano.Volcano{},
@@ -157,7 +163,7 @@ func TestNew(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmp.AllowUnexported(Framework{}),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, flux.Flux{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}, xgboost.XGBoost{}),
+		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, flux.Flux{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, trainjobstatus.Status{}, jobset.JobSet{}, xgboost.XGBoost{}),
 		cmpopts.IgnoreFields(flux.Flux{}, "client", "scheme"),
 		cmpopts.IgnoreFields(coscheduling.CoScheduling{}, "client"),
 		cmpopts.IgnoreFields(volcano.Volcano{}, "client"),
@@ -551,6 +557,10 @@ func nodeContainerRequests(cpu, memory string) *corev1ac.ResourceRequirementsApp
 }
 
 func TestRunComponentBuilderPlugins(t *testing.T) {
+	// Do not use t.Parallel() — SetFeatureGateDuringTest mutates global state.
+	// TrainJobStatus requires status server config and TLS secret; tested separately in plugins/trainjobstatus.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobStatus, false)
+
 	cases := map[string]struct {
 		registry        fwkplugins.Registry
 		runtimeInfo     *runtime.Info

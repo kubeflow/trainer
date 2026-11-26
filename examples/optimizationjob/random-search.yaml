@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Prerequisites: Kubeflow Trainer 2.4+ with OptimizationJob controller, TrainJobStatus=true, and the
+# Prerequisites: Kubeflow Trainer 2.4+ with OptimizationJob controller enabled (TrainJobStatus is enabled by default; also set TrainJobStatus=true on Trainer 2.4), and the
 # default torch-distributed ClusterTrainingRuntime. No GPUs or dataset downloads.
 # Apply: kubectl apply -f examples/optimizationjob/random-search.yaml
 # Clean: kubectl delete optimizationjob linear-regression-search

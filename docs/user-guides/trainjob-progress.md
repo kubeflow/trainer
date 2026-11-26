@@ -8,8 +8,10 @@ pairs) directly into `TrainJob.status.trainerStatus` in real time. This eliminat
 to manually parse or scrape container logs to monitor training health and performance.
 
 :::{important}
-The TrainJob progress feature was introduced in Kubeflow Trainer v2.2.0 and requires the `TrainJobStatus` alpha
-feature gate to be enabled on the controller.
+The TrainJob progress feature was introduced in Kubeflow Trainer v2.2.0. The `TrainJobStatus`
+feature is Beta and enabled by default, so no configuration is required for normal use.
+On earlier releases where it was Alpha (such as v2.2.0–v2.4.x), enable it explicitly via
+`--feature-gates=TrainJobStatus=true` or Helm (`manager.config.featureGates.TrainJobStatus=true`).
 :::
 
 :::{note}
@@ -20,18 +22,27 @@ to understand the basics of Kubeflow Trainer.
 ## Prerequisites
 
 - Kubeflow Trainer v2.2.0 or later installed on your cluster.
-- The `TrainJobStatus` alpha feature gate enabled on the Trainer controller. To enable
-  it, pass the flag to the controller at startup:
-
-  ```bash
-  --feature-gates=TrainJobStatus=true
-  ```
-
-  Or, if deploying via Helm, set `manager.config.featureGates.TrainJobStatus=true`.
-
-  The command-line flag takes precedence over any value set in the controller config file.
-
 - For SDK-based progress reporting: Kubeflow SDK `>= 0.5.0`.
+
+`TrainJobStatus` is a Beta feature and is enabled by default, so no configuration is required for normal use
+(earlier releases where it was Alpha require `--feature-gates=TrainJobStatus=true` or
+`manager.config.featureGates.TrainJobStatus=true` in Helm).
+
+Before disabling `TrainJobStatus`, ensure dependent Alpha features such as `OptimizationJob` are
+also disabled (`OptimizationJob=false`), or the controller will fail its startup feature-gate
+dependency check and exit.
+
+Administrators can opt out by passing `--feature-gates=TrainJobStatus=false` to the controller at startup,
+or with Helm by passing `--set manager.config.featureGates.TrainJobStatus=false` (or in `values.yaml`):
+
+```yaml
+manager:
+  config:
+    featureGates:
+      TrainJobStatus: false
+```
+
+The command-line flag takes precedence over any value set in the controller config file.
 
 ### Status server rate limits
 
@@ -137,9 +148,9 @@ trainer = Trainer(
     compute_metrics=compute_metrics,
 )
 
-# When running inside a Kubeflow TrainJob with TrainJobStatus enabled,
-# KubeflowTrainerCallback is auto-registered and reports the following
-# at each logging step: loss, learning_rate, epoch, completion percentage.
+# When running inside a Kubeflow TrainJob, KubeflowTrainerCallback is
+# auto-registered and reports the following at each logging step:
+# loss, learning_rate, epoch, completion percentage.
 # Any custom metrics returned by compute_metrics (like 'accuracy') are also automatically reported.
 trainer.train()
 ```

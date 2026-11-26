@@ -33,14 +33,16 @@ runtimes. For the example below, you need:
 
 - Kubeflow Trainer 2.4 or later to enable the OptimizationJob CRD and controller.
 - The default `torch-distributed` ClusterTrainingRuntime.
-- The `OptimizationJob` and `TrainJobStatus` alpha feature gates enabled on the Trainer controller:
+- The `OptimizationJob` alpha feature gate enabled on the Trainer controller (`OptimizationJob` depends
+  on `TrainJobStatus`, which is Beta and enabled by default; on Trainer 2.4 where `TrainJobStatus`
+  was Alpha, also enable `TrainJobStatus=true`):
 
   ```text
-  --feature-gates=OptimizationJob=true,TrainJobStatus=true
+  --feature-gates=OptimizationJob=true
   ```
 
-  With Helm, set `manager.config.featureGates.OptimizationJob=true` and
-  `manager.config.featureGates.TrainJobStatus=true`. See
+  With Helm, set `manager.config.featureGates.OptimizationJob=true` (and
+  `manager.config.featureGates.TrainJobStatus=true` on Trainer 2.4). See
   [TrainJob progress and training metrics](trainjob-progress.md) for status server prerequisites
   and configuration.
 - Capacity for two concurrent trials requesting one CPU and 256 MiB of memory each, with a
