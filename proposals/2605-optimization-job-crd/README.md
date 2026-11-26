@@ -8,13 +8,13 @@
 
 1. [Background & Motivation](#1-background--motivation)
 2. [User Stories](#2-user-stories)
-3. [Goals by Phase](#3-goals-by-phase)
-4. [Non-Goals](#4-non-goals)
+3. [Goals](#3-goals)
+4. [Non-Goals / Future Iterations](#4-non-goals--future-iterations)
 5. [Phase 1 API Design (v1alpha1)](#5-phase-1-api-design-v1alpha1)
 6. [Sample YAML (Phase 1)](#6-sample-yaml-phase-1)
 7. [Reconciliation & Architecture (Phase 1)](#7-reconciliation--architecture-phase-1)
-8. [Open Discussions](#8-open-discussions)
-9. [Implementation History](#9-implementation-history)
+8. [Design Decisions & Open Discussions](#8-design-decisions--open-discussions)
+9. [Implementation History](#implementation-history)
 10. [Alternatives](#10-alternatives)
 
 ---
