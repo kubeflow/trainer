@@ -87,6 +87,27 @@ func TestValidate(t *testing.T) {
 				&field.Error{Type: field.ErrorTypeInvalid, Field: "health.livenessEndpointName"},
 			},
 		},
+		"invalid percent-encoded equivalent health endpoints": {
+			cfg: &configapi.Configuration{
+				Health: configapi.ControllerHealth{
+					HealthProbeBindAddress: ":8081",
+					ReadinessEndpointName:  "probe",
+					LivenessEndpointName:   "%70robe",
+				},
+			},
+			wantErr: field.ErrorList{
+				&field.Error{Type: field.ErrorTypeInvalid, Field: "health.livenessEndpointName"},
+			},
+		},
+		"valid escaped slash within a path segment": {
+			cfg: &configapi.Configuration{
+				Health: configapi.ControllerHealth{
+					HealthProbeBindAddress: ":8081",
+					ReadinessEndpointName:  "probe/live",
+					LivenessEndpointName:   "probe%2Flive",
+				},
+			},
+		},
 		"invalid readiness endpoint matching the liveness subtree": {
 			cfg: &configapi.Configuration{
 				Health: configapi.ControllerHealth{
