@@ -1219,6 +1219,22 @@ func MakeClusterTrainingRuntimeWrapper(name string) *ClusterTrainingRuntimeWrapp
 	}
 }
 
+func (r *ClusterTrainingRuntimeWrapper) Label(key, value string) *ClusterTrainingRuntimeWrapper {
+	if r.Labels == nil {
+		r.Labels = make(map[string]string, 1)
+	}
+	r.Labels[key] = value
+	return r
+}
+
+func (r *ClusterTrainingRuntimeWrapper) Annotation(key, value string) *ClusterTrainingRuntimeWrapper {
+	if r.Annotations == nil {
+		r.Annotations = make(map[string]string, 1)
+	}
+	r.Annotations[key] = value
+	return r
+}
+
 func (r *ClusterTrainingRuntimeWrapper) Finalizers(f ...string) *ClusterTrainingRuntimeWrapper {
 	r.ObjectMeta.Finalizers = append(r.ObjectMeta.Finalizers, f...)
 	return r
