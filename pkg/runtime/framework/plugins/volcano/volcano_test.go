@@ -547,6 +547,7 @@ func TestVolcanoDelete(t *testing.T) {
 		"running trainjob is not touched": {
 			trainJob: &trainer.TrainJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob", Namespace: "test-ns", UID: "1"},
+				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(false)},
 			},
 			objs:     []client.Object{ownedPodGroup},
 			wantObjs: nil,
