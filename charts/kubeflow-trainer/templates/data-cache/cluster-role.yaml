@@ -37,4 +37,16 @@ rules:
     resources:
       - serviceaccounts
     verbs: ["create", "delete", "get", "list", "watch"]
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - trainjobs
+    verbs: ["get"]
+  # Setting blockOwnerDeletion on the TrainJob owner reference requires update
+  # on the owner's finalizers subresource under OwnerReferencesPermissionEnforcement.
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - trainjobs/finalizers
+    verbs: ["update"]
 {{- end }}
