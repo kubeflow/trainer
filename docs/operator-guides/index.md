@@ -39,13 +39,6 @@ Migrate from Kubeflow Training Operator v1 to Trainer v2
 Configure TrainingRuntime and ClusterTrainingRuntime resources
 ::::
 
-::::{grid-item-card} Distributed Runtimes: FSDP & DeepSpeed
-:link: distributed-training-runtimes
-:link-type: doc
-
-Configure TrainingRuntimes for PyTorch FSDP and DeepSpeed
-::::
-
 ::::{grid-item-card} ML Policies
 :link: ml-policy
 :link-type: doc
@@ -113,7 +106,6 @@ Integrate with Kueue, Slurm Bridge, KAI Scheduler, Coscheduling, and Volcano
 installation
 migration
 runtime
-distributed-training-runtimes
 ml-policy
 job-template
 runtime-patches
