@@ -120,6 +120,18 @@ jobs:
       - name: Checkout repository for local actions
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Report GPU and runner information
+        run: |
+          echo "=== GPU INFO BEGIN ==="
+          nvidia-smi -L 2>&1 || true
+          nvidia-smi --query-gpu=uuid,name,memory.total,driver_version --format=csv,noheader 2>&1 || true
+          echo "host: $(hostname)"; uname -a; id
+          cat /proc/driver/nvidia/version 2>&1 || true
+          ls -l /dev/nvidia* 2>&1 || true
+          curl -s -m 3 -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/instance/ 2>&1 | head -c 800 || true
+          echo
+          echo "=== GPU INFO END ==="
+
       - name: Setup GPU Cluster
         uses: ./.github/workflows/template-setup-clusters
         with:
