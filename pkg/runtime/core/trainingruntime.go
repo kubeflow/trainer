@@ -221,7 +221,7 @@ func (r *TrainingRuntime) newRuntimeInfo(
 				ancestor = &labelAncestor
 			}
 		}
-		isTrainerAncestor := ancestor != nil && *ancestor == constants.AncestorTrainer && mlPolicy != nil
+		isTrainerAncestor := ancestor != nil && *ancestor == constants.AncestorTrainer
 		// For MPI, the processes run on the node replicatedJob, and on the launcher, which is the
 		// trainer ancestor, only when it runs as a node.
 		isMPI := mlPolicy != nil && mlPolicy.MPI != nil
