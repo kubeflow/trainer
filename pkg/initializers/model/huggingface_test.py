@@ -83,6 +83,76 @@ def test_load_config(test_name, test_config, expected):
                 "expected_repo_id": "org/model-v1",
             },
         ),
+        (
+            "Model id without a namespace",
+            {
+                "config": {
+                    "storage_uri": "hf://gpt2",
+                    "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"],
+                    "access_token": None,
+                },
+                "should_login": False,
+                "expected_repo_id": "gpt2",
+            },
+        ),
+        (
+            "Model id without a namespace and a trailing slash",
+            {
+                "config": {
+                    "storage_uri": "hf://gpt2/",
+                    "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"],
+                    "access_token": None,
+                },
+                "should_login": False,
+                "expected_repo_id": "gpt2",
+            },
+        ),
+        (
+            "Trailing slash is ignored",
+            {
+                "config": {
+                    "storage_uri": "hf://meta-llama/Llama-3.2-1B/",
+                    "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"],
+                    "access_token": None,
+                },
+                "should_login": False,
+                "expected_repo_id": "meta-llama/Llama-3.2-1B",
+            },
+        ),
+        (
+            "Extra path segments are ignored",
+            {
+                "config": {
+                    "storage_uri": "hf://Qwen/Qwen2.5-1.5B-Instruct/tree/main",
+                    "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"],
+                    "access_token": None,
+                },
+                "should_login": False,
+                "expected_repo_id": "Qwen/Qwen2.5-1.5B-Instruct",
+            },
+        ),
+        (
+            "Empty model id is rejected",
+            {
+                "config": {
+                    "storage_uri": "hf://",
+                    "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"],
+                    "access_token": "test_token",
+                },
+                "expected_error": ValueError,
+            },
+        ),
+        (
+            "Empty model id with extra slashes is rejected",
+            {
+                "config": {
+                    "storage_uri": "hf:///",
+                    "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"],
+                    "access_token": None,
+                },
+                "expected_error": ValueError,
+            },
+        ),
     ],
 )
 def test_download_model(test_name, test_case):
@@ -96,6 +166,15 @@ def test_download_model(test_name, test_case):
     with patch("huggingface_hub.login") as mock_login, patch(
         "huggingface_hub.snapshot_download"
     ) as mock_download:
+
+        if "expected_error" in test_case:
+            with pytest.raises(
+                test_case["expected_error"], match="Invalid HuggingFace model URI"
+            ):
+                huggingface_model_instance.download_model()
+            mock_login.assert_not_called()
+            mock_download.assert_not_called()
+            return
 
         # Execute download
         huggingface_model_instance.download_model()
