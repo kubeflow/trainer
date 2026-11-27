@@ -3,29 +3,30 @@
 This guide shows how to fine-tune T5 for text summarization with PyTorch Fully Sharded
 Data Parallel (FSDP) and the Kubeflow Python SDK. It adapts the
 [Trainer v1 T5 FSDP notebook](https://github.com/kubeflow/trainer/blob/release-1.9/examples/pytorch/fsdp/fine-tune-t5-with-fsdp.ipynb)
-to TrainJob and the existing `torch-distributed` runtime. An equivalent
-[notebook](https://github.com/kubeflow/trainer/blob/master/examples/pytorch/fsdp/fine-tune-t5-with-fsdp.ipynb)
-is available.
+to TrainJob and the existing `torch-distributed` runtime.
 
 FSDP shards model parameters, gradients, and optimizer state across GPUs. The runtime
 launches the processes with `torchrun`; your training function wraps the model with
 FSDP. You do not need a custom TrainingRuntime, an FSDP-specific launcher flag, or
-`FSDP_*` environment variables to enable it.
+`FSDP_*` environment variables to enable it. For the distributed environment variables
+and runtime setup, see the [PyTorch guide](pytorch).
 
 ## Prerequisites
 
-- Follow [Getting Started](../getting-started/index) to install Kubeflow Trainer and
-  configure Kubernetes access from your notebook or Python environment.
-- Ask your platform administrator to make the `torch-distributed` runtime available.
-  This example uses NVIDIA GPUs, a CUDA-enabled PyTorch image, and the NCCL backend.
-- Have four allocatable GPUs: the example requests two training nodes with two GPUs
-  each. These are training pods, not necessarily distinct Kubernetes worker machines.
-  Ensure that NCCL communication between the pods is supported by your cluster network.
-- Allow training pods to download packages from PyPI, the T5 model from Hugging Face,
-  and the WikiHow CSV from S3. The full CSV is downloaded before selecting 1,500 rows;
-  use a smaller accessible CSV with `text` and `headline` columns for a short trial.
-- Check model and dataset terms before using them. This is a training example, not a
-  quality benchmark or a production fine-tuning recipe.
+Before exploring this guide, make sure to follow
+[the Getting Started guide](../getting-started/index) to understand the basics of Kubeflow Trainer.
+This example also needs four allocatable NVIDIA GPUs: it requests two training nodes
+with two GPUs each.
+
+:::{note}
+This example uses the `torch-distributed` runtime with a CUDA-enabled PyTorch image
+and the NCCL backend, so NCCL traffic between the training pods must work on your
+cluster network. Training pods must reach PyPI, Hugging Face, and the WikiHow CSV on
+S3. The full CSV is downloaded before 1,500 rows are selected. The S3 URL is outside
+this project's control, so set `dataset_url` to your own copy (with `text` and
+`headline` columns) if it becomes unavailable. Check the model and dataset licenses
+before use. This is a training example, not a production recipe.
+:::
 
 Install the client in your notebook environment:
 
@@ -86,12 +87,6 @@ def fine_tune_t5(
         set_seed(42)
         rank = dist.get_rank()
         tokenizer = AutoTokenizer.from_pretrained(model_name)
-        dataset = load_dataset("csv", data_files=dataset_url, split="train")
-        dataset = dataset.filter(lambda row: bool(row["text"] and row["headline"]))
-        dataset = dataset.select(range(min(num_samples, len(dataset))))
-        if len(dataset) < dist.get_world_size():
-            raise ValueError("Use at least one training example per GPU.")
-
         def tokenize(batch):
             inputs = tokenizer(
                 ["summarize: " + text for text in batch["text"]],
@@ -112,9 +107,22 @@ def fine_tune_t5(
             ]
             return inputs
 
-        dataset = dataset.map(
-            tokenize, batched=True, remove_columns=dataset.column_names
-        )
+        def prepare_dataset():
+            data = load_dataset("csv", data_files=dataset_url, split="train")
+            data = data.filter(lambda row: bool(row["text"] and row["headline"]))
+            data = data.select(range(min(num_samples, len(data))))
+            return data.map(tokenize, batched=True, remove_columns=data.column_names)
+
+        # Ranks in a pod share one Hugging Face cache. Local rank 0 downloads and
+        # tokenizes first; the other ranks wait, then read the cache. Every rank
+        # must reach the barrier. Each pod has its own cache.
+        if local_rank == 0:
+            dataset = prepare_dataset()
+        dist.barrier()
+        if local_rank != 0:
+            dataset = prepare_dataset()
+        if len(dataset) < dist.get_world_size():
+            raise ValueError("Use at least one training example per GPU.")
         dataset.set_format("torch")
         sampler = DistributedSampler(dataset, shuffle=True, seed=42)
         loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler)
@@ -155,10 +163,9 @@ def fine_tune_t5(
 
 ## Submit the TrainJob
 
-Use `CustomTrainer` with `TrainerClient`, not the v1 `TrainingClient`/`PyTorchJob` API.
-The SDK installs the extra packages in every training pod. PyTorch itself comes from
-the existing runtime image; do not replace it with a different CUDA build via pip.
-The package pins below apply to this example, not to the Kubeflow SDK.
+Use `CustomTrainer` with `TrainerClient`. The SDK installs `packages_to_install` on every
+training node. PyTorch comes from the runtime image, so don't reinstall it with pip.
+The pins below apply only to this example.
 
 ```python
 from kubeflow.trainer import CustomTrainer, TrainerClient
@@ -181,17 +188,14 @@ job_id = client.train(
 ```
 
 The Torch plugin starts one process per requested GPU, so this configuration has
-`WORLD_SIZE=4`. To try two GPUs in one pod, set `num_nodes=1` and keep `"gpu": 2`.
-Do not switch this example to CPU/Gloo: FSDP here requires an accelerator. Reduce
-`batch_size` or use `model_name="google-t5/t5-small"` in `func_args` if you run out of
-GPU memory. The CPU/memory requests above are a starting point, not a GPU memory guarantee.
+`WORLD_SIZE=4`. To use a single node, set `num_nodes=1`. If you run out of GPU memory,
+reduce `batch_size` or set `model_name="google-t5/t5-small"` in `func_args`.
 
 ## Inspect and Clean Up
 
-Wait for completion, then inspect the rank-zero loss in the first training node's logs.
-The call below waits up to one hour. If it times out during downloads or training,
-the TrainJob keeps running; inspect its logs and wait again, or delete it explicitly.
-Increase `timeout` if your dataset download or training needs more time:
+Wait for the TrainJob to finish, then check the rank-zero loss in the `node-0` logs.
+If the wait times out, the TrainJob keeps running: check the logs and wait again, or
+delete it. Increase `timeout` if downloads or training need more time:
 
 ```python
 client.wait_for_job_status(name=job_id, timeout=3600)
@@ -219,3 +223,6 @@ client.delete_job(name=job_id)
 - Read the [PyTorch FSDP documentation](https://docs.pytorch.org/docs/stable/fsdp.html)
   before changing wrapping, precision, or checkpointing.
 - Use the [DeepSpeed guide](deepspeed) if you need the separate DeepSpeed runtime.
+- Check out [the FSDP T5 notebook](https://github.com/kubeflow/trainer/blob/master/examples/pytorch/fsdp/fine-tune-t5-with-fsdp.ipynb).
+- Compare with [the DeepSpeed T5 example](https://github.com/kubeflow/trainer/blob/master/examples/deepspeed/text-summarization/T5-Fine-Tuning.ipynb).
+- Learn more about `TrainerClient()` APIs [in the Kubeflow SDK](https://github.com/kubeflow/sdk/blob/main/kubeflow/trainer/api/trainer_client.py).
