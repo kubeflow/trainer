@@ -46,6 +46,11 @@ type Info struct {
 	// TemplateSpec is TrainingRuntime Template object.
 	// ObjApply PodSpecs and PodSets should be kept in sync by PreComponentBuilderPlugin.PreBuildSync.
 	TemplateSpec TemplateSpec
+	// RuntimeTemplatePodSets is the PodSets of the runtime template before the TrainJob
+	// spec.runtimePatches are merged into it. It is set only for the validation plugins, so that
+	// they can check that every patch targets a replicatedJob and container the runtime defines:
+	// TemplateSpec already contains the jobs and containers a patch introduces.
+	RuntimeTemplatePodSets PodSets
 }
 
 type RuntimePolicy struct {

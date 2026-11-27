@@ -261,6 +261,35 @@ func (r *TrainingRuntime) newRuntimeInfo(
 	return runtime.NewInfo(opts...), nil
 }
 
+// newValidationRuntimeInfo builds the Info for the validation plugins. Info.TemplateSpec is the
+// runtime template with the TrainJob spec.runtimePatches merged, so that the plugins validate the
+// template the TrainJob runs with, including the fields a patch sets (e.g. an initializer
+// volumeMount or a container resources.claims entry). Strategic merge appends the replicatedJobs
+// and containers a patch targets when they are not found, so Info.RuntimeTemplatePodSets records
+// the runtime template without the patches, against which the plugins check the patch targets.
+func (r *TrainingRuntime) newValidationRuntimeInfo(
+	trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
+	scheduling *trainer.TrainingRuntimeScheduling,
+) *runtime.Info {
+	// ignoring the error here as the runtime configured should be valid
+	info, _ := r.newRuntimeInfo(trainJob, jobSetTemplateSpec, mlPolicy, podGroupPolicy, scheduling)
+	if info == nil || len(trainJob.Spec.RuntimePatches) == 0 {
+		return info
+	}
+	if unpatched, err := r.newRuntimeInfo(withoutRuntimePatches(trainJob), jobSetTemplateSpec, mlPolicy, podGroupPolicy, scheduling); err == nil {
+		info.RuntimeTemplatePodSets = unpatched.TemplateSpec.PodSets
+	}
+	return info
+}
+
+// withoutRuntimePatches returns a copy of the TrainJob with spec.runtimePatches cleared, so that
+// newRuntimeInfo describes the runtime template itself.
+func withoutRuntimePatches(trainJob *trainer.TrainJob) *trainer.TrainJob {
+	unpatched := trainJob.DeepCopy()
+	unpatched.Spec.RuntimePatches = nil
+	return unpatched
+}
+
 func (r *TrainingRuntime) mergeRuntimePatches(trainJob *trainer.TrainJob, jobSetTemplateSpec *trainer.JobSetTemplateSpec) error {
 	// Capture the original ReplicatedJobs ordering since SMP may reorder the list.
 	order := make(map[string]int, len(jobSetTemplateSpec.Spec.ReplicatedJobs))
@@ -356,7 +385,7 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 			constants.RuntimeDeprecationPolicyURL,
 		))
 	}
-	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy, trainingRuntime.Spec.Scheduling) // ignoring the error here as the runtime configured should be valid
+	info := r.newValidationRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy, trainingRuntime.Spec.Scheduling)
 	fwWarnings, errs := r.framework.RunCustomValidationPlugins(ctx, info, old, new)
 	if len(fwWarnings) != 0 {
 		warnings = append(warnings, fwWarnings...)

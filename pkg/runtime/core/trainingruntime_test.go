@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -3358,4 +3359,193 @@ func TestNewRuntimeInfo(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTrainingRuntimeValidateObjectsRuntimePatchTargets(t *testing.T) {
+	runtimePatchesPath := field.NewPath("spec").Child("runtimePatches")
+	containerPatch := func(rJobName, containerName string) []trainer.RuntimePatch {
+		return []trainer.RuntimePatch{{
+			Manager: "test.io/manager",
+			TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+				Template: &trainer.JobSetTemplatePatch{
+					Spec: &trainer.JobSetSpecPatch{
+						ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+							Name: rJobName,
+							Template: &trainer.JobTemplatePatch{
+								Spec: &trainer.JobSpecPatch{
+									Template: &trainer.PodTemplatePatch{
+										Spec: &trainer.PodSpecPatch{
+											Containers: []trainer.ContainerPatch{{
+												Name:         containerName,
+												VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}},
+											}},
+										},
+									},
+								},
+							},
+						}},
+					},
+				},
+			},
+		}}
+	}
+
+	initContainerPatch := func(rJobName, initContainerName string) []trainer.RuntimePatch {
+		patches := containerPatch(rJobName, initContainerName)
+		podSpecPatch := patches[0].TrainingRuntimeSpec.Template.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec
+		podSpecPatch.InitContainers, podSpecPatch.Containers = podSpecPatch.Containers, nil
+		return patches
+	}
+	runtimeWithInitContainer := func() *trainer.TrainingRuntime {
+		return testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+			RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(
+				testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+				InitContainer(constants.Node, "setup", "setup:image").
+				Obj()).
+			Obj()
+	}
+
+	cases := map[string]struct {
+		trainingRuntime *trainer.TrainingRuntime
+		trainJob        *trainer.TrainJob
+		wantErrs        field.ErrorList
+	}{
+		"runtimePatches targeting a job and container of the runtime are accepted": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches(containerPatch(constants.Node, constants.Node)).
+				Obj(),
+		},
+		"runtimePatches adding the initializer volumeMount the runtime lacks are accepted": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+				RuntimeSpec(withoutInitializerVolumeMount(
+					testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj().Spec,
+					constants.DatasetInitializer,
+				)).
+				Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Initializer(&trainer.Initializer{Dataset: &trainer.DatasetInitializer{}}).
+				RuntimePatches(initializerVolumeMountPatch(constants.DatasetInitializer, constants.DatasetMountPath)).
+				Obj(),
+		},
+		"runtimePatches targeting an initContainer of the runtime are accepted": {
+			trainingRuntime: runtimeWithInitContainer(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches(initContainerPatch(constants.Node, "setup")).
+				Obj(),
+		},
+		"runtimePatches targeting a container of the runtime as an initContainer are rejected": {
+			trainingRuntime: runtimeWithInitContainer(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches(initContainerPatch(constants.Node, constants.Node)).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Invalid(runtimePatchesPath, nil, fmt.Sprintf("must not have initContainer that doesn't exist in the runtime job %s", constants.Node)),
+			},
+		},
+		"runtimePatches targeting an initContainer of the runtime as a container are rejected": {
+			trainingRuntime: runtimeWithInitContainer(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches(containerPatch(constants.Node, "setup")).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Invalid(runtimePatchesPath, nil, fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", constants.Node)),
+			},
+		},
+		"runtimePatches targeting a replicated job the runtime doesn't define are rejected": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches(containerPatch("nodes", constants.Node)).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Invalid(runtimePatchesPath, nil, "must not have replicated job that doesn't exist in the runtime job template"),
+			},
+		},
+		"runtimePatches targeting a container the runtime doesn't define are rejected": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches(containerPatch(constants.Node, "nod")).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Invalid(runtimePatchesPath, nil, fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", constants.Node)),
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+			clientBuilder := testingutil.NewClientBuilder().WithObjects(tc.trainingRuntime)
+			c := clientBuilder.Build()
+
+			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, errs := trainingRuntime.ValidateObjects(ctx, nil, tc.trainJob)
+			if diff := cmp.Diff(tc.wantErrs, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue")); len(diff) != 0 {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// withoutInitializerVolumeMount returns a copy of the runtime spec without the initializer
+// volumeMount in the containers of the given replicatedJob.
+func withoutInitializerVolumeMount(spec trainer.TrainingRuntimeSpec, rJobName string) trainer.TrainingRuntimeSpec {
+	spec = *spec.DeepCopy()
+	for i, rJob := range spec.Template.Spec.ReplicatedJobs {
+		if rJob.Name != rJobName {
+			continue
+		}
+		containers := spec.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers
+		for j := range containers {
+			containers[j].VolumeMounts = slices.DeleteFunc(containers[j].VolumeMounts, func(vm corev1.VolumeMount) bool {
+				return vm.Name == jobsetplgconsts.VolumeNameInitializer
+			})
+		}
+	}
+	return spec
+}
+
+// initializerVolumeMountPatch returns runtimePatches that add the initializer volumeMount to the
+// container of the given initializer replicatedJob, which has the same name as the job.
+func initializerVolumeMountPatch(rJobName, mountPath string) []trainer.RuntimePatch {
+	return []trainer.RuntimePatch{{
+		Manager: "test.io/manager",
+		TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+			Template: &trainer.JobSetTemplatePatch{
+				Spec: &trainer.JobSetSpecPatch{
+					ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+						Name: rJobName,
+						Template: &trainer.JobTemplatePatch{
+							Spec: &trainer.JobSpecPatch{
+								Template: &trainer.PodTemplatePatch{
+									Spec: &trainer.PodSpecPatch{
+										Containers: []trainer.ContainerPatch{{
+											Name: rJobName,
+											VolumeMounts: []corev1.VolumeMount{{
+												Name:      jobsetplgconsts.VolumeNameInitializer,
+												MountPath: mountPath,
+											}},
+										}},
+									},
+								},
+							},
+						},
+					}},
+				},
+			},
+		},
+	}}
 }
