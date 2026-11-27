@@ -24,19 +24,29 @@ import (
 
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
 	trainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -581,6 +591,313 @@ func TestCoScheduling(t *testing.T) {
 			}
 			if diff := gocmp.Diff(tc.wantObjs, typedObjs, objCmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func drainQueue(q workqueue.TypedRateLimitingInterface[reconcile.Request]) []reconcile.Request {
+	var got []reconcile.Request
+	for q.Len() > 0 {
+		item, shutdown := q.Get()
+		if shutdown {
+			break
+		}
+		got = append(got, item)
+		q.Done(item)
+	}
+	return got
+}
+
+func TestPodGroupLimitRangeHandler(t *testing.T) {
+	reqCmpOpts := []gocmp.Option{
+		cmpopts.SortSlices(func(a, b reconcile.Request) int {
+			if c := cmp.Compare(a.Namespace, b.Namespace); c != 0 {
+				return c
+			}
+			return cmp.Compare(a.Name, b.Name)
+		}),
+	}
+
+	suspendedDefault := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "suspended-default").
+		Suspend(true).
+		Obj()
+	activeDefault := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "active-default").
+		Suspend(false).
+		Obj()
+	suspendedOtherNS := utiltesting.MakeTrainJobWrapper("other-ns", "suspended-other").
+		Suspend(true).
+		Obj()
+
+	lr := &corev1.LimitRange{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-lr",
+			Namespace: metav1.NamespaceDefault,
+		},
+	}
+
+	cases := map[string]struct {
+		objs     []client.Object
+		listErr  error
+		trigger  func(ctx context.Context, h *PodGroupLimitRangeHandler, q workqueue.TypedRateLimitingInterface[reconcile.Request])
+		wantReqs []reconcile.Request
+	}{
+		"create queues only suspended TrainJobs in same namespace": {
+			objs: []client.Object{suspendedDefault, activeDefault, suspendedOtherNS},
+			trigger: func(ctx context.Context, h *PodGroupLimitRangeHandler, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				h.Create(ctx, event.TypedCreateEvent[*corev1.LimitRange]{Object: lr}, q)
+			},
+			wantReqs: []reconcile.Request{
+				{NamespacedName: types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: "suspended-default"}},
+			},
+		},
+		"update queues suspended TrainJobs in same namespace": {
+			objs: []client.Object{suspendedDefault, activeDefault},
+			trigger: func(ctx context.Context, h *PodGroupLimitRangeHandler, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				h.Update(ctx, event.TypedUpdateEvent[*corev1.LimitRange]{ObjectOld: lr, ObjectNew: lr}, q)
+			},
+			wantReqs: []reconcile.Request{
+				{NamespacedName: types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: "suspended-default"}},
+			},
+		},
+		"delete queues suspended TrainJobs in same namespace": {
+			objs: []client.Object{suspendedDefault, activeDefault},
+			trigger: func(ctx context.Context, h *PodGroupLimitRangeHandler, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				h.Delete(ctx, event.TypedDeleteEvent[*corev1.LimitRange]{Object: lr}, q)
+			},
+			wantReqs: []reconcile.Request{
+				{NamespacedName: types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: "suspended-default"}},
+			},
+		},
+		"generic is a no-op": {
+			objs: []client.Object{suspendedDefault},
+			trigger: func(ctx context.Context, h *PodGroupLimitRangeHandler, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				h.Generic(ctx, event.TypedGenericEvent[*corev1.LimitRange]{Object: lr}, q)
+			},
+			wantReqs: nil,
+		},
+		"list error queues nothing": {
+			objs:    []client.Object{suspendedDefault},
+			listErr: errors.New("list failed"),
+			trigger: func(ctx context.Context, h *PodGroupLimitRangeHandler, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				h.Create(ctx, event.TypedCreateEvent[*corev1.LimitRange]{Object: lr}, q)
+			},
+			wantReqs: nil,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			clientBuilder := utiltesting.NewClientBuilder().WithObjects(tc.objs...)
+			if tc.listErr != nil {
+				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					List: func(context.Context, client.WithWatch, client.ObjectList, ...client.ListOption) error {
+						return tc.listErr
+					},
+				})
+			}
+			h := &PodGroupLimitRangeHandler{client: clientBuilder.Build()}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			defer q.ShutDown()
+
+			tc.trigger(ctx, h, q)
+			got := drainQueue(q)
+			if diff := gocmp.Diff(tc.wantReqs, got, reqCmpOpts...); diff != "" {
+				t.Errorf("Unexpected queued requests (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPodGroupRuntimeClassHandler(t *testing.T) {
+	reqCmpOpts := []gocmp.Option{
+		cmpopts.SortSlices(func(a, b reconcile.Request) int {
+			if c := cmp.Compare(a.Namespace, b.Namespace); c != 0 {
+				return c
+			}
+			return cmp.Compare(a.Name, b.Name)
+		}),
+	}
+
+	rcName := "kata"
+	otherRCName := "runc"
+	rc := &nodev1.RuntimeClass{
+		ObjectMeta: metav1.ObjectMeta{Name: rcName},
+	}
+
+	makeSpecWithRC := func(name string) trainerv1alpha1.TrainingRuntimeSpec {
+		return trainerv1alpha1.TrainingRuntimeSpec{
+			Template: trainerv1alpha1.JobSetTemplateSpec{
+				Spec: jobsetv1alpha2.JobSetSpec{
+					ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+						{
+							Name: "node",
+							Template: batchv1.JobTemplateSpec{
+								Spec: batchv1.JobSpec{
+									Template: corev1.PodTemplateSpec{
+										Spec: corev1.PodSpec{
+											RuntimeClassName: ptr.To(name),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	trWithRC := utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "tr-kata").
+		RuntimeSpec(makeSpecWithRC(rcName)).
+		Obj()
+	ctrWithRC := utiltesting.MakeClusterTrainingRuntimeWrapper("ctr-kata").
+		RuntimeSpec(makeSpecWithRC(rcName)).
+		Obj()
+	trOtherRC := utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "tr-other").
+		RuntimeSpec(makeSpecWithRC(otherRCName)).
+		Obj()
+
+	trGVK := trainerv1alpha1.GroupVersion.WithKind(trainerv1alpha1.TrainingRuntimeKind)
+	ctrGVK := trainerv1alpha1.GroupVersion.WithKind(trainerv1alpha1.ClusterTrainingRuntimeKind)
+
+	suspendedTRJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "job-tr-suspended").
+		RuntimeRef(trGVK, "tr-kata").
+		Suspend(true).
+		Obj()
+	activeTRJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "job-tr-active").
+		RuntimeRef(trGVK, "tr-kata").
+		Suspend(false).
+		Obj()
+	suspendedCTRJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "job-ctr-suspended").
+		RuntimeRef(ctrGVK, "ctr-kata").
+		Suspend(true).
+		Obj()
+	suspendedOtherRCJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "job-other-rc").
+		RuntimeRef(trGVK, "tr-other").
+		Suspend(true).
+		Obj()
+
+	baseObjs := []client.Object{
+		trWithRC,
+		ctrWithRC,
+		trOtherRC,
+		suspendedTRJob,
+		activeTRJob,
+		suspendedCTRJob,
+		suspendedOtherRCJob,
+	}
+	wantSuspended := []reconcile.Request{
+		{NamespacedName: types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: "job-ctr-suspended"}},
+		{NamespacedName: types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: "job-tr-suspended"}},
+	}
+
+	cases := map[string]struct {
+		objs     []client.Object
+		listErr  error
+		trigger  func(ctx context.Context, h *PodGroupRuntimeClassHandler, q workqueue.TypedRateLimitingInterface[reconcile.Request])
+		wantReqs []reconcile.Request
+	}{
+		"create queues suspended TrainJobs referencing matching TrainingRuntime and ClusterTrainingRuntime": {
+			objs: baseObjs,
+			trigger: func(ctx context.Context, h *PodGroupRuntimeClassHandler, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				h.Create(ctx, event.TypedCreateEvent[*nodev1.RuntimeClass]{Object: rc}, q)
+			},
+			wantReqs: wantSuspended,
+		},
+		"update queues suspended TrainJobs for updated RuntimeClass": {
+			objs: baseObjs,
+			trigger: func(ctx context.Context, h *PodGroupRuntimeClassHandler, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				h.Update(ctx, event.TypedUpdateEvent[*nodev1.RuntimeClass]{ObjectOld: rc, ObjectNew: rc}, q)
+			},
+			wantReqs: wantSuspended,
+		},
+		"delete queues suspended TrainJobs for deleted RuntimeClass": {
+			objs: baseObjs,
+			trigger: func(ctx context.Context, h *PodGroupRuntimeClassHandler, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				h.Delete(ctx, event.TypedDeleteEvent[*nodev1.RuntimeClass]{Object: rc}, q)
+			},
+			wantReqs: wantSuspended,
+		},
+		"generic is a no-op": {
+			objs: baseObjs,
+			trigger: func(ctx context.Context, h *PodGroupRuntimeClassHandler, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				h.Generic(ctx, event.TypedGenericEvent[*nodev1.RuntimeClass]{Object: rc}, q)
+			},
+			wantReqs: nil,
+		},
+		"list error queues nothing": {
+			objs:    baseObjs,
+			listErr: errors.New("list failed"),
+			trigger: func(ctx context.Context, h *PodGroupRuntimeClassHandler, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				h.Create(ctx, event.TypedCreateEvent[*nodev1.RuntimeClass]{Object: rc}, q)
+			},
+			wantReqs: nil,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			clientBuilder := utiltesting.NewClientBuilder().
+				WithObjects(tc.objs...).
+				WithIndex(&trainerv1alpha1.TrainingRuntime{}, indexer.TrainingRuntimeContainerRuntimeClassKey, indexer.IndexTrainingRuntimeContainerRuntimeClass).
+				WithIndex(&trainerv1alpha1.ClusterTrainingRuntime{}, indexer.ClusterTrainingRuntimeContainerRuntimeClassKey, indexer.IndexClusterTrainingRuntimeContainerRuntimeClass).
+				WithIndex(&trainerv1alpha1.TrainJob{}, indexer.TrainJobRuntimeRefKey, indexer.IndexTrainJobTrainingRuntime).
+				WithIndex(&trainerv1alpha1.TrainJob{}, indexer.TrainJobClusterRuntimeRefKey, indexer.IndexTrainJobClusterTrainingRuntime)
+			if tc.listErr != nil {
+				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					List: func(context.Context, client.WithWatch, client.ObjectList, ...client.ListOption) error {
+						return tc.listErr
+					},
+				})
+			}
+			h := &PodGroupRuntimeClassHandler{client: clientBuilder.Build()}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			defer q.ShutDown()
+
+			tc.trigger(ctx, h, q)
+			got := drainQueue(q)
+			if diff := gocmp.Diff(tc.wantReqs, got, reqCmpOpts...); diff != "" {
+				t.Errorf("Unexpected queued requests (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestReconcilerBuilders(t *testing.T) {
+	cases := map[string]struct {
+		withPodGroupCRD bool
+		wantCount       int
+	}{
+		"returns nil when PodGroup CRD is not installed": {
+			withPodGroupCRD: false,
+			wantCount:       0,
+		},
+		"returns three reconciler builders when PodGroup CRD is installed": {
+			withPodGroupCRD: true,
+			wantCount:       3,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			clientBuilder := utiltesting.NewClientBuilder()
+			if tc.withPodGroupCRD {
+				mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{schedulerpluginsv1alpha1.SchemeGroupVersion})
+				mapper.Add(schedulerpluginsv1alpha1.SchemeGroupVersion.WithKind("PodGroup"), meta.RESTScopeNamespace)
+				clientBuilder.WithRESTMapper(mapper)
+			}
+			cli := clientBuilder.Build()
+			p, err := New(ctx, cli, utiltesting.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatalf("Failed to create plugin: %v", err)
+			}
+			builders := p.(framework.WatchExtensionPlugin).ReconcilerBuilders()
+			if len(builders) != tc.wantCount {
+				t.Errorf("Unexpected number of reconciler builders: want %d, got %d", tc.wantCount, len(builders))
 			}
 		})
 	}
