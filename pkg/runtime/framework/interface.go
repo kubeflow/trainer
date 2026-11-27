@@ -86,6 +86,13 @@ type ComponentBuilderPlugin interface {
 	Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error)
 }
 
+// OrderedComponentBuilderPlugin optionally sets build order: lower values run first.
+// Other builders have order zero; ties retain deterministic name order.
+type OrderedComponentBuilderPlugin interface {
+	ComponentBuilderPlugin
+	BuildOrder() int
+}
+
 // ComponentDeleterPlugin returns previously created objects that should be removed for a TrainJob.
 // It runs on every reconcile regardless of the TrainJob status, so plugins must decide when objects
 // should be removed and must be idempotent. The caller performs the deletion.

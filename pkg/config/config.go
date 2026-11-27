@@ -22,14 +22,21 @@ import (
 	"os"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/features"
+	"github.com/kubeflow/trainer/v2/pkg/util/cert"
 	"github.com/kubeflow/trainer/v2/pkg/util/tlsconfig"
 )
 
@@ -135,6 +142,21 @@ func Load(scheme *runtime.Scheme, configFile string) (ctrl.Options, configapi.Co
 	addTo(&options, &cfg)
 
 	return options, cfg, nil
+}
+
+// ApplyNetworkPolicyCache configures infrastructure watches after feature gates are resolved.
+func ApplyNetworkPolicyCache(o *ctrl.Options, cfg *configapi.Configuration) {
+	if cfg.NetworkPolicy == nil || !ptr.Deref(cfg.NetworkPolicy.Enabled, false) {
+		return
+	}
+	namespaces := map[string]cache.Config{corev1.NamespaceDefault: {}, cert.GetOperatorNamespace(): {}}
+	o.Cache.ByObject = map[client.Object]cache.ByObject{
+		&discoveryv1.EndpointSlice{}: {Namespaces: namespaces},
+	}
+	// OptimizationJob owns Services in user namespaces and needs its existing cluster-wide watch.
+	if !features.Enabled(features.OptimizationJob) {
+		o.Cache.ByObject[&corev1.Service{}] = cache.ByObject{Namespaces: namespaces}
+	}
 }
 
 // ApplyClientConnection copies QPS and burst from cfg.ClientConnection to restCfg.
