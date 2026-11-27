@@ -52,7 +52,7 @@ func TestPodDisruptionBudget(t *testing.T) {
 				RuntimePolicy: runtime.RuntimePolicy{},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
-						{Name: constants.Node, Count: ptr.To[int32](2)},
+						{Name: constants.Node, Ancestor: ptr.To(constants.AncestorTrainer), Count: ptr.To[int32](2)},
 					},
 				},
 			},
