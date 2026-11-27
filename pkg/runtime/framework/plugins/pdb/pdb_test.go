@@ -94,6 +94,11 @@ func TestPodDisruptionBudget(t *testing.T) {
 				utiltesting.MakePodDisruptionBudgetWrapper("test-job", metav1.NamespaceDefault).
 					MinAvailable(3).
 					MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: "test-job"}).
+					MatchExpressions(metav1.LabelSelectorRequirement{
+						Key:      jobsetv1alpha2.ReplicatedJobNameKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{constants.Node},
+					}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "test-uid").
 					Obj(),
 			},
@@ -120,6 +125,11 @@ func TestPodDisruptionBudget(t *testing.T) {
 				utiltesting.MakePodDisruptionBudgetWrapper("test-job", metav1.NamespaceDefault).
 					MinAvailable(4).
 					MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: "test-job"}).
+					MatchExpressions(metav1.LabelSelectorRequirement{
+						Key:      jobsetv1alpha2.ReplicatedJobNameKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{constants.Node, constants.Launcher},
+					}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "test-uid").
 					Obj(),
 			},

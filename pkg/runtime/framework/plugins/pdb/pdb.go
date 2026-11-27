@@ -20,6 +20,7 @@ import (
 	"context"
 
 	policyv1 "k8s.io/api/policy/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
@@ -80,11 +81,15 @@ func (p *PodDisruptionBudget) Build(ctx context.Context, info *runtime.Info, tra
 	}
 
 	isMPI := info.RuntimePolicy.MLPolicySource != nil && info.RuntimePolicy.MLPolicySource.MPI != nil
-	var trainerReplicas int32
+	var (
+		trainerReplicas int32
+		rJobNames       []string
+	)
 	for _, ps := range info.TemplateSpec.PodSets {
 		isMPIPodSet := isMPI && (ps.Name == constants.Launcher || ps.Name == constants.Node)
 		if (isMPIPodSet || ptr.Deref(ps.Ancestor, "") == constants.AncestorTrainer) && ps.Count != nil {
 			trainerReplicas += *ps.Count
+			rJobNames = append(rJobNames, ps.Name)
 		}
 	}
 
@@ -101,7 +106,11 @@ func (p *PodDisruptionBudget) Build(ctx context.Context, info *runtime.Info, tra
 			WithSelector(metav1ac.LabelSelector().
 				WithMatchLabels(map[string]string{
 					jobsetv1alpha2.JobSetNameKey: trainJob.Name,
-				}))).
+				}).
+				WithMatchExpressions(metav1ac.LabelSelectorRequirement().
+					WithKey(jobsetv1alpha2.ReplicatedJobNameKey).
+					WithOperator(metav1.LabelSelectorOpIn).
+					WithValues(rJobNames...)))).
 		WithOwnerReferences(metav1ac.OwnerReference().
 			WithAPIVersion(trainer.GroupVersion.String()).
 			WithKind(trainer.TrainJobKind).

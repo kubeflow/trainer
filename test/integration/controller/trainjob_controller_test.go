@@ -207,6 +207,11 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 						testingutil.MakePodDisruptionBudgetWrapper(trainJobKey.Name, ns.Name).
 							MinAvailable(100). // 100 trainer replicas; initializers are excluded.
 							MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: trainJobKey.Name}).
+							MatchExpressions(metav1.LabelSelectorRequirement{
+								Key:      jobsetv1alpha2.ReplicatedJobNameKey,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{constants.Node},
+							}).
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
 							Obj(),
 						util.IgnoreObjectMetadata))

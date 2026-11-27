@@ -1765,6 +1765,14 @@ func (p *PodDisruptionBudgetWrapper) MatchLabels(matchLabels map[string]string) 
 	return p
 }
 
+func (p *PodDisruptionBudgetWrapper) MatchExpressions(matchExpressions ...metav1.LabelSelectorRequirement) *PodDisruptionBudgetWrapper {
+	if p.Spec.Selector == nil {
+		p.Spec.Selector = &metav1.LabelSelector{}
+	}
+	p.Spec.Selector.MatchExpressions = matchExpressions
+	return p
+}
+
 func (p *PodDisruptionBudgetWrapper) ControllerReference(gvk schema.GroupVersionKind, name, uid string) *PodDisruptionBudgetWrapper {
 	p.OwnerReferences = append(p.OwnerReferences, metav1.OwnerReference{
 		APIVersion:         gvk.GroupVersion().String(),

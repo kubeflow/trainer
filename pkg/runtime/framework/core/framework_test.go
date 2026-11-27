@@ -1862,6 +1862,11 @@ test-job-node-0-1.test-job slots=1
 				testingutil.MakePodDisruptionBudgetWrapper("test-job", metav1.NamespaceDefault).
 					MinAvailable(100). // 100 trainer replicas; initializers are excluded.
 					MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: "test-job"}).
+					MatchExpressions(metav1.LabelSelectorRequirement{
+						Key:      jobsetv1alpha2.ReplicatedJobNameKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{constants.Node},
+					}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-job", "uid").
 					Obj(),
 			},
@@ -2315,6 +2320,11 @@ test-job-node-0-1.test-job slots=1
 				testingutil.MakePodDisruptionBudgetWrapper("test-volcano-job", metav1.NamespaceDefault).
 					MinAvailable(100). // 100 trainer replicas; initializers are excluded.
 					MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: "test-volcano-job"}).
+					MatchExpressions(metav1.LabelSelectorRequirement{
+						Key:      jobsetv1alpha2.ReplicatedJobNameKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{constants.Node},
+					}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-volcano-job", "uid").
 					Obj(),
 			},

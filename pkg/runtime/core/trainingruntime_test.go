@@ -224,6 +224,11 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				testingutil.MakePodDisruptionBudgetWrapper("test-job", metav1.NamespaceDefault).
 					MinAvailable(30). // 30 trainer replicas; initializers are excluded.
 					MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: "test-job"}).
+					MatchExpressions(metav1.LabelSelectorRequirement{
+						Key:      jobsetv1alpha2.ReplicatedJobNameKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{constants.Node},
+					}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					Obj(),
 			},
@@ -279,6 +284,11 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				testingutil.MakePodDisruptionBudgetWrapper("test-job", metav1.NamespaceDefault).
 					MinAvailable(32). // 8 nodes × 4 slices; initializers are excluded.
 					MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: "test-job"}).
+					MatchExpressions(metav1.LabelSelectorRequirement{
+						Key:      jobsetv1alpha2.ReplicatedJobNameKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{constants.Node},
+					}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					Obj(),
 			},
