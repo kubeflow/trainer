@@ -16,12 +16,19 @@
 
 import fnmatch
 import logging
+import os
+import stat
+import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
 import opendal
 from opendal.exceptions import NotFound
+
+# Size of the chunks that an object is streamed to disk in, which bounds the memory
+# used for file content regardless of the object size.
+DOWNLOAD_CHUNK_SIZE = 8 * 1024 * 1024
 
 
 class OpenDALStorage(ABC):
@@ -115,9 +122,7 @@ class S3Storage(OpenDALStorage):
 
                 # Download the file via OpenDAL
                 logging.info(f"Downloading {key} to {file_destination_path}")
-                data = self.op.read(key)
-                with open(file_destination_path, "wb") as f:
-                    f.write(data)
+                self._download_object(key, file_destination_path)
                 downloaded += 1
 
             if downloaded == 0:
@@ -131,6 +136,36 @@ class S3Storage(OpenDALStorage):
             raise
 
         logging.info("Files have been downloaded")
+
+    def _download_object(self, key: str, destination: Path):
+        """Stream one object to the destination file.
+
+        The object is written to a temporary file in the destination directory and
+        moved to the destination only once it has been fully written, so a failed
+        download never leaves a partial file at the destination or changes an
+        existing one. The destination gets the same mode as a file written with
+        open(), so the files stay readable from a shared volume.
+        """
+        mode = _destination_mode(destination)
+        fd, temp_name = tempfile.mkstemp(
+            dir=destination.parent, prefix=".s3dl-", suffix=".part"
+        )
+        try:
+            with os.fdopen(fd, "wb") as dst, self.op.open(key, "rb") as src:
+                # A read can return less than the chunk size before the end of the
+                # object, only an empty read means the end.
+                while chunk := src.read(DOWNLOAD_CHUNK_SIZE):
+                    dst.write(chunk)
+            os.chmod(temp_name, mode)
+            os.replace(temp_name, destination)
+        except BaseException:
+            try:
+                os.remove(temp_name)
+            except FileNotFoundError:
+                pass
+            except OSError as e:
+                logging.error(f"Failed to remove temporary file {temp_name}: {e}")
+            raise
 
     def _resolve_keys(self, prefix: str) -> list[str]:
         """Return the object keys that the prefix refers to.
@@ -171,3 +206,17 @@ class S3Storage(OpenDALStorage):
             return bool(self.op.stat(key).is_file)
         except NotFound:
             return False
+
+
+def _destination_mode(destination: Path) -> int:
+    """Return the mode that open(destination, "wb") would leave the file with.
+
+    An existing file keeps its mode, and a new file gets the default mode masked by
+    the process umask.
+    """
+    try:
+        return stat.S_IMODE(destination.stat().st_mode)
+    except FileNotFoundError:
+        umask = os.umask(0)
+        os.umask(umask)
+        return 0o666 & ~umask
