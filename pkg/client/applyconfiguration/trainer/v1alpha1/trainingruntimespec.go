@@ -37,6 +37,8 @@ type TrainingRuntimeSpecApplyConfiguration struct {
 	// stability guarantees until the upstream scheduling APIs graduate.
 	// More info: https://github.com/kubeflow/trainer/tree/master/proposals/3015-workload-aware-scheduling
 	Scheduling *TrainingRuntimeSchedulingApplyConfiguration `json:"scheduling,omitempty"`
+	// runPolicy defines lifecycle defaults that referencing TrainJobs can override.
+	RunPolicy *RunPolicyApplyConfiguration `json:"runPolicy,omitempty"`
 	// template for the JobSet which will be used by TrainJob.
 	Template *JobSetTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }
@@ -68,6 +70,14 @@ func (b *TrainingRuntimeSpecApplyConfiguration) WithPodGroupPolicy(value *PodGro
 // If called multiple times, the Scheduling field is set to the value of the last call.
 func (b *TrainingRuntimeSpecApplyConfiguration) WithScheduling(value *TrainingRuntimeSchedulingApplyConfiguration) *TrainingRuntimeSpecApplyConfiguration {
 	b.Scheduling = value
+	return b
+}
+
+// WithRunPolicy sets the RunPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RunPolicy field is set to the value of the last call.
+func (b *TrainingRuntimeSpecApplyConfiguration) WithRunPolicy(value *RunPolicyApplyConfiguration) *TrainingRuntimeSpecApplyConfiguration {
+	b.RunPolicy = value
 	return b
 }
 

@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -29,6 +30,9 @@ import (
 type TrainJobStatusApplyConfiguration struct {
 	// conditions for the TrainJob.
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	// startTime records when the TrainJob becomes active.
+	// It is cleared on suspension and reset on resume.
+	StartTime *metav1.Time `json:"startTime,omitempty"`
 	// jobsStatus tracks the child Jobs in TrainJob.
 	JobsStatus []JobStatusApplyConfiguration `json:"jobsStatus,omitempty"`
 	// trainerStatus contains the latest observed runtime status of the
@@ -59,6 +63,14 @@ func (b *TrainJobStatusApplyConfiguration) WithConditions(values ...*v1.Conditio
 		}
 		b.Conditions = append(b.Conditions, *values[i])
 	}
+	return b
+}
+
+// WithStartTime sets the StartTime field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the StartTime field is set to the value of the last call.
+func (b *TrainJobStatusApplyConfiguration) WithStartTime(value metav1.Time) *TrainJobStatusApplyConfiguration {
+	b.StartTime = &value
 	return b
 }
 

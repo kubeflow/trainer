@@ -67,6 +67,15 @@ func getRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.
 
 	// Validate snapshot matches expected RuntimeRef
 	snapshotGVK := runtimeObj.GetObjectKind().GroupVersionKind()
+	if snapshotGVK.Empty() {
+		// Recover GVK defensively when serialized type metadata is absent.
+		gvk, err := c.GroupVersionKindFor(runtimeObj)
+		if err != nil {
+			return fmt.Errorf("invalid runtime snapshot: unable to resolve runtime GroupVersionKind: %w", err)
+		}
+		runtimeObj.GetObjectKind().SetGroupVersionKind(gvk)
+		snapshotGVK = gvk
+	}
 	kindMismatch := trainJob.Spec.RuntimeRef.Kind != nil && snapshotGVK.Kind != *trainJob.Spec.RuntimeRef.Kind
 	groupMismatch := trainJob.Spec.RuntimeRef.APIGroup != nil && snapshotGVK.Group != *trainJob.Spec.RuntimeRef.APIGroup
 	nameMismatch := runtimeObj.GetName() != trainJob.Spec.RuntimeRef.Name
@@ -99,8 +108,7 @@ func getRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.
 // An existing configmap will be overwritten. Callers must only invoke this when no snapshot exists.
 func createRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.TrainJob, runtimeObj client.Object) error {
 	// client.Get() does not populate TypeMeta on typed objects, so the GVK must be resolved
-	// from the scheme before serializing. Otherwise the stored snapshot has an empty
-	// kind/apiVersion and getRuntimeSnapshot rejects it on the next reconciliation.
+	// from the scheme before serializing so the stored snapshot carries kind/apiVersion.
 	gvk, err := c.GroupVersionKindFor(runtimeObj)
 	if err != nil {
 		return fmt.Errorf("getting GroupVersionKind for the runtime: %w", err)
