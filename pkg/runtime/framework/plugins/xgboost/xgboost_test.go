@@ -331,7 +331,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
-		"trainer is nil - DMLC_NUM_WORKER uses the GPUs in the runtime": {
+		"trainer is nil - GPUs in the runtime still give one worker per node": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
@@ -408,7 +408,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.XGBoostEnvNumWorker),
-									Value: ptr.To("4"),
+									Value: ptr.To("2"),
 								},
 							},
 						}},
@@ -638,7 +638,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.XGBoostEnvNumWorker),
-									Value: ptr.To("8"),
+									Value: ptr.To("2"),
 								},
 							},
 						}},
@@ -863,7 +863,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.XGBoostEnvNumWorker),
-									Value: ptr.To("6"),
+									Value: ptr.To("3"),
 								},
 							},
 						}},
@@ -957,7 +957,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.XGBoostEnvNumWorker),
-									Value: ptr.To("8"),
+									Value: ptr.To("2"),
 								},
 							},
 						}},
@@ -1053,7 +1053,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.XGBoostEnvNumWorker),
-									Value: ptr.To("6"),
+									Value: ptr.To("2"),
 								},
 							},
 						}},

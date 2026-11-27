@@ -33,16 +33,18 @@ CUDA 12 support, NumPy, and scikit-learn.
 
 ### Worker Count
 
-The total number of XGBoost workers is calculated as:
+Each node runs one XGBoost worker, so the total number of workers is:
 
 ```text
-DMLC_NUM_WORKER = numNodes × workersPerNode
+DMLC_NUM_WORKER = numNodes
 ```
 
-- **CPU training**: 1 worker per node. Each worker uses OpenMP to parallelize
- across all available CPU cores.
-- **GPU training**: 1 worker per GPU. The GPU count is derived from
- `resourcesPerNode` limits in the TrainJob.
+`DMLC_TASK_ID` is the node's index, from `0` to `numNodes - 1`.
+
+- **CPU training**: each worker uses OpenMP to parallelize across all available
+ CPU cores.
+- **GPU training**: XGBoost uses one GPU per worker, so give each node one GPU
+ and scale out with `numNodes`. Additional GPUs on the same node are not used.
 
 ## Distributed Training Function
 
