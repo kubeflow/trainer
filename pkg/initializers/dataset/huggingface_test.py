@@ -42,6 +42,19 @@ from pkg.initializers.dataset.huggingface import HuggingFace
                 "access_token": None,
             },
         ),
+        (
+            "Config with ignore patterns",
+            {
+                "storage_uri": "hf://dataset/path",
+                "ignore_patterns": ["*.parquet", "*.md"],
+                "access_token": "test_token",
+            },
+            {
+                "storage_uri": "hf://dataset/path",
+                "ignore_patterns": ["*.parquet", "*.md"],
+                "access_token": "test_token",
+            },
+        ),
     ],
 )
 def test_load_config(test_name, test_config, expected):
@@ -82,6 +95,18 @@ def test_load_config(test_name, test_config, expected):
                 },
                 "should_login": False,
                 "expected_repo_id": "org/dataset-v1",
+            },
+        ),
+        (
+            "Successful download with ignore patterns",
+            {
+                "config": {
+                    "storage_uri": "hf://org/dataset-with-patterns",
+                    "ignore_patterns": ["*.parquet", "*.md"],
+                    "access_token": None,
+                },
+                "should_login": False,
+                "expected_repo_id": "org/dataset-with-patterns",
             },
         ),
         (
@@ -206,3 +231,20 @@ def test_download_dataset(test_name, test_case):
             ignore_patterns=test_case["config"]["ignore_patterns"],
         )
     print("Test execution completed")
+
+
+def test_download_dataset_error():
+    """Test that snapshot_download exceptions propagate."""
+    huggingface_dataset_instance = HuggingFace()
+    huggingface_dataset_instance.config = MagicMock(
+        storage_uri="hf://org/dataset",
+        ignore_patterns=None,
+        access_token=None,
+    )
+
+    with patch(
+        "huggingface_hub.snapshot_download",
+        side_effect=RuntimeError("Snapshot download failed"),
+    ):
+        with pytest.raises(RuntimeError, match="Snapshot download failed"):
+            huggingface_dataset_instance.download_dataset()
