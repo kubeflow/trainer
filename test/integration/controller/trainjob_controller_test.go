@@ -24,6 +24,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -195,6 +196,22 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 								corev1.ResourceMemory: resource.MustParse("408Gi"),
 							}).
 							SchedulingTimeout(100).
+							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
+							Obj(),
+						util.IgnoreObjectMetadata))
+
+					ginkgo.By("Checking if the PodDisruptionBudget is created")
+					pdb := &policyv1.PodDisruptionBudget{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, pdb)).Should(gomega.Succeed())
+					g.Expect(pdb).Should(gomega.BeComparableTo(
+						testingutil.MakePodDisruptionBudgetWrapper(trainJobKey.Name, ns.Name).
+							MinAvailable(100). // 100 trainer replicas; initializers are excluded.
+							MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: trainJobKey.Name}).
+							MatchExpressions(metav1.LabelSelectorRequirement{
+								Key:      jobsetv1alpha2.ReplicatedJobNameKey,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{constants.Node},
+							}).
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
 							Obj(),
 						util.IgnoreObjectMetadata))

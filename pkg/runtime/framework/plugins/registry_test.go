@@ -31,6 +31,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jax"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/pdb"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/trainjobstatus"
@@ -47,21 +48,21 @@ func TestNewRegistry(t *testing.T) {
 		"TrainJobStatus plugin is registered when the TrainJobStatus feature gate is enabled": {
 			featureGates: []featuregate.Feature{features.TrainJobStatus},
 			wantRegistry: sets.New(
-				coscheduling.Name, flux.Name, volcano.Name, mpi.Name, plainml.Name, torch.Name, jobset.Name, jax.Name, xgboost.Name,
+				coscheduling.Name, flux.Name, volcano.Name, mpi.Name, pdb.Name, plainml.Name, torch.Name, jobset.Name, jax.Name, xgboost.Name,
 				trainjobstatus.Name,
 			),
 		},
 		"WorkloadAwareScheduling plugin is registered when the TrainJobWorkloadAwareScheduling feature gate is enabled": {
 			featureGates: []featuregate.Feature{features.TrainJobWorkloadAwareScheduling},
 			wantRegistry: sets.New(
-				coscheduling.Name, flux.Name, volcano.Name, mpi.Name, plainml.Name, torch.Name, jobset.Name, jax.Name, xgboost.Name,
+				coscheduling.Name, flux.Name, volcano.Name, mpi.Name, pdb.Name, plainml.Name, torch.Name, jobset.Name, jax.Name, xgboost.Name,
 				workloadawarescheduling.Name,
 			),
 		},
 		"TrainJobStatus and WorkloadAwareScheduling plugins are registered when both feature gates are enabled": {
 			featureGates: []featuregate.Feature{features.TrainJobStatus, features.TrainJobWorkloadAwareScheduling},
 			wantRegistry: sets.New(
-				coscheduling.Name, flux.Name, volcano.Name, mpi.Name, plainml.Name, torch.Name, jobset.Name, jax.Name, xgboost.Name,
+				coscheduling.Name, flux.Name, volcano.Name, mpi.Name, pdb.Name, plainml.Name, torch.Name, jobset.Name, jax.Name, xgboost.Name,
 				trainjobstatus.Name, workloadawarescheduling.Name,
 			),
 		},

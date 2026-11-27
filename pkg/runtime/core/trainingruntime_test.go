@@ -221,6 +221,16 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					}).
 					SchedulingTimeout(120).
 					Obj(),
+				testingutil.MakePodDisruptionBudgetWrapper("test-job", metav1.NamespaceDefault).
+					MinAvailable(30). // 30 trainer replicas; initializers are excluded.
+					MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: "test-job"}).
+					MatchExpressions(metav1.LabelSelectorRequirement{
+						Key:      jobsetv1alpha2.ReplicatedJobNameKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{constants.Node},
+					}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Obj(),
 			},
 		},
 		"succeeded to build PodGroup and JobSet with multi-slice TPU trainer.": {
@@ -270,6 +280,16 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						corev1.ResourceCPU: resource.MustParse("34"),
 					}).
 					SchedulingTimeout(120).
+					Obj(),
+				testingutil.MakePodDisruptionBudgetWrapper("test-job", metav1.NamespaceDefault).
+					MinAvailable(32). // 8 nodes × 4 slices; initializers are excluded.
+					MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: "test-job"}).
+					MatchExpressions(metav1.LabelSelectorRequirement{
+						Key:      jobsetv1alpha2.ReplicatedJobNameKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{constants.Node},
+					}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					Obj(),
 			},
 		},
