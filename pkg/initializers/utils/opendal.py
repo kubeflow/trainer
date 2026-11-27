@@ -16,12 +16,15 @@
 
 import fnmatch
 import logging
+import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
 import opendal
 from opendal.exceptions import NotFound
+
+DOWNLOAD_CHUNK_SIZE = 8 * 1024 * 1024
 
 
 class OpenDALStorage(ABC):
@@ -113,11 +116,13 @@ class S3Storage(OpenDALStorage):
                 # Create directory if needed
                 file_destination_path.parent.mkdir(parents=True, exist_ok=True)
 
-                # Download the file via OpenDAL
+                # Stream the file via OpenDAL, so memory use does not grow with
+                # the object size (model weight shards are often several GiB).
                 logging.info(f"Downloading {key} to {file_destination_path}")
-                data = self.op.read(key)
-                with open(file_destination_path, "wb") as f:
-                    f.write(data)
+                with self.op.open(key, "rb") as src, open(
+                    file_destination_path, "wb"
+                ) as f:
+                    shutil.copyfileobj(src, f, DOWNLOAD_CHUNK_SIZE)
                 downloaded += 1
 
             if downloaded == 0:

@@ -15,6 +15,7 @@
 """Tests for OpenDAL utilities."""
 
 import fnmatch
+import io
 import os
 import tempfile
 from unittest.mock import MagicMock, Mock, patch
@@ -158,8 +159,10 @@ class TestS3Storage:
             mock_entries = [self._create_mock_entry(path) for path in files.keys()]
             mock_operator.list.return_value = mock_entries
 
-            # Setup read side effect
-            mock_operator.read.side_effect = list(files.values())
+            # Setup open side effect
+            mock_operator.open.side_effect = [
+                io.BytesIO(content) for content in files.values()
+            ]
 
             storage = S3Storage(bucket="test-bucket")
 
@@ -217,7 +220,7 @@ class TestS3Storage:
 
         mock_operator.list.side_effect = list_objects
         mock_operator.stat.side_effect = stat
-        mock_operator.read.side_effect = lambda key: objects[key]
+        mock_operator.open.side_effect = lambda key, mode: io.BytesIO(objects[key])
 
     def _downloaded_files(self, directory: str) -> list[str]:
         return sorted(
@@ -254,7 +257,7 @@ class TestS3Storage:
             # never returned by the storage, let alone read.
             mock_operator.list.assert_called_once_with("models/llama/", recursive=True)
             assert sorted(
-                call.args[0] for call in mock_operator.read.call_args_list
+                call.args[0] for call in mock_operator.open.call_args_list
             ) == [
                 "models/llama/config.json",
                 "models/llama/weights/model.safetensors",
@@ -287,7 +290,41 @@ class TestS3Storage:
 
             # The exact key is read directly, nothing is listed.
             mock_operator.list.assert_not_called()
-            mock_operator.read.assert_called_once_with("datasets/train.parquet")
+            mock_operator.open.assert_called_once_with("datasets/train.parquet", "rb")
+
+    def test_download_streams_object_in_chunks(self):
+        """Objects are streamed to disk in chunks instead of read into memory whole."""
+
+        class RecordingReader(io.BytesIO):
+            def __init__(self, data):
+                super().__init__(data)
+                self.read_sizes = []
+
+            def read(self, size=-1):
+                self.read_sizes.append(size)
+                return super().read(size)
+
+        weights = os.urandom(1000)
+        reader = RecordingReader(weights)
+
+        with patch("pkg.initializers.utils.opendal.opendal") as mock_opendal, patch(
+            "pkg.initializers.utils.opendal.DOWNLOAD_CHUNK_SIZE", 64
+        ):
+            mock_operator = MagicMock()
+            mock_opendal.Operator.return_value = mock_operator
+            mock_operator.layer.return_value = mock_operator
+            self._mock_bucket(mock_operator, {"models/model.safetensors": weights})
+            mock_operator.open.side_effect = lambda key, mode: reader
+
+            storage = S3Storage(bucket="test-bucket", region="us-east-1")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(prefix="models/", destination_path=tmpdir)
+                with open(os.path.join(tmpdir, "model.safetensors"), "rb") as f:
+                    assert f.read() == weights
+
+            mock_operator.read.assert_not_called()
+            assert reader.read_sizes and all(0 < s <= 64 for s in reader.read_sizes)
 
     def test_download_exact_object_takes_precedence(self):
         """When both an object and a directory have the name, the object wins."""
@@ -372,7 +409,7 @@ class TestS3Storage:
                     storage.download(prefix=prefix, destination_path=tmpdir)
                 assert os.listdir(tmpdir) == []
 
-            mock_operator.read.assert_not_called()
+            mock_operator.open.assert_not_called()
 
     def test_download_all_objects_ignored_warns(self, caplog):
         """Ignore patterns that skip every object log a warning but do not fail."""
@@ -394,4 +431,4 @@ class TestS3Storage:
                 assert os.listdir(tmpdir) == []
 
             assert "skipped by the ignore patterns" in caplog.text
-            mock_operator.read.assert_not_called()
+            mock_operator.open.assert_not_called()
