@@ -66,10 +66,11 @@ func (p *PodDisruptionBudget) Name() string {
 
 // Build creates a PodDisruptionBudget for gang-scheduled, multi-pod TrainJobs.
 // The budget's minAvailable equals the number of training replicas (the trainer
-// PodSets), which is the long-lived gang that must stay available for the job to
-// make progress. Short-lived initializer pods are deliberately excluded: they
-// run to completion and stop being Ready, so counting them would make the PDB
-// permanently unsatisfiable (currentHealthy could never reach minAvailable).
+// PodSets and, for MPI, the launcher and node PodSets), which is the long-lived
+// gang that must stay available for the job to make progress. Short-lived
+// initializer pods are deliberately excluded: they run to completion and stop
+// being Ready, so counting them would make the PDB permanently unsatisfiable
+// (currentHealthy could never reach minAvailable).
 func (p *PodDisruptionBudget) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
 	// Only gang-scheduled TrainJobs declare all-or-nothing semantics, so we
 	// scope the PDB to them to avoid blocking node maintenance for ordinary
@@ -78,9 +79,11 @@ func (p *PodDisruptionBudget) Build(ctx context.Context, info *runtime.Info, tra
 		return nil, nil
 	}
 
+	isMPI := info.RuntimePolicy.MLPolicySource != nil && info.RuntimePolicy.MLPolicySource.MPI != nil
 	var trainerReplicas int32
 	for _, ps := range info.TemplateSpec.PodSets {
-		if ptr.Deref(ps.Ancestor, "") == constants.AncestorTrainer && ps.Count != nil {
+		isMPIPodSet := isMPI && (ps.Name == constants.Launcher || ps.Name == constants.Node)
+		if (isMPIPodSet || ptr.Deref(ps.Ancestor, "") == constants.AncestorTrainer) && ps.Count != nil {
 			trainerReplicas += *ps.Count
 		}
 	}

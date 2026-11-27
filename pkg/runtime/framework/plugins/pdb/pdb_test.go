@@ -98,6 +98,32 @@ func TestPodDisruptionBudget(t *testing.T) {
 					Obj(),
 			},
 		},
+		"pdb counts the MPI launcher and node workers": {
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						MPI: &trainer.MPIMLPolicySource{},
+					},
+					PodGroupPolicy: &trainer.PodGroupPolicy{},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{Name: constants.Node, Count: ptr.To[int32](3)},
+						{Name: constants.Launcher, Ancestor: ptr.To(constants.AncestorTrainer), Count: ptr.To[int32](1)},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("test-uid").
+				Obj(),
+			wantObjs: []apiruntime.Object{
+				utiltesting.MakePodDisruptionBudgetWrapper("test-job", metav1.NamespaceDefault).
+					MinAvailable(4).
+					MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: "test-job"}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "test-uid").
+					Obj(),
+			},
+		},
 	}
 
 	for name, tc := range cases {
