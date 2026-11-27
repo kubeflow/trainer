@@ -4202,6 +4202,100 @@ func TestBuild(t *testing.T) {
 				},
 			},
 		},
+		"volumeClaimPolicies get the JobSet default retentionPolicy when it is unset": {
+			info: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:       constants.Node,
+							Count:      ptr.To[int32](1),
+							Containers: []runtime.Container{{Name: constants.Node}},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithVolumeClaimPolicies(
+							jobsetv1alpha2ac.VolumeClaimPolicy().
+								WithTemplates(corev1.PersistentVolumeClaim{
+									ObjectMeta: metav1.ObjectMeta{Name: "initializer"},
+								}),
+							jobsetv1alpha2ac.VolumeClaimPolicy().
+								WithTemplates(corev1.PersistentVolumeClaim{
+									ObjectMeta: metav1.ObjectMeta{Name: "checkpoints"},
+								}).
+								WithRetentionPolicy(jobsetv1alpha2ac.VolumeRetentionPolicy().
+									WithWhenDeleted(jobsetv1alpha2.RetentionPolicyRetain)),
+						).
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Obj(),
+			wantObjs: []apiruntime.Object{
+				&jobsetv1alpha2.JobSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{
+							{APIVersion: trainer.GroupVersion.String(), Kind: trainer.TrainJobKind, Name: "test-job", Controller: ptr.To(true)},
+						},
+					},
+					Spec: jobsetv1alpha2.JobSetSpec{
+						VolumeClaimPolicies: []jobsetv1alpha2.VolumeClaimPolicy{
+							{
+								Templates: []corev1.PersistentVolumeClaim{
+									{ObjectMeta: metav1.ObjectMeta{Name: "initializer"}},
+								},
+								RetentionPolicy: &jobsetv1alpha2.VolumeRetentionPolicy{
+									WhenDeleted: ptr.To(jobsetv1alpha2.RetentionPolicyDelete),
+								},
+							},
+							{
+								Templates: []corev1.PersistentVolumeClaim{
+									{ObjectMeta: metav1.ObjectMeta{Name: "checkpoints"}},
+								},
+								RetentionPolicy: &jobsetv1alpha2.VolumeRetentionPolicy{
+									WhenDeleted: ptr.To(jobsetv1alpha2.RetentionPolicyRetain),
+								},
+							},
+						},
+						ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+							{
+								Name:     constants.Node,
+								Replicas: 0,
+								Template: batchv1.JobTemplateSpec{
+									Spec: batchv1.JobSpec{
+										Template: corev1.PodTemplateSpec{
+											Spec: corev1.PodSpec{
+												Containers: []corev1.Container{
+													{Name: constants.Node},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

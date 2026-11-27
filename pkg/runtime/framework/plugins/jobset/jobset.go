@@ -545,6 +545,16 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 		)
 	}
 
+	// The JobSet webhook defaults an unset retentionPolicy only on create, and
+	// volumeClaimPolicies is immutable, so apply the same default here to keep
+	// the applied spec identical to the stored one on subsequent updates.
+	for i := range jobSetSpec.VolumeClaimPolicies {
+		if jobSetSpec.VolumeClaimPolicies[i].RetentionPolicy == nil {
+			jobSetSpec.VolumeClaimPolicies[i].RetentionPolicy = jobsetv1alpha2ac.VolumeRetentionPolicy().
+				WithWhenDeleted(jobsetv1alpha2.RetentionPolicyDelete)
+		}
+	}
+
 	for psIdx, ps := range info.TemplateSpec.PodSets {
 		apply.UpsertVolumes(&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Volumes, ps.Volumes...)
 		if ps.SchedulingGroup != nil {
