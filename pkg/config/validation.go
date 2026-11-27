@@ -17,6 +17,9 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
+	"net/http"
+
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
@@ -30,6 +33,16 @@ func validate(cfg *configapi.Configuration) field.ErrorList {
 	// Validate webhook port
 	if cfg.Webhook.Port != nil && (*cfg.Webhook.Port < 1 || *cfg.Webhook.Port > 65535) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("webhook", "port"), *cfg.Webhook.Port, "must be between 1 and 65535"))
+	}
+
+	if cfg.Health.HealthProbeBindAddress != "" && cfg.Health.HealthProbeBindAddress != "0" {
+		mux := http.NewServeMux()
+		if err := validateHealthProbePath(mux, cfg.Health.ReadinessEndpointName, field.NewPath("health", "readinessEndpointName")); err != nil {
+			allErrs = append(allErrs, err)
+		}
+		if err := validateHealthProbePath(mux, cfg.Health.LivenessEndpointName, field.NewPath("health", "livenessEndpointName")); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 
 	// Validate client connection QPS and Burst
@@ -70,4 +83,20 @@ func validate(cfg *configapi.Configuration) field.ErrorList {
 	allErrs = append(allErrs, tlsconfig.Validate(cfg.TLS, field.NewPath("tls"))...)
 
 	return allErrs
+}
+
+func validateHealthProbePath(mux *http.ServeMux, name string, fieldPath *field.Path) (err *field.Error) {
+	// ServeMux.Handle panics when a pattern is invalid or conflicts with a registered pattern.
+	defer func() {
+		if reason := recover(); reason != nil {
+			err = field.Invalid(fieldPath, name, fmt.Sprint(reason))
+		}
+	}()
+
+	// Register the same pair of patterns as controller-runtime's health probe server.
+	path := healthEndpointPath(name)
+	handler := http.NotFoundHandler()
+	mux.Handle(path, handler)
+	mux.Handle(path+"/", handler)
+	return nil
 }
