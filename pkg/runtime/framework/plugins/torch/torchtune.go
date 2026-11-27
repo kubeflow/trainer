@@ -136,7 +136,11 @@ func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, gpuQ 
 // isLoraConfigEnabled checks if we enables LoraConfig.
 func isLoraConfigEnabled(args []string) bool {
 	for _, arg := range args {
-		if strings.Contains(arg, constants.TorchTuneLoraAttnModules) {
+		name, _, found := strings.Cut(arg, "=")
+		if !found {
+			continue
+		}
+		if strings.Contains(name, constants.TorchTuneLoraAttnModules) {
 			return true
 		}
 	}
