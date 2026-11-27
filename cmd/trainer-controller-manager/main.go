@@ -140,7 +140,7 @@ func main() {
 	ctx := ctrl.SetupSignalHandler()
 
 	setupProbeEndpoints(mgr, certsReady, options)
-	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer(), &cfg)
+	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetAPIReader(), mgr.GetFieldIndexer(), &cfg)
 	if err != nil {
 		setupLog.Error(err, "Could not initialize runtimes")
 		os.Exit(1)
