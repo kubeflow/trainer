@@ -25,6 +25,7 @@ import (
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -559,6 +560,10 @@ func TestOptionalTrainerFields(t *testing.T) {
 		wantHostlist  string
 		// wantImage is the image of the trainer container, and defaults to the runtime image when empty.
 		wantImage string
+		// runtimeResources is the resources of the runtime's trainer node container.
+		runtimeResources corev1.ResourceList
+		// wantRspec is only asserted when set.
+		wantRspec string
 	}{
 		"trainer is not set": {
 			podSetCount:  3,
@@ -589,6 +594,41 @@ func TestOptionalTrainerFields(t *testing.T) {
 			wantViewImage: "example.com/flux-view:test",
 			wantHostlist:  "test-job-node-0-[0-2]",
 		},
+		"one task per node requests all the GPUs of the node": {
+			podSetCount:      1,
+			runtimeResources: corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")},
+			wantFlags:        `flags="-N 1 -n 1 -g 4  "`,
+			wantRspec:        "--cores=0 --gpu=0-3 > /tmp/R",
+			wantHostlist:     "test-job-node-0-[0]",
+		},
+		"the GPUs of the node are split across its tasks": {
+			podSetCount:      1,
+			jobTrainer:       utiltesting.MakeTrainJobTrainerWrapper().NumProcPerNode(2).Obj(),
+			runtimeResources: corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")},
+			wantFlags:        `flags="-N 1 -n 2 -g 2  "`,
+			wantRspec:        "--cores=0-1 --gpu=0-3 > /tmp/R",
+			wantHostlist:     "test-job-node-0-[0]",
+		},
+		"the runtime GPUs are split across the tasks when the TrainJob overrides only CPU": {
+			podSetCount: 2,
+			jobTrainer: utiltesting.MakeTrainJobTrainerWrapper().
+				NumProcPerNode(2).
+				Container("image", nil, nil, corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("8")}).
+				Obj(),
+			runtimeResources: corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")},
+			wantImage:        "image",
+			wantFlags:        `flags="-N 2 -n 4 -g 2  "`,
+			wantRspec:        "--cores=0-1 --gpu=0-3 > /tmp/R",
+			wantHostlist:     "test-job-node-0-[0-1]",
+		},
+		"no per-task GPUs are requested when a node runs more tasks than it has GPUs": {
+			podSetCount:      1,
+			jobTrainer:       utiltesting.MakeTrainJobTrainerWrapper().NumProcPerNode(4).Obj(),
+			runtimeResources: corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")},
+			wantFlags:        `flags="-N 1 -n 4  "`,
+			wantRspec:        "--cores=0-3 --gpu=0-1 > /tmp/R",
+			wantHostlist:     "test-job-node-0-[0]",
+		},
 	}
 
 	for name, tc := range cases {
@@ -618,7 +658,9 @@ func TestOptionalTrainerFields(t *testing.T) {
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
-													corev1ac.Container().WithName(constants.Node),
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithResources(corev1ac.ResourceRequirements().WithLimits(tc.runtimeResources)),
 												),
 											),
 										),
@@ -685,6 +727,9 @@ func TestOptionalTrainerFields(t *testing.T) {
 			}
 			if !strings.Contains(configMap.Data["entrypoint.sh"], tc.wantFlags) {
 				t.Errorf("entrypoint.sh does not contain the Flux flags %q", tc.wantFlags)
+			}
+			if tc.wantRspec != "" && !strings.Contains(configMap.Data["entrypoint.sh"], tc.wantRspec) {
+				t.Errorf("entrypoint.sh does not contain the Flux resource spec %q", tc.wantRspec)
 			}
 			if !strings.Contains(configMap.Data["init.sh"], tc.wantHostlist) {
 				t.Errorf("init.sh does not contain the hostlist %q", tc.wantHostlist)
