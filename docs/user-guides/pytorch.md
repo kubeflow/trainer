@@ -218,3 +218,4 @@ print("\n".join(TrainerClient().get_job_logs(name=job_id)))
 - Follow [the PyTorch fine-tuning example](https://github.com/kubeflow/trainer/blob/master/examples/pytorch/question-answering/fine-tune-distilbert.ipynb)
  using the pre-trained DistilBERT model.
 - Learn more about `TrainerClient()` APIs [in the Kubeflow SDK](https://github.com/kubeflow/sdk/blob/main/kubeflow/trainer/api/trainer_client.py).
+- Follow the [PyTorch FSDP guide](pytorch-fsdp) to fine-tune T5 with FSDP and the Kubeflow SDK.

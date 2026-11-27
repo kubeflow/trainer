@@ -18,6 +18,13 @@ This section contains guides for running distributed training workloads with var
 Distributed PyTorch training with FSDP, DDP, and more
 ::::
 
+::::{grid-item-card} PyTorch FSDP
+:link: pytorch-fsdp
+:link-type: doc
+
+Fine-tune T5 with FSDP and the Kubeflow SDK
+::::
+
 ::::{grid-item-card} PyTorch on AMD ROCm
 :link: pytorch-rocm
 :link-type: doc
@@ -181,6 +188,7 @@ Run training jobs as local processes for quick iteration
 :maxdepth: 2
 
 pytorch
+pytorch-fsdp
 pytorch-rocm
 jax
 jax-tpu

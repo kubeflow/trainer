@@ -7,6 +7,7 @@ This directory contains examples for training PyTorch models using the Kubeflow 
 | Task | Model | Dataset | Notebook |
 | :--- | :--- | :--- | :--- |
 | Image Classification | CNN | Fashion MNIST | [mnist.ipynb](./image-classification/mnist.ipynb) |
+| Text Summarization (FSDP) | T5 | WikiHow | [fine-tune-t5-with-fsdp.ipynb](./fsdp/fine-tune-t5-with-fsdp.ipynb) |
 | Question Answering | DistilBERT | SQuAD | [fine-tune-distilbert.ipynb](./question-answering/fine-tune-distilbert.ipynb) |
 | Speech Recognition | Transformer | Speech Commands | [speech-recognition.ipynb](./speech-recognition/speech-recognition.ipynb) |
 | Audio Classification | CNN (M5) | GTZAN | [audio-classification.ipynb](./audio-classification/audio-classification.ipynb) |
