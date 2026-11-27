@@ -238,6 +238,21 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, client.IgnoreNotFound(getErr)
 	}
 
+	// An OptimizationJob being deleted must not be reconciled. With foreground deletion, it
+	// remains visible until the garbage collector has removed its trial TrainJobs and the
+	// algorithm service, and each removal triggers a new reconciliation. Proceeding would
+	// create replacement trials and re-apply the algorithm service until the garbage
+	// collector wins the race.
+	// TODO: The OptimizationJob controller currently owns no finalizer on OptimizationJobs, so
+	// there is nothing to clean up here. If one is ever added, its cleanup must run before this
+	// early return, otherwise the finalizer is never removed and the OptimizationJob is never
+	// deleted.
+	if !optJob.DeletionTimestamp.IsZero() {
+		log.V(2).Info("Skipping OptimizationJob being deleted")
+		r.clearTrialExpectations(req.NamespacedName)
+		return ctrl.Result{}, nil
+	}
+
 	if optJob.Status == nil {
 		optJob.Status = &trainer.OptimizationJobStatus{}
 	}

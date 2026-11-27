@@ -469,6 +469,30 @@ func TestReconcileOptimizationJob(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: metav1.NamespaceDefault},
 	}
 
+	activeTrial := func(name string) *trainer.TrainJob {
+		return &trainer.TrainJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: metav1.NamespaceDefault,
+				OwnerReferences: []metav1.OwnerReference{{
+					APIVersion: trainer.GroupVersion.String(),
+					Kind:       trainer.OptimizationJobKind,
+					Name:       "test-optjob",
+					UID:        "test-uid-123",
+					Controller: ptr.To(true),
+				}},
+			},
+		}
+	}
+
+	deletionTime := metav1.NewTime(time.Now().Truncate(time.Second))
+	deletingOptJob := func() *trainer.OptimizationJob {
+		job := getBaseOptJob()
+		job.DeletionTimestamp = ptr.To(deletionTime)
+		job.Finalizers = []string{metav1.FinalizerDeleteDependents}
+		return job
+	}
+
 	cases := map[string]struct {
 		getInitObjects        func() []client.Object
 		searchAlgorithmClient SearchAlgorithmClient
@@ -513,6 +537,31 @@ func TestReconcileOptimizationJob(t *testing.T) {
 				}}}
 				return job
 			},
+		},
+		"do not create trials for an optimizationjob being deleted": {
+			getInitObjects: func() []client.Object {
+				job := deletingOptJob()
+				job.Spec.ParallelTrials = 2
+				return []client.Object{job, optDeploy, optSvc, activeTrial("tj-running")}
+			},
+			searchAlgorithmClient: &mockSearchAlgorithmClient{
+				mockedAssignments: [][]trainer.ParameterAssignment{
+					{{Name: "lr", Value: "0.03"}},
+				},
+			},
+			wantSuggestionCalls: 0,
+			wantTrainJobs:       1,
+			getWantOptJob: func() *trainer.OptimizationJob {
+				job := deletingOptJob()
+				job.Spec.ParallelTrials = 2
+				return job
+			},
+		},
+		"do not re-create the algorithm service for an optimizationjob being deleted": {
+			getInitObjects:    func() []client.Object { return []client.Object{deletingOptJob()} },
+			wantDeployDeleted: true,
+			wantSvcDeleted:    true,
+			getWantOptJob:     deletingOptJob,
 		},
 		"fail when search algorithm is unsupported": {
 			getInitObjects: func() []client.Object {
@@ -1417,6 +1466,29 @@ func TestReconcileTrialCreationExpectations(t *testing.T) {
 			},
 			pendingTrials:     map[string]time.Duration{"trial-1": 0},
 			wantPendingTrials: 0,
+		},
+		"expectations cleared on job being deleted": {
+			objs: []client.Object{
+				&trainer.OptimizationJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "test-optjob",
+						Namespace:         metav1.NamespaceDefault,
+						UID:               types.UID("optjob-uid"),
+						DeletionTimestamp: ptr.To(metav1.NewTime(time.Now().Truncate(time.Second))),
+						Finalizers:        []string{metav1.FinalizerDeleteDependents},
+					},
+					Spec: trainer.OptimizationJobSpec{
+						NumTrials:      3,
+						ParallelTrials: 2,
+						SearchAlgorithm: &trainer.SearchAlgorithm{
+							Random: &trainer.RandomAlgorithm{},
+						},
+					},
+				},
+			},
+			pendingTrials:     map[string]time.Duration{"trial-1": 0},
+			wantPendingTrials: 0,
+			wantTrainJobs:     ptr.To(0),
 		},
 		"expectations cleared on job Failed": {
 			objs: []client.Object{
