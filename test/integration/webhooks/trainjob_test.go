@@ -256,6 +256,16 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				testingutil.BeForbiddenError()),
+			ginkgo.Entry("Should fail in creating trainJob with trainer config having envs with reserved JAX env names",
+				func() *trainer.TrainJob {
+					trainingRuntime.Spec.MLPolicy = &trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{JAX: &trainer.JAXMLPolicySource{}}}
+					gomega.Expect(k8sClient.Update(ctx, trainingRuntime)).To(gomega.Succeed())
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+						Trainer(&trainer.Trainer{Env: []corev1.EnvVar{{Name: constants.JAXEnvProcessID, Value: "0"}}}).
+						Obj()
+				},
+				testingutil.BeForbiddenError()),
 
 			ginkgo.Entry("Should fail in creating TrainJob with Flux numProcPerNode < 1",
 				func() *trainer.TrainJob {

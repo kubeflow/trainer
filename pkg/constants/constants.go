@@ -309,6 +309,18 @@ const (
 	// XGBoostEnvNumWorker is the env name for the total number of workers.
 	XGBoostEnvNumWorker string = "DMLC_NUM_WORKER"
 
+	// Distributed envs for jax.distributed.initialize().
+	// Ref: https://docs.jax.dev/en/latest/_autosummary/jax.distributed.initialize.html
+
+	// JAXEnvNumProcesses is the env name for the total number of JAX processes.
+	JAXEnvNumProcesses string = "JAX_NUM_PROCESSES"
+
+	// JAXEnvProcessID is the env name for the ID of the current JAX process.
+	JAXEnvProcessID string = "JAX_PROCESS_ID"
+
+	// JAXEnvCoordinatorAddress is the env name for the address of the JAX coordinator process.
+	JAXEnvCoordinatorAddress string = "JAX_COORDINATOR_ADDRESS"
+
 	// SearchAlgorithmServicePort is the port for the Optuna GRPC service.
 	SearchAlgorithmServicePort int32 = 6789
 
@@ -354,6 +366,9 @@ var (
 
 	// XGBoostReservedEnvNames is XGBoost reserved env names that should not be set by users.
 	XGBoostReservedEnvNames = sets.New(XGBoostEnvTrackerURI, XGBoostEnvTrackerPort, XGBoostEnvTaskID, XGBoostEnvNumWorker)
+
+	// JAXReservedEnvNames is JAX reserved env names that should not be set by users.
+	JAXReservedEnvNames = sets.New(JAXEnvNumProcesses, JAXEnvProcessID, JAXEnvCoordinatorAddress)
 
 	// MPIReservedEnvNames is MPI reserved env names that users must not set manually.
 	MPIReservedEnvNames = sets.New(
