@@ -50,7 +50,26 @@ func (j *Jax) Name() string {
 }
 
 func (j *Jax) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
-	return nil, nil
+	var allErrs field.ErrorList
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil ||
+		runtimeInfo.RuntimePolicy.MLPolicySource.JAX == nil {
+		return nil, allErrs
+	}
+
+	// The TrainJob trainer envs are applied after the JAX envs, so a reserved env set by
+	// the user would override the value computed for every trainer Pod.
+	if newObj.Spec.Trainer != nil {
+		specPath := field.NewPath("spec", "trainer", "env")
+		for i, env := range newObj.Spec.Trainer.Env {
+			if constants.JAXReservedEnvNames.Has(env.Name) {
+				allErrs = append(allErrs, field.Forbidden(
+					specPath.Index(i),
+					fmt.Sprintf("%s is reserved for the JAX runtime", env.Name),
+				))
+			}
+		}
+	}
+	return nil, allErrs
 }
 
 func (j *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
@@ -81,19 +100,19 @@ func (j *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 			apply.UpsertEnvVars(&trainerContainer.Env,
 				// Total number of JAX processes (one per node/host)
 				*corev1ac.EnvVar().
-					WithName("JAX_NUM_PROCESSES").
+					WithName(constants.JAXEnvNumProcesses).
 					WithValue(fmt.Sprintf("%d", numNodes)),
 
 				// Process ID - derived from job completion index
 				*corev1ac.EnvVar().
-					WithName("JAX_PROCESS_ID").
+					WithName(constants.JAXEnvProcessID).
 					WithValueFrom(corev1ac.EnvVarSource().
 						WithFieldRef(corev1ac.ObjectFieldSelector().
 							WithFieldPath(constants.JobCompletionIndexFieldPath))),
 
 				// Coordinator address - first pod in the headless service
 				*corev1ac.EnvVar().
-					WithName("JAX_COORDINATOR_ADDRESS").
+					WithName(constants.JAXEnvCoordinatorAddress).
 					WithValue(fmt.Sprintf("%s-%s-0-0.%s:%d",
 						trainJob.Name,
 						constants.Node,
