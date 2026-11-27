@@ -35,7 +35,14 @@ class HuggingFace(utils.ModelProvider):
 
     def download_model(self):
         storage_uri_parsed = urlparse(self.config.storage_uri)
-        model_uri = storage_uri_parsed.netloc + storage_uri_parsed.path
+        # Model id is either "name" or "namespace/name". Extra path segments are ignored.
+        segments = [storage_uri_parsed.netloc] + storage_uri_parsed.path.split("/")
+        model_uri = "/".join([s for s in segments if s][:2])
+        if not model_uri:
+            raise ValueError(
+                f"Invalid HuggingFace model URI: {self.config.storage_uri}. "
+                "Expected hf://<model> or hf://<namespace>/<model>"
+            )
 
         logging.info(f"Downloading model: {model_uri}")
         logging.info("-" * 40)
