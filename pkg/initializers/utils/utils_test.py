@@ -12,10 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
+
 import pytest
 
 import pkg.initializers.types.types as types
 import pkg.initializers.utils.utils as utils
+
+
+@dataclass
+class IgnorePatternsWithDefault:
+    ignore_patterns: tuple[str, ...] = ("*.ckpt",)
 
 
 @pytest.mark.parametrize(
@@ -39,7 +46,6 @@ import pkg.initializers.utils.utils as utils
             {"STORAGE_URI": "hf://test"},
             {
                 "storage_uri": "hf://test",
-                "ignore_patterns": None,
                 "access_token": None,
             },
         ),
@@ -135,6 +141,23 @@ import pkg.initializers.utils.utils as utils
         (
             types.S3ModelInitializer,
             {"STORAGE_URI": "s3://bucket/path"},
+            {
+                "storage_uri": "s3://bucket/path",
+                "endpoint": None,
+                "access_key_id": None,
+                "secret_access_key": None,
+                "region": None,
+                "role_arn": None,
+            },
+        ),
+        (
+            IgnorePatternsWithDefault,
+            {},
+            {},
+        ),
+        (
+            types.S3ModelInitializer,
+            {"STORAGE_URI": "s3://bucket/path", "IGNORE_PATTERNS": ""},
             {
                 "storage_uri": "s3://bucket/path",
                 "ignore_patterns": None,
