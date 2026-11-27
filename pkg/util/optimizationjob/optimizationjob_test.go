@@ -27,6 +27,7 @@ import (
 	katibapi "github.com/kubeflow/katib/pkg/apis/manager/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -45,15 +46,31 @@ func TestGetAlgorithmServiceName(t *testing.T) {
 			jobName: strings.Repeat("a", 46),
 			want:    strings.Repeat("a", 46) + "-search-algorithm",
 		},
-		"long name gets truncated to 63 chars": {
+		"shortest name that gets a hash": {
+			jobName: strings.Repeat("a", 47),
+			want:    strings.Repeat("a", 37) + "-11eaed93-search-algorithm",
+		},
+		"63-character name gets a hash": {
+			jobName: strings.Repeat("a", 63),
+			want:    strings.Repeat("a", 37) + "-7d3e74a0-search-algorithm",
+		},
+		"long name gets truncated to 63 chars with a hash of the full name": {
 			jobName: strings.Repeat("a", 60),
-			want:    strings.Repeat("a", 46) + "-search-algorithm",
+			want:    strings.Repeat("a", 37) + "-11ee3912-search-algorithm",
 		},
 		"long name with hyphen at truncation boundary gets trimmed": {
-			// 45 'a's + '-' + 14 'b's = 60 chars.
-			// Truncating to 46 gives 45 'a's + '-'. TrimRight removes the hyphen.
-			jobName: strings.Repeat("a", 45) + "-" + strings.Repeat("b", 14),
-			want:    strings.Repeat("a", 45) + "-search-algorithm",
+			// 36 'a's + '-' + 23 'b's = 60 chars.
+			// Truncating to 37 gives 36 'a's + '-'. TrimRight removes the hyphen.
+			jobName: strings.Repeat("a", 36) + "-" + strings.Repeat("b", 23),
+			want:    strings.Repeat("a", 36) + "-604b735b-search-algorithm",
+		},
+		"name sharing a 46-character prefix, run-a": {
+			jobName: strings.Repeat("b", 46) + "-run-a",
+			want:    strings.Repeat("b", 37) + "-480294b5-search-algorithm",
+		},
+		"name sharing a 46-character prefix, run-b": {
+			jobName: strings.Repeat("b", 46) + "-run-b",
+			want:    strings.Repeat("b", 37) + "-6a6e29cc-search-algorithm",
 		},
 	}
 
@@ -68,6 +85,9 @@ func TestGetAlgorithmServiceName(t *testing.T) {
 			}
 			if len(got) > 63 {
 				t.Errorf("GetAlgorithmServiceName() length %d exceeds 63 characters: %q", len(got), got)
+			}
+			if errs := validation.IsDNS1035Label(got); len(errs) > 0 {
+				t.Errorf("GetAlgorithmServiceName() = %q is not a valid DNS-1035 label: %v", got, errs)
 			}
 		})
 	}
@@ -116,33 +136,65 @@ func TestGetAlgorithmName(t *testing.T) {
 
 func TestGenerateTrialName(t *testing.T) {
 	t.Run("random suffixes distinguish trials", func(t *testing.T) {
-		name1 := generateTrialName("my-optjob", "abc12345")
-		name2 := generateTrialName("my-optjob", "def67890")
+		name1 := generateTrialName("my-optjob", "12345")
+		name2 := generateTrialName("my-optjob", "67890")
 		if name1 == name2 {
 			t.Fatalf("trial names must differ for different suffixes: %q", name1)
 		}
-		if name1 != "my-optjob-trial-abc12345" {
+		if name1 != "my-optjob-12345" {
 			t.Errorf("unexpected trial name %q", name1)
 		}
 	})
 
 	t.Run("generated suffix has expected format", func(t *testing.T) {
 		name := GenerateTrialName("my-optjob")
-		if !strings.HasPrefix(name, "my-optjob-trial-") || len(name) != len("my-optjob-trial-")+8 {
+		if !strings.HasPrefix(name, "my-optjob-") || len(name) != len("my-optjob-")+5 {
 			t.Errorf("unexpected generated trial name %q", name)
 		}
 	})
 
 	t.Run("length limit of 63 characters is enforced", func(t *testing.T) {
 		longName := strings.Repeat("x", 60)
-		trialName := generateTrialName(longName, "abc12345")
+		trialName := generateTrialName(longName, "12345")
 		if len(trialName) > 63 {
 			t.Errorf("GenerateTrialName length %d exceeds 63 characters: %q", len(trialName), trialName)
 		}
-		if !strings.Contains(trialName, "-trial-") {
-			t.Errorf("GenerateTrialName does not contain '-trial-': %q", trialName)
+		if !strings.HasSuffix(trialName, "-12345") {
+			t.Errorf("GenerateTrialName does not end with '-12345': %q", trialName)
 		}
 	})
+}
+
+func TestMaxOptimizationJobNameLength(t *testing.T) {
+	cases := map[string]struct {
+		maxTrainJobLen int
+		wantLen        int
+	}{
+		"dataset-initializer with max TrainJob length 33": {
+			maxTrainJobLen: 33,
+			wantLen:        27,
+		},
+		"node with max TrainJob length 48": {
+			maxTrainJobLen: 48,
+			wantLen:        42,
+		},
+		"launcher with max TrainJob length 44": {
+			maxTrainJobLen: 44,
+			wantLen:        38,
+		},
+		"trainJob length less than trial suffix length clamps to 0": {
+			maxTrainJobLen: 5,
+			wantLen:        0,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := MaxOptimizationJobNameLength(tc.maxTrainJobLen)
+			if got != tc.wantLen {
+				t.Errorf("MaxOptimizationJobNameLength(%d) = %d, want %d", tc.maxTrainJobLen, got, tc.wantLen)
+			}
+		})
+	}
 }
 
 func TestGetFinalObjectiveMetric(t *testing.T) {

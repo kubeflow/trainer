@@ -12,6 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# controller-gen orders the webhooks by name. The test operations fail the build when a new
+# webhook shifts the order, so that every replacement below targets the intended webhook.
+- op: test
+  path: /webhooks/0/name
+  value: validator.clustertrainingruntime.trainer.kubeflow.org
+- op: test
+  path: /webhooks/1/name
+  value: validator.optimizationjob.trainer.kubeflow.org
+- op: test
+  path: /webhooks/2/name
+  value: validator.trainingruntime.trainer.kubeflow.org
+- op: test
+  path: /webhooks/3/name
+  value: validator.trainjob.trainer.kubeflow.org
 - op: replace
   path: /webhooks/0/clientConfig/service/name
   value: kubeflow-trainer-controller-manager
@@ -20,6 +34,9 @@
   value: kubeflow-trainer-controller-manager
 - op: replace
   path: /webhooks/2/clientConfig/service/name
+  value: kubeflow-trainer-controller-manager
+- op: replace
+  path: /webhooks/3/clientConfig/service/name
   value: kubeflow-trainer-controller-manager
 - op: replace
   path: /metadata/name
@@ -33,7 +50,7 @@
         values:
           - disabled
 - op: add
-  path: /webhooks/1/objectSelector
+  path: /webhooks/2/objectSelector
   value:
     matchExpressions:
       - key: trainer.kubeflow.org/webhook-validation

@@ -1133,10 +1133,10 @@ stateDiagram-v2
 In the above state transition, the `Created=False` will happen in the following situations and
 those different situations can be identified by the condition reasons (`.status.conditions.[type="Created"].reason`).
 
-- `JobsBuildFailed`: When the TrainJob controller failed to construct objects (resources) using the [runtime framework interfaces](../../../pkg/runtime.v2/framework/interface.go)
+- `JobsBuildFailed`: When the TrainJob controller failed to construct objects (resources) using the [runtime framework interfaces](../../pkg/runtime/framework/interface.go)
 - `JobsCreationFailed`: When the TrainJob controller succeeded to construct objects, but it failed to deploy objects to the cluster.
 
-Additionally, we extend the [runtime framework interfaces](../../../pkg/runtime.v2/framework/interface.go)
+Additionally, we extend the [runtime framework interfaces](../../pkg/runtime/framework/interface.go)
 to allow each plugin to propagate the arbitrary conditions to the TrainJob.
 
 ## The Training Runtime API

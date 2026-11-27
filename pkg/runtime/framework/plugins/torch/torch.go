@@ -69,6 +69,10 @@ func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, oldObj, n
 
 	specPath := field.NewPath("spec")
 	allErrs = append(allErrs, validateEnvInjectionTargets(runtimeInfo, specPath.Child("runtimeRef"))...)
+	if trainerReplicas := runtime.TrainerReplicas(runtimeInfo); trainerReplicas > 1 {
+		allErrs = append(allErrs, field.Invalid(specPath.Child("runtimeRef"), trainerReplicas,
+			"trainer replicatedJob replicas must be 1 for the Torch runtime"))
+	}
 
 	if newObj.Spec.Trainer != nil {
 		// Check reserved envs.
@@ -161,6 +165,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	trainerContainer := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node)
 	if trainerContainer != nil && trainJob.Spec.Trainer != nil {
 		apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
+		runtime.SetContainerImageFromTrainer(trainerContainer, trainJob.Spec.Trainer)
 	}
 
 	petEnvs := []corev1ac.EnvVarApplyConfiguration{

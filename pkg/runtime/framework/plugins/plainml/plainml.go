@@ -46,9 +46,7 @@ func (p *PlainML) Name() string {
 func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	if info == nil ||
 		(info.RuntimePolicy.MLPolicySource != nil &&
-			(info.RuntimePolicy.MLPolicySource.Torch != nil ||
-				info.RuntimePolicy.MLPolicySource.MPI != nil ||
-				info.RuntimePolicy.MLPolicySource.JAX != nil)) {
+			*info.RuntimePolicy.MLPolicySource != trainer.MLPolicySource{}) {
 		return nil
 	}
 
@@ -64,6 +62,7 @@ func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 	if trainJob.Spec.Trainer != nil {
 		if trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
 			apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
+			runtime.SetContainerImageFromTrainer(trainerContainer, trainJob.Spec.Trainer)
 		}
 	}
 

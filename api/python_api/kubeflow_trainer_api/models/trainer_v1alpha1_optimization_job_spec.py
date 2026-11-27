@@ -48,7 +48,7 @@ class TrainerV1alpha1OptimizationJobSpec(BaseModel):
     objectives: List[TrainerV1alpha1Objective] = Field(description="objectives is the list of objectives to optimize.")
     parallel_trials: Optional[StrictInt] = Field(default=None, description="parallelTrials is the number of trials to run in parallel. Defaults to 1.", alias="parallelTrials")
     parameters: List[TrainerV1alpha1Parameter] = Field(description="parameters is the list of hyperparameters to search over.")
-    search_algorithm: Optional[TrainerV1alpha1SearchAlgorithm] = Field(default=None, description="searchAlgorithm is the algorithm to use for searching over the hyperparameters.", alias="searchAlgorithm")
+    search_algorithm: TrainerV1alpha1SearchAlgorithm = Field(description="searchAlgorithm is the algorithm to use for searching over the hyperparameters.", alias="searchAlgorithm")
     train_job_template: TrainerV1alpha1TrainJobTemplateSpec = Field(description="trainJobTemplate is the template for the train job to run.", alias="trainJobTemplate")
     __properties: ClassVar[List[str]] = ["numTrials", "objectives", "parallelTrials", "parameters", "searchAlgorithm", "trainJobTemplate"]
 

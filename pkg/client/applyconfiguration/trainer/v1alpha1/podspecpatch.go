@@ -28,6 +28,9 @@ import (
 //
 // PodSpecPatch contains the Pod spec fields that managers are permitted to patch.
 type PodSpecPatchApplyConfiguration struct {
+	// schedulerName patches the scheduler for the Pods in the target job templates.
+	// When omitted, the scheduler specified in the runtime template is preserved.
+	SchedulerName *string `json:"schedulerName,omitempty"`
 	// serviceAccountName patches the service account for the Pods in the target job templates.
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 	// volumes patches the Pod's volumes.
@@ -65,6 +68,14 @@ type PodSpecPatchApplyConfiguration struct {
 // apply.
 func PodSpecPatch() *PodSpecPatchApplyConfiguration {
 	return &PodSpecPatchApplyConfiguration{}
+}
+
+// WithSchedulerName sets the SchedulerName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SchedulerName field is set to the value of the last call.
+func (b *PodSpecPatchApplyConfiguration) WithSchedulerName(value string) *PodSpecPatchApplyConfiguration {
+	b.SchedulerName = &value
+	return b
 }
 
 // WithServiceAccountName sets the ServiceAccountName field in the declarative configuration to the given value

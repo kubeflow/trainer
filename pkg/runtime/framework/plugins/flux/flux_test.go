@@ -245,6 +245,30 @@ func TestValidate(t *testing.T) {
 			},
 			newObj: &trainer.TrainJob{},
 		},
+		"invalid when trainer replicatedJob has multiple replicas": {
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						Flux: &trainer.FluxMLPolicySource{},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: v1alpha2.JobSetSpec().
+						WithReplicatedJobs(v1alpha2.ReplicatedJob().
+							WithName(constants.Node).
+							WithReplicas(2).
+							WithTemplate(batchv1ac.JobTemplateSpec().
+								WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}),
+							),
+						),
+				},
+			},
+			newObj: &trainer.TrainJob{},
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "runtimeRef"), int32(2),
+					"trainer replicatedJob replicas must be 1 for the Flux runtime"),
+			},
+		},
 		"invalid when node podSet includes reserved flux installer init container": {
 			info: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
@@ -533,6 +557,8 @@ func TestOptionalTrainerFields(t *testing.T) {
 		// wantViewImage defaults to constants.FluxInstallerImage when empty.
 		wantViewImage string
 		wantHostlist  string
+		// wantImage is the image of the trainer container, and defaults to the runtime image when empty.
+		wantImage string
 	}{
 		"trainer is not set": {
 			podSetCount:  3,
@@ -545,6 +571,7 @@ func TestOptionalTrainerFields(t *testing.T) {
 			jobTrainer:   utiltesting.MakeTrainJobTrainerWrapper().Container("image", []string{"python", "train.py"}, nil, nil).Obj(),
 			wantFlags:    "-N 2 -n 2",
 			wantHostlist: "test-job-node-0-[0-1]",
+			wantImage:    "image",
 		},
 		"numProcPerNode is not set in the runtime and TrainJob": {
 			podSetCount:  2,
@@ -603,7 +630,7 @@ func TestOptionalTrainerFields(t *testing.T) {
 							Name:       constants.Node,
 							Ancestor:   ptr.To(constants.AncestorTrainer),
 							Count:      ptr.To(tc.podSetCount),
-							Containers: []runtime.Container{{Name: constants.Node, Command: []string{"python", "train.py"}}},
+							Containers: []runtime.Container{{Name: constants.Node, Image: "test:runtime", Command: []string{"python", "train.py"}}},
 						},
 					},
 				},
@@ -633,6 +660,9 @@ func TestOptionalTrainerFields(t *testing.T) {
 			}
 			if want := cmp.Or(tc.wantViewImage, constants.FluxInstallerImage); viewImage != want {
 				t.Errorf("flux-installer image = %q; want %q", viewImage, want)
+			}
+			if got, want := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node).Image, cmp.Or(tc.wantImage, "test:runtime"); got != want {
+				t.Errorf("trainer image = %q; want %q", got, want)
 			}
 
 			var objs []apiruntime.ApplyConfiguration

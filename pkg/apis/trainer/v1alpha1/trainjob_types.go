@@ -424,6 +424,15 @@ type PodTemplatePatch struct {
 
 // PodSpecPatch contains the Pod spec fields that managers are permitted to patch.
 type PodSpecPatch struct {
+	// schedulerName patches the scheduler for the Pods in the target job templates.
+	// When omitted, the scheduler specified in the runtime template is preserved.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
+	// +optional
+	SchedulerName string `json:"schedulerName,omitempty"`
+
 	// serviceAccountName patches the service account for the Pods in the target job templates.
 	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"

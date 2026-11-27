@@ -121,7 +121,7 @@ func TestBuilderInitializer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To("initializer-job"),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](3),
 						},
 					},
 				},
@@ -179,7 +179,7 @@ func TestBuilderInitializer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To("initializer-job"),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](2),
 						},
 					},
 				},
@@ -272,7 +272,7 @@ func TestBuilderInitializer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To("initializer-job"),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](3),
 						},
 					},
 				},
@@ -318,13 +318,13 @@ func TestBuilderInitializer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To("initializer-job"),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](2),
 						},
 					},
 				},
 			},
 		},
-		"dataset initializer ancestor with nil Initializer spec sets replicas to 1": {
+		"dataset initializer ancestor with nil Initializer spec preserves replicas from template": {
 			jobSet: makeJobSet(constants.DatasetInitializer, constants.DatasetInitializer, 3, "initializer-job"),
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
@@ -354,7 +354,7 @@ func TestBuilderInitializer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To("initializer-job"),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](3),
 						},
 					},
 				},
@@ -434,7 +434,7 @@ func TestBuilderTrainer(t *testing.T) {
 		info       *runtime.Info
 		wantJobSet *jobsetv1alpha2ac.JobSetApplyConfiguration
 	}{
-		"trainer ancestor with image command and args": {
+		"trainer ancestor with command and args, leaving the image to the MLPolicy plugins": {
 			jobSet: makeJobSet(constants.AncestorTrainer, constants.Node, 4, constants.Node),
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
@@ -457,7 +457,6 @@ func TestBuilderTrainer(t *testing.T) {
 											Containers: []corev1ac.ContainerApplyConfiguration{
 												{
 													Name:    ptr.To(constants.Node),
-													Image:   ptr.To("docker.io/my-org/train:latest"),
 													Command: []string{"torchrun", "--nproc_per_node=4"},
 													Args:    []string{"train.py", "--epochs=10"},
 												},
@@ -472,7 +471,7 @@ func TestBuilderTrainer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To(constants.Node),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](4),
 						},
 					},
 				},
@@ -559,7 +558,7 @@ func TestBuilderTrainer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To(constants.Node),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](4),
 						},
 					},
 				},
@@ -584,9 +583,9 @@ func TestBuilderTrainer(t *testing.T) {
 				},
 			},
 			info:       &runtime.Info{},
-			wantJobSet: makeJobSet(constants.AncestorTrainer, constants.Node, 1, constants.Node),
+			wantJobSet: makeJobSet(constants.AncestorTrainer, constants.Node, 2, constants.Node),
 		},
-		"trainer ancestor with nil Trainer spec sets replicas to 1": {
+		"trainer ancestor with nil Trainer spec preserves replicas from template": {
 			jobSet: makeJobSet(constants.AncestorTrainer, constants.Node, 5, constants.Node),
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
@@ -617,7 +616,7 @@ func TestBuilderTrainer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To(constants.Node),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](5),
 						},
 					},
 				},
@@ -693,7 +692,6 @@ func TestBuilderTrainer(t *testing.T) {
 											Containers: []corev1ac.ContainerApplyConfiguration{
 												{
 													Name:    ptr.To(constants.Node),
-													Image:   ptr.To("registry.example/train:combined"),
 													Command: []string{"mpirun"},
 													Env: []corev1ac.EnvVarApplyConfiguration{
 														{
@@ -721,7 +719,7 @@ func TestBuilderTrainer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To(constants.Node),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](3),
 						},
 					},
 				},

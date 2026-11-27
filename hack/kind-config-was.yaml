@@ -1,0 +1,32 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Kind cluster configuration for Kubeflow Trainer Workload-Aware Scheduling e2e tests.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+featureGates:
+  GenericWorkload: true
+  TopologyAwareWorkloadScheduling: true
+  DRAWorkloadResourceClaims: true
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: ClusterConfiguration
+        apiVersion: kubeadm.k8s.io/v1beta4
+        apiServer:
+          extraArgs:
+          - name: runtime-config
+            # Trainer creates Workload and PodGroup objects via the scheduling.k8s.io/v1beta1 API.
+            value: "scheduling.k8s.io/v1beta1=true"

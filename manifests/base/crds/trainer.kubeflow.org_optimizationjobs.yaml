@@ -95,9 +95,12 @@ spec:
                 items:
                   properties:
                     name:
-                      description: name is the name of the hyperparameter.
+                      description: name is the name of the hyperparameter. Only letters,
+                        digits and underscores are allowed, and it cannot start with
+                        a digit.
                       maxLength: 64
                       minLength: 1
+                      pattern: ^[A-Za-z_][A-Za-z0-9_]*$
                       type: string
                     searchSpace:
                       description: searchSpace is the search space for the hyperparameter.
@@ -110,6 +113,7 @@ spec:
                                 from.
                               items:
                                 maxLength: 64
+                                minLength: 1
                                 type: string
                               maxItems: 100
                               minItems: 1
@@ -201,8 +205,6 @@ spec:
                 - name
                 x-kubernetes-list-type: map
               searchAlgorithm:
-                default:
-                  random: {}
                 description: searchAlgorithm is the algorithm to use for searching
                   over the hyperparameters.
                 properties:
@@ -213,8 +215,12 @@ spec:
                     description: random is the random search algorithm.
                     properties:
                       seed:
-                        description: seed is the seed for the random search algorithm.
+                        description: |-
+                          seed is the seed for the random search algorithm.
+                          It must be between 0 and 4294967295.
                         format: int64
+                        maximum: 4294967295
+                        minimum: 0
                         type: integer
                     type: object
                 type: object
@@ -3459,6 +3465,19 @@ spec:
                                                                 - message: field is
                                                                     immutable
                                                                   rule: self == oldSelf
+                                                              schedulerName:
+                                                                description: schedulerName
+                                                                  patches the scheduler
+                                                                  for the Pods in
+                                                                  the target job templates.
+                                                                maxLength: 253
+                                                                minLength: 1
+                                                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                                                type: string
+                                                                x-kubernetes-validations:
+                                                                - message: field is
+                                                                    immutable
+                                                                  rule: self == oldSelf
                                                               schedulingGates:
                                                                 description: |-
                                                                   schedulingGates patches the scheduling gates for the Pods in the target job templates.
@@ -6578,6 +6597,7 @@ spec:
             required:
             - objectives
             - parameters
+            - searchAlgorithm
             - trainJobTemplate
             type: object
             x-kubernetes-validations:
@@ -6689,6 +6709,9 @@ spec:
         required:
         - spec
         type: object
+        x-kubernetes-validations:
+        - message: metadata.name must match RFC 1035 DNS label format
+          rule: self.metadata.name.matches('^[a-z]([-a-z0-9]*[a-z0-9])?$')
     served: true
     storage: true
     subresources:

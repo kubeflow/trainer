@@ -107,28 +107,36 @@ func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.Trai
 		}
 	}
 
-	info, err := r.RuntimeInfo(trainJob, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy)
+	info, err := r.RuntimeInfo(trainJob, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy, trainingRuntime.Spec.Scheduling)
 	if err != nil {
 		return nil, err
 	}
 	return r.framework.RunComponentBuilderPlugins(ctx, info, trainJob)
 }
 
+// DeleteObjects returns the previously materialized objects that should now be removed
+// for the TrainJob. It runs on every TrainJob reconcile and does not read the runtime:
+// each ComponentDeleterPlugin decides from the TrainJob state whether anything is returned.
+func (r *TrainingRuntime) DeleteObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]client.Object, error) {
+	return r.framework.RunComponentDeleterPlugins(ctx, trainJob)
+}
+
 // RuntimeInfo builds the Info object for a TrainJob and consolidates it through the
 // Build Phase extension points, in this order:
-//  1. EnforceMLPolicy, then EnforcePodGroupPolicy, for the parameters declared in the
-//     runtime `.spec.mlPolicy` and `.spec.podGroupPolicy`.
+//  1. EnforceMLPolicy, then EnforcePodGroupPolicy, then EnforceScheduling, for the parameters
+//     declared in the runtime `.spec.mlPolicy`, `.spec.podGroupPolicy`, and `.spec.scheduling`.
 //  2. EnforcePodSpec, for the PodSet concerns enabled outside of MLPolicy and PodGroupPolicy APIs.
 //  3. PreBuildSync, which consolidates the Info object with the concrete runtime template.
 func (r *TrainingRuntime) RuntimeInfo(
 	trainJob *trainer.TrainJob, runtimeTemplateSpec any, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
+	scheduling *trainer.TrainingRuntimeScheduling,
 ) (*runtime.Info, error) {
 
 	jobSetTemplateSpec, ok := runtimeTemplateSpec.(trainer.JobSetTemplateSpec)
 	if !ok {
 		return nil, fmt.Errorf("unsupported runtimeTemplateSpec")
 	}
-	info, err := r.newRuntimeInfo(trainJob, jobSetTemplateSpec, mlPolicy, podGroupPolicy)
+	info, err := r.newRuntimeInfo(trainJob, jobSetTemplateSpec, mlPolicy, podGroupPolicy, scheduling)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +144,9 @@ func (r *TrainingRuntime) RuntimeInfo(
 		return nil, err
 	}
 	if err = r.framework.RunEnforcePodGroupPolicyPlugins(info, trainJob); err != nil {
+		return nil, err
+	}
+	if err = r.framework.RunEnforceSchedulingPlugins(info, trainJob); err != nil {
 		return nil, err
 	}
 	if err = r.framework.RunEnforcePodSpecPlugins(info, trainJob); err != nil {
@@ -150,6 +161,7 @@ func (r *TrainingRuntime) RuntimeInfo(
 
 func (r *TrainingRuntime) newRuntimeInfo(
 	trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
+	scheduling *trainer.TrainingRuntimeScheduling,
 ) (*runtime.Info, error) {
 	propagationLabels := maps.Clone(jobSetTemplateSpec.Labels)
 	propagationAnnotations := maps.Clone(jobSetTemplateSpec.Annotations)
@@ -190,26 +202,32 @@ func (r *TrainingRuntime) newRuntimeInfo(
 		runtime.WithAnnotations(propagationAnnotations),
 		runtime.WithMLPolicySource(mlPolicy),
 		runtime.WithPodGroupPolicy(podGroupPolicy),
+		runtime.WithScheduling(scheduling),
 		runtime.WithTemplateSpecObjApply(jobSetSpecApply),
 	}
 
 	for i, rJob := range jobSetSpecApply.ReplicatedJobs {
-		// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
+		// The PodSet count is the total number of Pods across all replicas of the replicatedJob.
+		// The JobSet plugin divides it by replicas to compute per-replica Parallelism/Completions.
 		// REF: https://github.com/kubeflow/trainer/issues/2318
-		count := ptr.Deref(rJob.Template.Spec.Parallelism, 1)
+		count := ptr.Deref(rJob.Template.Spec.Parallelism, 1) * ptr.Deref(rJob.Replicas, constants.DefaultJobReplicas)
 		var ancestor *string
 		if metadata := rJob.Template.ObjectMetaApplyConfiguration; metadata != nil && metadata.Labels != nil {
 			if labelAncestor, ok := metadata.Labels[constants.LabelTrainJobAncestor]; ok {
 				if labelAncestor == constants.AncestorTrainer && mlPolicy != nil {
+					// numNodes is the total number of nodes across all trainer replicas (e.g. TPU slices).
 					count = ptr.Deref(mlPolicy.NumNodes, 1)
 				}
 				ancestor = &labelAncestor
 			}
 		}
 		isTrainerAncestor := ancestor != nil && *ancestor == constants.AncestorTrainer && mlPolicy != nil
-		isMPILauncherAsNode := mlPolicy != nil && mlPolicy.MPI != nil &&
-			ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false) && ptr.Deref(rJob.Name, "") == constants.Node
-		if isTrainerAncestor || isMPILauncherAsNode {
+		// For MPI, the processes run on the node replicatedJob, and on the launcher, which is the
+		// trainer ancestor, only when it runs as a node.
+		isMPI := mlPolicy != nil && mlPolicy.MPI != nil
+		isTrainerNode := isTrainerAncestor && (!isMPI || ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false))
+		isMPINode := isMPI && ptr.Deref(rJob.Name, "") == constants.Node
+		if isTrainerNode || isMPINode {
 			if applyPodSpec := jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec; applyPodSpec != nil {
 				if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil {
 					applyTrainerPodResourceClaims(applyPodSpec, jobTrainer.ResourceClaimsPerNode)
@@ -298,14 +316,22 @@ func (r *TrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {
 
 func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	// Validate against the snapshot the TrainJob was built from, falling back to the live
-	// runtime when no snapshot exists yet, as NewObjects does.
+	// runtime when no snapshot exists yet, as NewObjects does. On create there is no snapshot
+	// to read: one under this name still belongs to a deleted TrainJob of the same name.
 	trainingRuntime := &trainer.TrainingRuntime{}
-	if err := getRuntimeSnapshot(ctx, r.client, new, trainingRuntime); err != nil {
-		if !apierrors.IsNotFound(err) {
+	snapshotLoaded := false
+
+	if old != nil {
+		err := getRuntimeSnapshot(ctx, r.client, new, trainingRuntime)
+		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, field.ErrorList{
 				field.InternalError(field.NewPath("spec", "runtimeRef"), fmt.Errorf("unable to get runtime snapshot: %w", err)),
 			}
 		}
+		snapshotLoaded = err == nil
+	}
+
+	if !snapshotLoaded {
 		trainingRuntime = &trainer.TrainingRuntime{}
 		if err := r.client.Get(ctx, client.ObjectKey{
 			Namespace: new.Namespace,
@@ -330,7 +356,7 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 			constants.RuntimeDeprecationPolicyURL,
 		))
 	}
-	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
+	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy, trainingRuntime.Spec.Scheduling) // ignoring the error here as the runtime configured should be valid
 	fwWarnings, errs := r.framework.RunCustomValidationPlugins(ctx, info, old, new)
 	if len(fwWarnings) != 0 {
 		warnings = append(warnings, fwWarnings...)

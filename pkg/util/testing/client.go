@@ -20,7 +20,10 @@ import (
 	"context"
 	"fmt"
 
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,6 +47,25 @@ func NewClientBuilder(addToSchemes ...func(s *runtime.Scheme) error) *fake.Clien
 	}
 	return fake.NewClientBuilder().
 		WithScheme(scm)
+}
+
+// WithVolcanoPodGroupRESTMapping makes the fake client's REST mapper know the Volcano PodGroup
+// kind, as on a cluster where the Volcano CRD is installed. Clients built without it behave
+// like a cluster without Volcano.
+func WithVolcanoPodGroupRESTMapping(b *fake.ClientBuilder) *fake.ClientBuilder {
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{volcanov1beta1.SchemeGroupVersion})
+	mapper.Add(volcanov1beta1.SchemeGroupVersion.WithKind("PodGroup"), meta.RESTScopeNamespace)
+	return b.WithRESTMapper(mapper)
+}
+
+// WithWorkloadRESTMapping makes the fake client's REST mapper know the scheduling.k8s.io/v1beta1
+// Workload and PodGroup kinds, as on a cluster which serves the Workload-Aware Scheduling APIs.
+// The WorkloadAwareScheduling plugin can't be initialized with clients built without it.
+func WithWorkloadRESTMapping(b *fake.ClientBuilder) *fake.ClientBuilder {
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{schedulingv1beta1.SchemeGroupVersion})
+	mapper.Add(schedulingv1beta1.SchemeGroupVersion.WithKind("Workload"), meta.RESTScopeNamespace)
+	mapper.Add(schedulingv1beta1.SchemeGroupVersion.WithKind("PodGroup"), meta.RESTScopeNamespace)
+	return b.WithRESTMapper(mapper)
 }
 
 type builderIndexer struct {

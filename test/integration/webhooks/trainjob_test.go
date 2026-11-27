@@ -22,6 +22,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
@@ -459,14 +460,22 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				gomega.Succeed()),
-			ginkgo.Entry("Should succeed to create TrainJob with name exactly 63 characters",
+			ginkgo.Entry("Should succeed to create TrainJob with name at maximum allowed length for runtime",
 				func() *trainer.TrainJob {
 					return testingutil.MakeTrainJobWrapper(ns.Name,
-						"abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijk"). // 63 chars
+						strings.Repeat("a", 33)). // 33 chars: max length for dataset-initializer
 						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeName).
 						Obj()
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create TrainJob with name exceeding maximum allowed length for runtime",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name,
+						strings.Repeat("a", 34)). // 34 chars: exceeds 33 max length for dataset-initializer
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeName).
+						Obj()
+				},
+				testingutil.BeForbiddenError()),
 			ginkgo.Entry("Should fail to create TrainJob with uppercase letters in name",
 				func() *trainer.TrainJob {
 					return testingutil.MakeTrainJobWrapper(ns.Name, "Invalid-job-name").
@@ -905,6 +914,84 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 		)
 	})
 
+	ginkgo.When("Creating TrainJob with a runtime which sets Job-level resourceClaims", func() {
+		ginkgo.BeforeEach(func() {
+			baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "testing-was")
+			wasRuntime := baseRuntime.RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+				PodResourceClaims(constants.Node, corev1.PodResourceClaim{Name: "tpu-slice", ResourceClaimTemplateName: ptr.To("tpu-slice-template")}).
+				Scheduling(&trainer.TrainingRuntimeScheduling{
+					ReplicatedJobs: []trainer.ReplicatedJobScheduling{
+						{TargetReplicatedJobs: []string{constants.DatasetInitializer, constants.ModelInitializer}},
+						{
+							TargetReplicatedJobs: []string{constants.Node},
+							Job: &trainer.JobScheduling{
+								ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{
+									Name:                      "tpu-slice",
+									ResourceClaimTemplateName: ptr.To("tpu-slice-template"),
+								}},
+							},
+						},
+					},
+				}).
+				Obj()).
+				Obj()
+			gomega.Expect(k8sClient.Create(ctx, wasRuntime)).To(gomega.Succeed())
+		})
+		ginkgo.DescribeTable("Validate TrainJob on creation", func(trainJob func() *trainer.TrainJob, errorMatcher gomega.OmegaMatcher) {
+			gomega.Expect(k8sClient.Create(ctx, trainJob())).Should(errorMatcher)
+		},
+			ginkgo.Entry("Should succeed to create TrainJob without resource claims",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "no-resource-claims").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing-was").
+						Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create TrainJob with resourceClaimsPerNode",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "resource-claims-per-node").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing-was").
+						Trainer(
+							testingutil.MakeTrainJobTrainerWrapper().
+								ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "gpu-template"}).
+								Obj()).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("must not be set when the runtime sets spec.scheduling.replicatedJobs[].job.resourceClaims"))),
+			ginkgo.Entry("Should fail to create TrainJob with runtimePatches Pod resourceClaims",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "runtime-patches-resource-claims").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing-was").
+						RuntimePatches([]trainer.RuntimePatch{{
+							Manager: "acme.io/manager",
+							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+								Template: &trainer.JobSetTemplatePatch{
+									Spec: &trainer.JobSetSpecPatch{
+										ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+											Name: constants.Node,
+											Template: &trainer.JobTemplatePatch{
+												Spec: &trainer.JobSpecPatch{
+													Template: &trainer.PodTemplatePatch{
+														Spec: &trainer.PodSpecPatch{
+															ResourceClaims: []corev1.PodResourceClaim{{
+																Name:                      "gpu",
+																ResourceClaimTemplateName: ptr.To("gpu-template"),
+															}},
+														},
+													},
+												},
+											},
+										}},
+									},
+								},
+							},
+						}}).
+						Obj()
+				},
+				gomega.MatchError(gomega.ContainSubstring("must not be set when the runtime sets spec.scheduling.replicatedJobs[].job.resourceClaims"))),
+		)
+	})
+
 	ginkgo.When("Defaulting RuntimePatch.Time on creation", func() {
 		ginkgo.It("Should set Time on each RuntimePatch when creating a TrainJob", func() {
 			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "time-defaulting").
@@ -1024,7 +1111,7 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 				gomega.Succeed()),
 			ginkgo.Entry("Should fail to update TrainJob terminationGracePeriodSeconds after creation",
 				func() *trainer.TrainJob {
-					return testingutil.MakeTrainJobWrapper(ns.Name, "immutable-termination-grace-period").
+					return testingutil.MakeTrainJobWrapper(ns.Name, "immutable-term-grace-period").
 						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
 						RuntimePatches([]trainer.RuntimePatch{
 							{

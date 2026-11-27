@@ -97,6 +97,42 @@ func TestPlainML(t *testing.T) {
 				},
 			},
 		},
+		"no action when mlPolicySource flux is not null": {
+			info: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						FluxPolicy(nil).
+						Obj(),
+				},
+			},
+			wantInfo: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						FluxPolicy(nil).
+						Obj(),
+				},
+			},
+		},
+		"no action when mlPolicySource xgboost is not null": {
+			info: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						XGBoostPolicy().
+						Obj(),
+				},
+			},
+			wantInfo: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						XGBoostPolicy().
+						Obj(),
+				},
+			},
+		},
 
 		"trainJob trainer numNodes are respected rather than runtimeInfo": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
@@ -176,6 +212,37 @@ func TestPlainML(t *testing.T) {
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								*corev1ac.EnvVar().WithName("CONFLICT").WithValue("FROM_TRAINER"),
 							},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
+		"trainJob trainer image is set on the trainer container": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Container("test:trainjob", nil, nil, nil).Obj()).
+				Obj(),
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().Obj()),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node).WithImage("test:runtime")),
+				),
+			),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](1),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name:  constants.Node,
+							Image: "test:trainjob",
 						}},
 					}},
 				},

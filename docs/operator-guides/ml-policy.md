@@ -35,14 +35,14 @@ mlPolicy:
 configures distributed training for PyTorch.
 
 TrainJobs using this policy are launched via [the `torchrun` CLI](https://docs.pytorch.org/docs/stable/elastic/run.html).
-You can customize `torchrun` options such as `numProcPerNode` to define number of
-processes (e.g. GPUs) to launch per training node.
+The Torch plugin automatically configures distributed rendezvous and injects `PET_*`
+environment variables into the training pods (you can override the number of processes per
+node on individual TrainJobs via `spec.trainer.numProcPerNode`).
 
 ```yaml
 mlPolicy:
   numNodes: 3
-  torch:
-    numProcPerNode: gpu
+  torch: {}
 ```
 
 #### Inject PET_* envs into init/sidecar containers
@@ -88,3 +88,8 @@ mlPolicy:
     sshAuthMountPath: /home/mpiuser/.ssh
     runLauncherAsNode: true
 ```
+
+The TrainJob `spec.trainer.image` is set on both the launcher and the worker nodes, so all MPI
+processes run the same application and MPI versions. `spec.trainer.command` and `args` are set
+only on the launcher, which runs `mpirun`, while the nodes keep the command of the runtime, which
+starts the SSH server, so the image must also provide the SSH environment that the runtime expects.

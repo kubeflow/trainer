@@ -67,6 +67,13 @@ Megatron-Core with Tensor Parallelism for large transformers
 Training on Apple Silicon with MLX framework
 ::::
 
+::::{grid-item-card} MPI
+:link: mpi
+:link-type: doc
+
+MPI runtimes for DeepSpeed, MLX and custom images
+::::
+
 ::::{grid-item-card} Flux
 :link: flux
 :link-type: doc
@@ -114,6 +121,20 @@ Active deadlines, suspend/resume for TrainJobs
 :link-type: doc
 
 Monitor training progress and custom metrics in TrainJob status
+::::
+
+:::::
+
+## Hyperparameter Optimization
+
+:::::{grid} 1 1 2 2
+:gutter: 3
+
+::::{grid-item-card} Hyperparameter Optimization
+:link: optimizationjob
+:link-type: doc
+
+Tune TrainJob hyperparameters with OptimizationJob
 ::::
 
 :::::
@@ -167,8 +188,10 @@ deepspeed
 mlx
 xgboost
 megatron
+mpi
 flux
 trainjob-progress
+optimizationjob
 data-cache
 builtin-trainer/index
 local-execution/index

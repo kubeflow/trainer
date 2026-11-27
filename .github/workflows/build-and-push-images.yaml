@@ -45,47 +45,68 @@ on:
         default: false
 
 jobs:
-  build-and-publish:
-    name: Build and Publish Images
+  # Every image is built on a native runner for each architecture to avoid slow QEMU emulation.
+  # The images are pushed by digest only, the publish job creates the multi-arch images and the tags.
+  build:
+    name: Build ${{ matrix.component-name }} (${{ matrix.arch }})
     if: github.repository == 'kubeflow/trainer'
-    runs-on: cncf-ubuntu-16-64-x86
+    runs-on: ${{ matrix.runner }}
 
     permissions:
       contents: read
       packages: write
 
-    env:
-      SHOULD_PUBLISH: ${{ inputs.publish || github.event_name == 'push' }}
-
     strategy:
       fail-fast: false
       matrix:
+        component-name: &components
+          - trainer-controller-manager
+          - model-initializer
+          - dataset-initializer
+          - deepspeed-runtime
+          - xgboost-runtime
+          - mlx-runtime
+          - torchtune-trainer
+          - data-cache
+        arch:
+          - x86
+          - arm64
+        exclude:
+          # TODO (andreyvelich): mlx-data doesn't provide Linux arm wheels at the moment:
+          # https://pypi.org/project/mlx-data/#files
+          - component-name: mlx-runtime
+            arch: arm64
+          # TODO (jaiakash): pytorch/pytorch CUDA base image doesn't support arm at the moment:
+          # https://hub.docker.com/r/pytorch/pytorch/tags?name=2.9.1-cuda12.8-cudnn9-runtime
+          - component-name: torchtune-trainer
+            arch: arm64
         include:
+          # Runner and platform for each architecture.
+          - arch: x86
+            runner: cncf-ubuntu-16-64-x86
+            platforms: linux/amd64
+          - arch: arm64
+            runner: cncf-ubuntu-16-64-arm
+            platforms: linux/arm64
+
+          # Dockerfile for each component.
           - component-name: trainer-controller-manager
             dockerfile: cmd/trainer-controller-manager/Dockerfile
-            platforms: linux/amd64,linux/arm64,linux/ppc64le
           - component-name: model-initializer
             dockerfile: cmd/initializers/model/Dockerfile
-            platforms: linux/amd64,linux/arm64
           - component-name: dataset-initializer
             dockerfile: cmd/initializers/dataset/Dockerfile
-            platforms: linux/amd64,linux/arm64
           - component-name: deepspeed-runtime
             dockerfile: cmd/runtimes/deepspeed/Dockerfile
-            platforms: linux/amd64,linux/arm64
           - component-name: xgboost-runtime
             dockerfile: cmd/runtimes/xgboost/Dockerfile
-            platforms: linux/amd64,linux/arm64
-          # TODO (andreyvelich): mlx[cuda] doesn't support arm at the moment: https://github.com/ml-explore/mlx/issues/2469
           - component-name: mlx-runtime
             dockerfile: cmd/runtimes/mlx/Dockerfile
-            platforms: linux/amd64
           - component-name: torchtune-trainer
             dockerfile: cmd/trainers/torchtune/Dockerfile
-            platforms: linux/amd64,linux/arm64
           - component-name: data-cache
             dockerfile: cmd/data_cache/Dockerfile
-            platforms: linux/amd64,linux/arm64
+
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -94,42 +115,122 @@ jobs:
           ref: ${{ inputs.ref }}
 
       - name: GHCR Login
-        if: env.SHOULD_PUBLISH == 'true'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        if: inputs.publish || github.event_name == 'push'
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Authenticate to Docker Hub to avoid the rate limits for the base images.
+      - name: Docker Hub Login
+        if: inputs.publish || github.event_name == 'push'
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # Push by digest only, the tags are created once the images for all architectures are built.
+      # Images are never pushed on pull requests, the build is only validated.
+      - name: Build and Push By Digest
+        id: build
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          platforms: ${{ matrix.platforms }}
+          context: .
+          file: ${{ matrix.dockerfile }}
+          outputs: type=image,name=ghcr.io/kubeflow/trainer/${{ matrix.component-name }},push-by-digest=true,name-canonical=true,push=${{ inputs.publish || github.event_name == 'push' }}
+          cache-from: type=gha,scope=${{ matrix.component-name }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=${{ matrix.component-name }}-${{ matrix.arch }},ignore-error=true
+
+      # The images are built on different runners, so the digests are passed to the publish job
+      # as artifacts: an empty file named after the digest.
+      - name: Export Digest
+        if: inputs.publish || github.event_name == 'push'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/digests"
+          touch "${RUNNER_TEMP}/digests/${DIGEST#sha256:}"
+
+      - name: Upload Digest
+        if: inputs.publish || github.event_name == 'push'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: digests-${{ matrix.component-name }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Merge the digests of all architectures into a single multi-arch image and push the tags.
+  # It runs only when all the builds succeeded, so a partially built image is never published.
+  publish:
+    name: Publish ${{ matrix.component-name }}
+    needs: build
+    if: inputs.publish || github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        component-name: *components
+
+    steps:
+      - name: Download Digests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-${{ matrix.component-name }}-*
+          merge-multiple: true
+
+      - name: GHCR Login
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker Hub Login
-        if: env.SHOULD_PUBLISH == 'true'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Publish Component ${{ matrix.component-name }}
-        if: env.SHOULD_PUBLISH == 'true'
-        id: publish
-        uses: ./.github/workflows/template-publish-image
-        with:
-          image: |
-            ghcr.io/kubeflow/trainer/${{ matrix.component-name }}
-            docker.io/kubeflow/${{ matrix.component-name }}
-          dockerfile: ${{ matrix.dockerfile }}
-          platforms: ${{ matrix.platforms }}
-          version: ${{ inputs.version }}
-          push: true
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
-      - name: Test Build For Component ${{ matrix.component-name }}
-        if: env.SHOULD_PUBLISH != 'true'
-        uses: ./.github/workflows/template-publish-image
+      - name: Add Docker Tags
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          image: |
+          images: |
             ghcr.io/kubeflow/trainer/${{ matrix.component-name }}
             docker.io/kubeflow/${{ matrix.component-name }}
-          dockerfile: ${{ matrix.dockerfile }}
-          platforms: ${{ matrix.platforms }}
-          version: ${{ inputs.version }}
-          push: false
+          tags: |
+            type=ref,event=tag
+            type=sha,enable=${{ inputs.version == '' }}
+            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
+
+      - name: Create Manifest List And Push
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ghcr.io/kubeflow/trainer/${{ matrix.component-name }}
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "${IMAGE}@sha256:%s " *)
+
+      - name: Inspect Image
+        env:
+          IMAGE: ghcr.io/kubeflow/trainer/${{ matrix.component-name }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: docker buildx imagetools inspect "${IMAGE}:${VERSION}"
