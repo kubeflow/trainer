@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -118,6 +119,49 @@ func TestReconcileDeadline(t *testing.T) {
 			// zero and must be clamped rather than requeued immediately.
 			now:        created.Add(60 * time.Second),
 			wantResult: ctrl.Result{RequeueAfter: time.Second},
+		},
+		"long deadline requeues after exactly the remaining duration": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
+				CreationTimestamp(created).
+				ActiveDeadlineSeconds(86400).
+				Obj(),
+			jobSet:     utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "deadline-job").Obj(),
+			now:        created.Add(time.Hour),
+			wantResult: ctrl.Result{RequeueAfter: 23 * time.Hour},
+			wantJobSet: true,
+		},
+		"deadline just below the time.Duration overflow threshold does not fail a young TrainJob": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
+				CreationTimestamp(created).
+				// The largest whole number of seconds that fits in a time.Duration.
+				ActiveDeadlineSeconds(9223372036).
+				Obj(),
+			jobSet:     utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "deadline-job").Obj(),
+			now:        created.Add(time.Second),
+			wantResult: ctrl.Result{RequeueAfter: 9223372035 * time.Second},
+			wantJobSet: true,
+		},
+		"deadline one second past the time.Duration overflow threshold does not fail a young TrainJob": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
+				CreationTimestamp(created).
+				ActiveDeadlineSeconds(9223372037).
+				Obj(),
+			jobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "deadline-job").Obj(),
+			now:    created.Add(time.Second),
+			// The value is clamped to the largest representable duration, so the deadline
+			// is the same as for 9223372036 seconds.
+			wantResult: ctrl.Result{RequeueAfter: 9223372035 * time.Second},
+			wantJobSet: true,
+		},
+		"maximum int64 deadline does not fail a young TrainJob": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
+				CreationTimestamp(created).
+				ActiveDeadlineSeconds(math.MaxInt64).
+				Obj(),
+			jobSet:     utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "deadline-job").Obj(),
+			now:        created.Add(time.Second),
+			wantResult: ctrl.Result{RequeueAfter: 9223372035 * time.Second},
+			wantJobSet: true,
 		},
 		"deadline is measured from the resume transition rather than the creation timestamp": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "deadline-job").
