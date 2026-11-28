@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import pkg.initializers.types.types as types
 import pkg.initializers.utils.opendal as opendal_utils
@@ -36,12 +36,16 @@ class HTTP(utils.ModelProvider):
     def download_model(self):
         storage_uri_parsed = urlparse(self.config.storage_uri)
 
-        # Extract base URL and file path
-        # For https://example.com/path/to/model.bin:
+        # Extract base URL and resource path with query string
+        # For https://example.com/path/to/model.bin?version=1.0:
         #   base_url = https://example.com
-        #   file_path = path/to/model.bin
+        #   resource_path = path/to/model.bin?version=1.0 (includes query string)
         base_url = f"{storage_uri_parsed.scheme}://{storage_uri_parsed.netloc}"
-        file_path = storage_uri_parsed.path.lstrip("/")
+
+        # Decode the path once to handle encoded characters like %2F
+        # but preserve it as-is for the HTTP request
+        decoded_path = unquote(storage_uri_parsed.path)
+        file_path = decoded_path.lstrip("/")
 
         if not file_path:
             raise ValueError(
@@ -49,10 +53,14 @@ class HTTP(utils.ModelProvider):
                 f"Expected format: http(s)://domain/path/to/file"
             )
 
+        # Preserve query string for the HTTP request
+        query_string = storage_uri_parsed.query
+        resource_path = f"{file_path}?{query_string}" if query_string else file_path
+
         http_storage = opendal_utils.HTTPStorage(base_url=base_url)
 
         http_storage.download(
-            prefix=file_path,
+            prefix=resource_path,
             destination_path=utils.MODEL_PATH,
             ignore_patterns=self.config.ignore_patterns,
         )

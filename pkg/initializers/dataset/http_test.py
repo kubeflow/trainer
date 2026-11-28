@@ -96,6 +96,31 @@ def test_load_config(test_name, test_config, expected):
                 "expected_file_path": "data/file.zip",
             },
         ),
+        (
+            "URL with query string",
+            {
+                "config": {
+                    "storage_uri": (
+                        "https://example.com/data/file.zip?"
+                        "version=1.0&format=compressed"
+                    ),
+                    "ignore_patterns": None,
+                },
+                "expected_base_url": "https://example.com",
+                "expected_file_path": "data/file.zip?version=1.0&format=compressed",
+            },
+        ),
+        (
+            "URL with encoded path",
+            {
+                "config": {
+                    "storage_uri": "https://example.com/path%2Fwith%2Fslashes/file.tar.gz",
+                    "ignore_patterns": None,
+                },
+                "expected_base_url": "https://example.com",
+                "expected_file_path": "path/with/slashes/file.tar.gz",
+            },
+        ),
     ],
 )
 def test_download_dataset(test_name, test_case):

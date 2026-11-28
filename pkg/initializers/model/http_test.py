@@ -96,6 +96,36 @@ def test_load_config(test_name, test_config, expected):
                 "expected_file_path": "path/model.onnx",
             },
         ),
+        (
+            "URL with query parameters",
+            {
+                "config": {
+                    "storage_uri": (
+                        "https://models.example.com/bert.bin?" "version=2.0&format=onnx"
+                    ),
+                    "ignore_patterns": [
+                        "*.msgpack",
+                        "*.h5",
+                        "*.bin",
+                        "*.pt",
+                        "*.pth",
+                    ],
+                },
+                "expected_base_url": "https://models.example.com",
+                "expected_file_path": "bert.bin?version=2.0&format=onnx",
+            },
+        ),
+        (
+            "URL with percent-encoded path",
+            {
+                "config": {
+                    "storage_uri": "https://example.com/models%2Fbert%2Fweights.safetensors",
+                    "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"],
+                },
+                "expected_base_url": "https://example.com",
+                "expected_file_path": "models/bert/weights.safetensors",
+            },
+        ),
     ],
 )
 def test_download_model(test_name, test_case):
