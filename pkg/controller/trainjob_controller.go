@@ -106,17 +106,39 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
 	} else {
+		// Always call reconcileObjects to allow cleanup for finished TrainJobs
 		err = r.reconcileObjects(ctx, runtime, &trainJob)
-		if err != nil {
-			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
-			//  the creation of the runtime resources failed and the TrainJob is backed off until
-			//  the next retry attempt.
-			// The event message is truncated to stay within the maximum length limit (1024 chars).
-			message := fmt.Sprintf("TrainJob resources reconciliation failed: %.950v", err.Error())
-			if len(err.Error()) > 950 {
-				message = fmt.Sprintf("%s ...", message)
+
+		// Only update readiness condition if TrainJob is not finished
+		if !trainjob.IsTrainJobFinished(&trainJob) {
+			if err != nil {
+				// Surface the error in TrainJob status as a condition
+				// Truncate message to fit within K8s condition message limit (32768 chars)
+				errMsg := err.Error()
+				if len(errMsg) > 32768 {
+					errMsg = errMsg[:32765] + "..."
+				}
+				meta.SetStatusCondition(&trainJob.Status.Conditions, metav1.Condition{
+					Type:    trainer.TrainJobRuntimeResourcesReady,
+					Status:  metav1.ConditionFalse,
+					Reason:  trainer.TrainJobRuntimeResourcesCreationFailedReason,
+					Message: errMsg,
+				})
+				// The event message is truncated to stay within the maximum length limit (1024 chars).
+				message := fmt.Sprintf("TrainJob resources reconciliation failed: %.950v", err.Error())
+				if len(err.Error()) > 950 {
+					message = fmt.Sprintf("%s ...", message)
+				}
+				r.recorder.Eventf(&trainJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "Reconciling", message)
+			} else {
+				// Runtime resources created successfully
+				meta.SetStatusCondition(&trainJob.Status.Conditions, metav1.Condition{
+					Type:    trainer.TrainJobRuntimeResourcesReady,
+					Status:  metav1.ConditionTrue,
+					Reason:  trainer.TrainJobRuntimeResourcesCreatedReason,
+					Message: "Runtime resources created successfully",
+				})
 			}
-			r.recorder.Eventf(&trainJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "Reconciling", message)
 		}
 		if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
 			err = errors.Join(err, statusErr)
