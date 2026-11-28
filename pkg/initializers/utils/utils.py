@@ -21,6 +21,8 @@ STORAGE_URI_ENV = "STORAGE_URI"
 HF_SCHEME = "hf"
 CACHE_SCHEME = "cache"
 S3_SCHEME = "s3"
+HTTP_SCHEME = "http"
+HTTPS_SCHEME = "https"
 
 # The default path to the users' workspace.
 # TODO (andreyvelich): Discuss how to keep this path is sync with Kubeflow SDK constants.

@@ -52,6 +52,24 @@ from pkg.initializers.dataset.__main__ import main
         ),
         pytest.param(
             {
+                "storage_uri": "http://example.com/dataset.zip",
+                "expected_provider": "http",
+                "expected_error": None,
+                "expected_error_match": None,
+            },
+            id="http-provider",
+        ),
+        pytest.param(
+            {
+                "storage_uri": "https://example.com/data/file.tar.gz",
+                "expected_provider": "http",
+                "expected_error": None,
+                "expected_error_match": None,
+            },
+            id="https-provider",
+        ),
+        pytest.param(
+            {
                 "storage_uri": None,
                 "expected_provider": None,
                 "expected_error": ValueError,
@@ -92,10 +110,12 @@ def test_dataset_main(test_case, mock_env_vars):
     mock_hf_instance = MagicMock()
     mock_cache_instance = MagicMock()
     mock_s3_instance = MagicMock()
+    mock_http_instance = MagicMock()
 
     mock_hf = MagicMock(return_value=mock_hf_instance)
     mock_cache = MagicMock(return_value=mock_cache_instance)
     mock_s3 = MagicMock(return_value=mock_s3_instance)
+    mock_http = MagicMock(return_value=mock_http_instance)
 
     mock_provider_modules = {
         "pkg.initializers.dataset.huggingface": MagicMock(
@@ -107,12 +127,16 @@ def test_dataset_main(test_case, mock_env_vars):
         "pkg.initializers.dataset.s3": MagicMock(
             S3=mock_s3,
         ),
+        "pkg.initializers.dataset.http": MagicMock(
+            HTTP=mock_http,
+        ),
     }
 
     provider_mocks = {
         "hf": (mock_hf, mock_hf_instance),
         "cache": (mock_cache, mock_cache_instance),
         "s3": (mock_s3, mock_s3_instance),
+        "http": (mock_http, mock_http_instance),
     }
 
     with patch.dict(sys.modules, mock_provider_modules):

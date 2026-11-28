@@ -46,6 +46,12 @@ def main():
             s3 = S3()
             s3.load_config()
             s3.download_model()
+        case utils.HTTP_SCHEME | utils.HTTPS_SCHEME:
+            from pkg.initializers.model.http import HTTP
+
+            http = HTTP()
+            http.load_config()
+            http.download_model()
         case _:
             logging.error(
                 f"STORAGE_URI must have the valid model provider. STORAGE_URI: {storage_uri}"

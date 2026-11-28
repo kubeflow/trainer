@@ -48,11 +48,16 @@ def main():
             from pkg.initializers.dataset.s3 import S3
 
             provider_cls = S3
+        case utils.HTTP_SCHEME | utils.HTTPS_SCHEME:
+            from pkg.initializers.dataset.http import HTTP
+
+            provider_cls = HTTP
         case _:
             raise ValueError(
                 f"Unsupported dataset storage URI scheme {scheme!r}: "
                 f"expected one of {utils.HF_SCHEME!r}, "
-                f"{utils.CACHE_SCHEME!r}, or {utils.S3_SCHEME!r}"
+                f"{utils.CACHE_SCHEME!r}, {utils.S3_SCHEME!r}, "
+                f"{utils.HTTP_SCHEME!r}, or {utils.HTTPS_SCHEME!r}"
             )
 
     provider = provider_cls()
