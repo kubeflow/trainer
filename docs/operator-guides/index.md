@@ -25,6 +25,13 @@ Install Kubeflow Trainer using kubectl or Helm
 Migrate from Kubeflow Training Operator v1 to Trainer v2
 ::::
 
+::::{grid-item-card} Migration from Katib
+:link: katib-migration
+:link-type: doc
+
+Migrate Katib Experiments to OptimizationJob
+::::
+
 :::::
 
 ## Configuration
@@ -105,6 +112,7 @@ Integrate with Kueue, Slurm Bridge, KAI Scheduler, Coscheduling, and Volcano
 
 installation
 migration
+katib-migration
 runtime
 ml-policy
 job-template
