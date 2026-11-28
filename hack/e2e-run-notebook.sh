@@ -71,7 +71,8 @@ follow_pod_logs() {
 # follows all of them.
 stream_pod_logs() {
     { set +x; } 2>/dev/null
-    trap 'kill $(jobs -p) 2>/dev/null || true' EXIT TERM INT
+    trap 'kill $(jobs -p) 2>/dev/null || true; exit 0' TERM INT
+    trap 'kill $(jobs -p) 2>/dev/null || true' EXIT
     while true; do
         for pod in $(kubectl get pods -l jobset.sigs.k8s.io/jobset-name -o name 2>/dev/null); do
             local marker="${POD_LOG_SEEN_DIR}/${pod//\//_}"
