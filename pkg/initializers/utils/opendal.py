@@ -171,3 +171,65 @@ class S3Storage(OpenDALStorage):
             return bool(self.op.stat(key).is_file)
         except NotFound:
             return False
+
+
+class HTTPStorage(OpenDALStorage):
+    def __init__(self, base_url: str):
+        """Initialize HTTP storage with OpenDAL.
+
+        Args:
+            base_url: Base URL for HTTP downloads (e.g. "https://example.com/models")
+        """
+        config = {
+            "endpoint": base_url,
+        }
+
+        retry_layer = opendal.layers.RetryLayer(max_times=3, factor=2.0, jitter=True)
+        self.op = opendal.Operator("http", **config).layer(retry_layer)
+        self.base_url = base_url
+
+    def download(
+        self,
+        prefix: str,
+        destination_path: str,
+        ignore_patterns: Optional[list[str]] = None,
+    ):
+        """Download file(s) from HTTP storage.
+
+        For HTTP, we download the specific file/resource pointed to by the prefix.
+        HTTP doesn't support directory listing like S3, so we download single files.
+
+        Args:
+            prefix: Path to the file relative to base URL
+            destination_path: Local directory to save files
+            ignore_patterns: Patterns to ignore (unused for HTTP single-file downloads)
+        """
+        logging.info(f"Downloading file from HTTP: {self.base_url}/{prefix}")
+        logging.info("-" * 40)
+
+        try:
+            destination = Path(destination_path)
+            destination.mkdir(parents=True, exist_ok=True)
+
+            # For HTTP, prefix is the file path
+            file_path = prefix.lstrip("/")
+
+            # Download the file
+            logging.info(f"Downloading {file_path}")
+            data = self.op.read(file_path)
+
+            # Determine filename from path
+            filename = Path(file_path).name
+            file_destination_path = destination / filename
+
+            # Write the file
+            with open(file_destination_path, "wb") as f:
+                f.write(data)
+
+            logging.info(f"Downloaded {filename} ({len(data)} bytes)")
+
+        except Exception as e:
+            logging.error(f"Error downloading file: {e}")
+            raise
+
+        logging.info("File has been downloaded")

@@ -78,3 +78,19 @@ class CacheDatasetInitializer:
     readiness_period_seconds: str = "10"
     readiness_timeout_seconds: str = "5"
     readiness_failure_threshold: str = "3"
+
+
+# Configuration for the HTTP dataset initializer.
+@dataclass
+class HTTPDatasetInitializer:
+    storage_uri: str
+    ignore_patterns: Optional[list[str]] = None
+
+
+# Configuration for the HTTP model initializer.
+@dataclass
+class HTTPModelInitializer:
+    storage_uri: str
+    ignore_patterns: Optional[list[str]] = field(
+        default_factory=lambda: ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"]
+    )

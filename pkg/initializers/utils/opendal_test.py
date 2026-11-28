@@ -395,3 +395,100 @@ class TestS3Storage:
 
             assert "skipped by the ignore patterns" in caplog.text
             mock_operator.read.assert_not_called()
+
+
+class TestHTTPStorage:
+    """Test suite for HTTPStorage class."""
+
+    def test_init_with_base_url(self):
+        """Test HTTPStorage initialization with base URL."""
+        from pkg.initializers.utils.opendal import HTTPStorage
+
+        with patch("pkg.initializers.utils.opendal.opendal.Operator") as mock_operator:
+            mock_op_instance = MagicMock()
+            mock_operator.return_value = mock_op_instance
+            mock_op_instance.layer.return_value = mock_op_instance
+
+            storage = HTTPStorage(base_url="https://example.com")
+
+            assert storage.base_url == "https://example.com"
+            mock_operator.assert_called_once()
+            call_args = mock_operator.call_args
+            assert call_args[0][0] == "http"
+            assert call_args[1]["endpoint"] == "https://example.com"
+
+    def test_download_single_file(self):
+        """Test downloading a single file."""
+        from pkg.initializers.utils.opendal import HTTPStorage
+
+        with patch("pkg.initializers.utils.opendal.opendal.Operator") as mock_operator:
+            mock_op_instance = MagicMock()
+            mock_operator.return_value = mock_op_instance
+            mock_op_instance.layer.return_value = mock_op_instance
+
+            # Mock read to return sample data
+            test_data = b"test file content"
+            mock_op_instance.read.return_value = test_data
+
+            storage = HTTPStorage(base_url="https://example.com")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(
+                    prefix="path/to/file.txt",
+                    destination_path=tmpdir,
+                )
+
+                # Verify read was called
+                mock_op_instance.read.assert_called_once_with("path/to/file.txt")
+
+                # Verify file was written
+                output_file = os.path.join(tmpdir, "file.txt")
+                assert os.path.exists(output_file)
+                with open(output_file, "rb") as f:
+                    assert f.read() == test_data
+
+    def test_download_with_nested_path(self):
+        """Test downloading file from nested path."""
+        from pkg.initializers.utils.opendal import HTTPStorage
+
+        with patch("pkg.initializers.utils.opendal.opendal.Operator") as mock_operator:
+            mock_op_instance = MagicMock()
+            mock_operator.return_value = mock_op_instance
+            mock_op_instance.layer.return_value = mock_op_instance
+
+            test_data = b"model weights"
+            mock_op_instance.read.return_value = test_data
+
+            storage = HTTPStorage(base_url="https://models.example.com")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storage.download(
+                    prefix="models/bert/weights.bin",
+                    destination_path=tmpdir,
+                )
+
+                mock_op_instance.read.assert_called_once_with("models/bert/weights.bin")
+
+                output_file = os.path.join(tmpdir, "weights.bin")
+                assert os.path.exists(output_file)
+
+    def test_download_error_handling(self):
+        """Test error handling during download."""
+        from pkg.initializers.utils.opendal import HTTPStorage
+
+        with patch("pkg.initializers.utils.opendal.opendal.Operator") as mock_operator:
+            mock_op_instance = MagicMock()
+            mock_operator.return_value = mock_op_instance
+            mock_op_instance.layer.return_value = mock_op_instance
+
+            # Simulate download error
+            mock_op_instance.read.side_effect = Exception("Network error")
+
+            storage = HTTPStorage(base_url="https://example.com")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                with pytest.raises(Exception, match="Network error"):
+                    storage.download(
+                        prefix="path/to/file.txt",
+                        destination_path=tmpdir,
+                    )
