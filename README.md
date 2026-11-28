@@ -175,3 +175,9 @@ We'd also like to thank everyone who's contributed to and maintained the origina
   and [maintainers](https://github.com/kubeflow/xgboost-operator/blob/master/OWNERS).
 - Common library: [list of contributors](https://github.com/kubeflow/common/graphs/contributors) and
   [maintainers](https://github.com/kubeflow/common/blob/master/OWNERS).
+
+## Contributors
+
+<a href="https://github.com/kubeflow/trainer/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=kubeflow/trainer" alt="Kubeflow Trainer contributors" />
+</a>
