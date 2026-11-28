@@ -507,6 +507,96 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 				testingutil.BeInvalidError()),
 		)
 	})
+
+	// The garbage collector removes the foregroundDeletion and orphan finalizers with an UPDATE.
+	// envtest runs no garbage collector, so these cases remove the finalizers directly.
+	ginkgo.When("Updating TrainJob metadata after its runtime or runtime snapshot is gone", func() {
+		ginkgo.It("Should allow removing the finalizer of a terminating TrainJob whose TrainingRuntime is deleted", func() {
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+				RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+				Obj()
+			trainJob.Finalizers = []string{metav1.FinalizerDeleteDependents}
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+			ginkgo.By("Deleting the TrainingRuntime and then the TrainJob")
+			gomega.Expect(k8sClient.Delete(ctx, trainingRuntime)).Should(gomega.Succeed())
+			gomega.Expect(k8sClient.Delete(ctx, trainJob)).Should(gomega.Succeed())
+
+			// The webhook reads runtimes through the manager cache. Probe with a dry-run spec
+			// update, which persists nothing, until the webhook rejects it for the missing runtime.
+			ginkgo.By("Waiting until the webhook rejects spec updates because the TrainingRuntime is gone")
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(gomega.Succeed())
+				g.Expect(trainJob.DeletionTimestamp).ShouldNot(gomega.BeNil())
+				updated := trainJob.DeepCopy()
+				updated.Spec.Suspend = ptr.To(true)
+				g.Expect(k8sClient.Update(ctx, updated, client.DryRunAll)).Should(gomega.And(
+					testingutil.BeForbiddenError(),
+					gomega.MatchError(gomega.ContainSubstring("specified trainingRuntime must be created before the TrainJob is created")),
+				))
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+			ginkgo.By("Removing the finalizer from the terminating TrainJob")
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(gomega.Succeed())
+				trainJob.Finalizers = nil
+				g.Expect(k8sClient.Update(ctx, trainJob)).Should(gomega.Succeed())
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(testingutil.BeNotFoundError())
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("Should allow metadata updates and orphan deletion when the runtime snapshot has no owner", func() {
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+				RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeName).
+				Obj()
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+			ginkgo.By("Creating a runtime snapshot without an owner, as left by an orphan deletion")
+			snapshot := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: jobName + "-runtime-snapshot", Namespace: ns.Name},
+				Data:       map[string]string{"runtime": ""},
+			}
+			gomega.Expect(k8sClient.Create(ctx, snapshot)).Should(gomega.Succeed())
+
+			// Probe with a dry-run spec update, which persists nothing, until the webhook rejects
+			// it for the ownerless snapshot.
+			ginkgo.By("Waiting until the webhook rejects spec updates because the snapshot has no owner")
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(gomega.Succeed())
+				updated := trainJob.DeepCopy()
+				updated.Spec.Suspend = ptr.To(true)
+				g.Expect(k8sClient.Update(ctx, updated, client.DryRunAll)).Should(gomega.And(
+					testingutil.BeForbiddenError(),
+					gomega.MatchError(gomega.ContainSubstring("a snapshot configmap exists but is owned by another object")),
+				))
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+			ginkgo.By("Updating the TrainJob labels")
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(gomega.Succeed())
+				trainJob.Labels = map[string]string{"example.com/label": "value"}
+				g.Expect(k8sClient.Update(ctx, trainJob)).Should(gomega.Succeed())
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+			ginkgo.By("Deleting the TrainJob with the orphan propagation policy and removing the orphan finalizer")
+			gomega.Expect(k8sClient.Delete(ctx, trainJob, client.PropagationPolicy(metav1.DeletePropagationOrphan))).Should(gomega.Succeed())
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(gomega.Succeed())
+				g.Expect(trainJob.Finalizers).Should(gomega.ContainElement(metav1.FinalizerOrphanDependents))
+				trainJob.Finalizers = nil
+				g.Expect(k8sClient.Update(ctx, trainJob)).Should(gomega.Succeed())
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(testingutil.BeNotFoundError())
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+		})
+	})
 })
 
 var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ordered, func() {
