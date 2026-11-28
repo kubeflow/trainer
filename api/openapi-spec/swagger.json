@@ -15226,7 +15226,7 @@
         }
       },
       "trainer.v1alpha1.ModelInitializer": {
-        "description": "ModelInitializer represents the desired configuration to initialize pre-trained model. The ModelInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`",
+        "description": "ModelInitializer represents the desired configuration to initialize pre-trained model. The ModelInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: model-initializer`",
         "type": "object",
         "properties": {
           "env": {

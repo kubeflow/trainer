@@ -28,7 +28,7 @@ import (
 //
 // ModelInitializer represents the desired configuration to initialize pre-trained model.
 // The ModelInitializer spec will override the runtime Job template
-// which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
+// which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: model-initializer`
 type ModelInitializerApplyConfiguration struct {
 	// storageUri is the URI for the model provider.
 	// If set, it may be empty, or it must be a valid URI format
