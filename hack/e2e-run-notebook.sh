@@ -40,42 +40,92 @@ fi
 # Example: "-p num_cpu 3 -p gpu 1"
 PAPERMILL_PARAMS="${PAPERMILL_PARAMS:-}"
 
+# State for background log streaming.
+POD_LOG_SEEN_DIR="$(mktemp -d)"
+POD_LOG_STREAM_PID=""
+
+# Follow a single pod's logs until its stream ends, retrying while the
+# container is still starting up. Writes to stdout so the logs appear in the
+# CI job output.
+follow_pod_logs() {
+    { set +x; } 2>/dev/null
+    local pod="$1"
+    echo "----- streaming logs ${pod} -----"
+    # kubectl logs -f exits non-zero if the container is not ready yet; retry
+    # until it attaches and streams to completion, or the pod disappears.
+    while kubectl get "${pod}" &> /dev/null; do
+        if kubectl logs -f "${pod}" --all-containers --prefix --tail=-1; then
+            return
+        fi
+        sleep 2
+    done
+}
+
+# Continuously discover training pods and stream their logs as soon as they
+# appear. A post-run "kubectl logs" cannot see pods that JobSet garbage-collects
+# immediately on failure (e.g. a failed MPI launcher for the DeepSpeed and MLX
+# runtimes); streaming live captures their tracebacks before deletion.
+#
+# JobSet labels every training pod with jobset-name. MPI runtimes create
+# "launcher" and "node" jobs, while other runtimes create only "node", so this
+# follows all of them.
+stream_pod_logs() {
+    { set +x; } 2>/dev/null
+    trap 'kill $(jobs -p) 2>/dev/null || true' EXIT TERM INT
+    while true; do
+        for pod in $(kubectl get pods -l jobset.sigs.k8s.io/jobset-name -o name 2>/dev/null); do
+            local marker="${POD_LOG_SEEN_DIR}/${pod//\//_}"
+            if [ ! -e "${marker}" ]; then
+                touch "${marker}"
+                follow_pod_logs "${pod}" &
+            fi
+        done
+        sleep 2
+    done
+}
+
+start_log_streaming() {
+    if command -v kubectl &> /dev/null && kubectl cluster-info &> /dev/null; then
+        stream_pod_logs &
+        POD_LOG_STREAM_PID=$!
+    fi
+}
+
+stop_log_streaming() {
+    if [ -n "${POD_LOG_STREAM_PID}" ]; then
+        # Stop the discovery loop; per-pod followers self-terminate when their
+        # pod's log stream ends.
+        kill "${POD_LOG_STREAM_PID}" 2>/dev/null || true
+        wait "${POD_LOG_STREAM_PID}" 2>/dev/null || true
+        POD_LOG_STREAM_PID=""
+    fi
+    if [ -n "${POD_LOG_SEEN_DIR:-}" ] && [ -d "${POD_LOG_SEEN_DIR}" ]; then
+        rm -rf "${POD_LOG_SEEN_DIR}"
+    fi
+}
+
+trap stop_log_streaming EXIT
+
 print_results() {
     # Only run kubectl commands if we're testing Kubernetes notebooks
     if command -v kubectl &> /dev/null && kubectl cluster-info &> /dev/null; then
-        echo "=== TrainJob Status ==="
+        # Stop live streaming; per-pod logs have already been printed above.
+        stop_log_streaming
+
+        # Always show TrainJob status.
         kubectl describe trainjob || true
-
-        echo "=== JobSet Status & Events ==="
         kubectl describe jobset || true
-
-        echo "=== Controller Manager Logs ==="
         kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer --tail 100 || true
 
-        echo "=== Cluster Pods Summary ==="
-        kubectl get pods -o wide || true
-
-        # Discover all training pods (MPI launcher & workers, PyTorch nodes, etc.)
-        local training_pods
-        training_pods=$(kubectl get pods -l jobset.sigs.k8s.io/jobset-name -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)
-        if [ -z "${training_pods}" ]; then
-            training_pods=$(kubectl get pods -l jobset.sigs.k8s.io/replicatedjob-name -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)
-        fi
-
-        if [ -n "${training_pods}" ]; then
-            echo "Found training pods: ${training_pods}"
-            for pod in ${training_pods}; do
-                local role
-                role=$(kubectl get pod "${pod}" -o jsonpath='{.metadata.labels.jobset\.sigs\.k8s\.io/replicatedjob-name}' 2>/dev/null || echo "unknown")
-                echo "=================================================="
-                echo "=== Pod: ${pod} (Role: ${role}) ==="
-                echo "=================================================="
-                echo "--- Pod Description & Events ---"
-                kubectl describe pod "${pod}" || true
-                echo "--- Pod Current Logs ---"
-                kubectl logs "${pod}" --all-containers=true --prefix=true --tail=-1 || true
-                echo "--- Pod Previous Logs (if restarted) ---"
-                kubectl logs "${pod}" --all-containers=true --prefix=true --previous=true --tail=-1 2>/dev/null || true
+        # Describe pods that still exist for extra failure context. Failed pods
+        # may already be garbage-collected, but their logs were captured live by
+        # the background streamer above.
+        if kubectl get pods -l jobset.sigs.k8s.io/jobset-name --no-headers 2>/dev/null | grep -q .; then
+            echo "Surviving training pods:"
+            kubectl get pods -o wide || true
+            for pod in $(kubectl get pods -l jobset.sigs.k8s.io/jobset-name -o name); do
+                echo "----- describe ${pod} -----"
+                kubectl describe "${pod}" || true
             done
         else
             echo "No training pods found (local backend used - training runs outside Kubernetes)"
@@ -86,6 +136,10 @@ print_results() {
         echo "Skipping kubectl commands (not a Kubernetes test)"
     fi
 }
+
+# Start streaming pod logs before the notebook runs so failed pods are captured
+# before JobSet can garbage-collect them.
+start_log_streaming
 
 (papermill "${NOTEBOOK_INPUT}" "${NOTEBOOK_OUTPUT}" ${PAPERMILL_PARAMS} --execution-timeout "${PAPERMILL_TIMEOUT}" && print_results) ||
     (print_results && exit 1)
