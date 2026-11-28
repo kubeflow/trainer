@@ -159,6 +159,87 @@ func TestValidateCreateOptimizationJob(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "trainJobTemplate", "spec", "runtimeRef"), "", ""),
 			},
 		},
+		"OptimizationJob with DRA fields in trainJobTemplate fails while the DRA feature gate is disabled": {
+			featureGates: featuregatetesting.FeatureOverrides{
+				features.TrainJobStatus:                    true,
+				features.OptimizationJob:                   true,
+				features.TrainJobDynamicResourceAllocation: false,
+			},
+			optimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						RuntimeRef: trainer.RuntimeRef{
+							APIGroup: ptr.To(trainer.SchemeGroupVersion.Group),
+							Kind:     ptr.To(trainer.ClusterTrainingRuntimeKind),
+							Name:     "runtime",
+						},
+						Trainer: testingutil.MakeTrainJobTrainerWrapper().
+							ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "gpu-template"}).
+							Obj(),
+						RuntimePatches: []trainer.RuntimePatch{{
+							Manager: "acme.io/manager",
+							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+								Template: &trainer.JobSetTemplatePatch{
+									Spec: &trainer.JobSetSpecPatch{
+										ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+											Name: constants.Node,
+											Template: &trainer.JobTemplatePatch{
+												Spec: &trainer.JobSpecPatch{
+													Template: &trainer.PodTemplatePatch{
+														Spec: &trainer.PodSpecPatch{
+															Containers: []trainer.ContainerPatch{{
+																Name: constants.Node,
+																Resources: &corev1.ResourceRequirements{
+																	Claims: []corev1.ResourceClaim{{Name: "gpu"}},
+																},
+															}},
+														},
+													},
+												},
+											},
+										}},
+									},
+								},
+							},
+						}},
+					},
+				}).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "trainJobTemplate", "spec", "trainer", "resourceClaimsPerNode"), ""),
+				field.Forbidden(field.NewPath("spec", "trainJobTemplate", "spec", "runtimePatches").Index(0).
+					Child("trainingRuntimeSpec", "template", "spec", "replicatedJobs").Index(0).
+					Child("template", "spec", "template", "spec", "containers").Index(0).
+					Child("resources", "claims"), ""),
+			},
+		},
+		"OptimizationJob with DRA fields in trainJobTemplate passes while the DRA feature gate is enabled": {
+			featureGates: featuregatetesting.FeatureOverrides{
+				features.TrainJobStatus:                    true,
+				features.OptimizationJob:                   true,
+				features.TrainJobDynamicResourceAllocation: true,
+			},
+			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
+					},
+				}).Obj(),
+			optimizationJob: testingutil.MakeOptimizationJobWrapper("default", "valid-name").
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						RuntimeRef: trainer.RuntimeRef{
+							APIGroup: ptr.To(trainer.SchemeGroupVersion.Group),
+							Kind:     ptr.To(trainer.ClusterTrainingRuntimeKind),
+							Name:     "runtime",
+						},
+						Trainer: testingutil.MakeTrainJobTrainerWrapper().
+							ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "gpu-template"}).
+							Obj(),
+					},
+				}).
+				Obj(),
+		},
 		"OptimizationJob with name exceeding 63 characters fails": {
 			featureGates: featuregatetesting.FeatureOverrides{features.TrainJobStatus: true, features.OptimizationJob: true},
 			optimizationJob: testingutil.MakeOptimizationJobWrapper("default", strings.Repeat("a", 64)).
