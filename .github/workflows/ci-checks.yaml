@@ -1,0 +1,118 @@
+# Only trusted base-branch code is executed by this status publisher.
+name: CI Check
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled, closed]
+  workflow_run:
+    # Explicit constituents prevent CI Check from recursively triggering itself.
+    workflows:
+      - 'Build and Publish Images'
+      - 'CI Scripts Tests'
+      - 'Code Quality Checks'
+      - 'govulncheck - CVE Detection'
+      - 'E2E Tests'
+      - 'Unit and Integration Test - Go'
+      - 'Unit and E2E Test - Helm'
+      - 'Unit and Integration Test - Python'
+      - 'Unit and Integration Test - Rust'
+      - 'Validate Python Lockfiles'
+    types: [requested, in_progress, completed]
+
+permissions:
+  contents: read
+
+jobs:
+  recovery_candidates:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+      statuses: read
+      contents: read
+    outputs:
+      candidates: ${{ steps.list.outputs.result }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - id: list
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const {recoveryCandidates} = require('./.github/resources/scripts/ci_passed.js');
+            return await recoveryCandidates({github, context});
+
+  check_ci_status:
+    name: check_ci_status
+    needs: recovery_candidates
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        candidate: ${{ fromJSON(needs.recovery_candidates.outputs.candidates || '[{"number":0,"head":""}]') }}
+    if: >-
+      always() && !cancelled() && (
+      (github.event_name == 'schedule' && needs.recovery_candidates.result == 'success' && needs.recovery_candidates.outputs.candidates != '[]') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request') ||
+      (github.event_name == 'pull_request_target' &&
+        ((github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
+         github.event.label.name == 'ok-to-test' || github.event.label.name == 'needs-ok-to-test')))
+    concurrency:
+      # GitHub can replace pending runs. Each survivor reads current PR, CI,
+      # and durable retarget history; correctness never depends on event order.
+      group: ci-passed-reconcile-${{ matrix.candidate.head || github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      issues: write
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: Check out the trusted workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # For both events github.sha is a base/default-branch commit,
+          # never the pull request head or a workflow_run artifact.
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Resolve PR and verify expected CI workflows
+        env:
+          CI_RECOVERY_NUMBER: ${{ matrix.candidate.number }}
+          CI_RECOVERY_HEAD: ${{ matrix.candidate.head }}
+        id: prepare
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const {prepare} = require('./.github/resources/scripts/ci_passed.js');
+            await prepare({github, context, core, recovery: {
+              number: Number(process.env.CI_RECOVERY_NUMBER),
+              head: process.env.CI_RECOVERY_HEAD}});
+
+
+
+      - name: Reconcile status and informational label
+        if: always() && steps.prepare.outputs.pr_number != ''
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          CI_PR_NUMBER: ${{ steps.prepare.outputs.pr_number }}
+          CI_HEAD_SHA: ${{ steps.prepare.outputs.head_sha }}
+          CI_PR_SNAPSHOT: ${{ steps.prepare.outputs.snapshot }}
+          CI_READY: ${{ steps.prepare.outputs.ready }}
+        with:
+          script: |
+            const {finalize} = require('./.github/resources/scripts/ci_passed.js');
+            await finalize({github, context, core,
+              number: process.env.CI_PR_NUMBER,
+              head: process.env.CI_HEAD_SHA,
+              before: process.env.CI_PR_SNAPSHOT,
+              ready: process.env.CI_READY === 'true'});
