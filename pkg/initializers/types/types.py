@@ -78,3 +78,23 @@ class CacheDatasetInitializer:
     readiness_period_seconds: str = "10"
     readiness_timeout_seconds: str = "5"
     readiness_failure_threshold: str = "3"
+
+
+# Configuration for the Kaggle dataset initializer.
+# Note: Unlike HuggingFace and S3 providers, Kaggle does not support ignore_patterns
+# because kagglehub downloads entire resources (datasets/competitions/models) atomically.
+# Selective file filtering is not supported by the Kaggle API.
+@dataclass
+class KaggleDatasetInitializer:
+    storage_uri: str
+    access_token: Optional[str] = None
+
+
+# Configuration for the Kaggle model initializer.
+# Note: Unlike HuggingFace and S3 providers, Kaggle does not support ignore_patterns
+# because kagglehub downloads entire resources (datasets/competitions/models) atomically.
+# Selective file filtering is not supported by the Kaggle API.
+@dataclass
+class KaggleModelInitializer:
+    storage_uri: str
+    access_token: Optional[str] = None

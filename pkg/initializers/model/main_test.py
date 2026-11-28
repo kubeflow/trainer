@@ -38,6 +38,14 @@ from pkg.initializers.model.__main__ import main
             },
         ),
         (
+            "Successful download with Kaggle provider",
+            {
+                "storage_uri": "kaggle://models/username/model/framework/variation",
+                "access_token": "kaggle_token",
+                "expected_error": None,
+            },
+        ),
+        (
             "Missing storage URI environment variable",
             {
                 "storage_uri": None,
@@ -69,6 +77,7 @@ def test_model_main(test_name, test_case, mock_env_vars):
     # Setup mock instances
     mock_hf_instance = MagicMock()
     mock_s3_instance = MagicMock()
+    mock_kaggle_instance = MagicMock()
 
     with patch(
         "pkg.initializers.model.__main__.HuggingFace",
@@ -76,7 +85,10 @@ def test_model_main(test_name, test_case, mock_env_vars):
     ) as mock_hf, patch(
         "pkg.initializers.model.__main__.S3",
         return_value=mock_s3_instance,
-    ) as mock_s3:
+    ) as mock_s3, patch(
+        "pkg.initializers.model.__main__.Kaggle",
+        return_value=mock_kaggle_instance,
+    ) as mock_kaggle:
 
         # Execute test
         if test_case["expected_error"]:
@@ -98,5 +110,11 @@ def test_model_main(test_name, test_case, mock_env_vars):
                 mock_s3_instance.load_config.assert_called_once()
                 mock_s3_instance.download_model.assert_called_once()
                 mock_s3.assert_called_once()
+            elif test_case["storage_uri"] and test_case["storage_uri"].startswith(
+                "kaggle://"
+            ):
+                mock_kaggle_instance.load_config.assert_called_once()
+                mock_kaggle_instance.download_model.assert_called_once()
+                mock_kaggle.assert_called_once()
 
     print("Test execution completed")

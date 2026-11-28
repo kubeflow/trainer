@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 
 import pkg.initializers.utils.utils as utils
 from pkg.initializers.model.huggingface import HuggingFace
+from pkg.initializers.model.kaggle import Kaggle
 from pkg.initializers.model.s3 import S3
 
 logging.basicConfig(
@@ -46,6 +47,10 @@ def main():
             s3 = S3()
             s3.load_config()
             s3.download_model()
+        case utils.KAGGLE_SCHEME:
+            kaggle = Kaggle()
+            kaggle.load_config()
+            kaggle.download_model()
         case _:
             logging.error(
                 f"STORAGE_URI must have the valid model provider. STORAGE_URI: {storage_uri}"
