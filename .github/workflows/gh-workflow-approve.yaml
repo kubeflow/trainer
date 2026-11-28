@@ -17,12 +17,17 @@ name: Approve Workflow Runs
 permissions:
   actions: write
   contents: read
+  pull-requests: read
 
 on:
   pull_request_target:
     types:
       - labeled
       - synchronize
+  # Approves runs that the event-driven job missed, for example when it failed to start.
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.number }}
@@ -60,6 +65,8 @@ jobs:
       - name: Approve Pending Workflow Runs
         if: steps.membership-check.outputs.is_member == 'true' || contains(github.event.pull_request.labels.*.name, 'ok-to-test')
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          IS_MEMBER: ${{ steps.membership-check.outputs.is_member }}
         with:
           retries: 3
           script: |
@@ -71,8 +78,32 @@ jobs:
               head_sha: context.payload.pull_request.head.sha,
             }
 
-            core.info(`Getting workflow runs that need approval for commit ${request.head_sha}`)
-            const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, request)
+            // On a push this job can start before GitHub has created the PR's workflow runs,
+            // and the runs for one commit are created over about a second. So retry for a
+            // short while, and once some runs show up, look once more to catch the rest.
+            // Members' runs never need approval, so they get a single lookup.
+            const attempts = process.env.IS_MEMBER === "true" ? 1 : 6
+            const delayMs = 10_000
+            const sleep = () => new Promise((resolve) => setTimeout(resolve, delayMs))
+            const pending = new Map()
+            const lookup = async (label) => {
+              core.info(`Getting workflow runs that need approval for commit ${request.head_sha} (${label})`)
+              for (const run of await github.paginate(github.rest.actions.listWorkflowRunsForRepo, request)) {
+                pending.set(run.id, run)
+              }
+            }
+            for (let attempt = 1; attempt <= attempts; attempt++) {
+              await lookup(`attempt ${attempt}/${attempts}`)
+              if (pending.size > 0 || attempt === attempts) {
+                break
+              }
+              await sleep()
+            }
+            if (attempts > 1 && pending.size > 0) {
+              await sleep()
+              await lookup("follow-up")
+            }
+            const runs = [...pending.values()]
 
             core.info(`Found ${runs.length} workflow runs that need approval`)
             for (const run of runs) {
@@ -83,4 +114,33 @@ jobs:
                 run_id: run.id,
               }
               await github.rest.actions.approveWorkflowRun(request)
+            }
+
+  # Sweep open PRs that have ok-to-test and approve any of their runs still waiting.
+  sweep:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Approve pending runs on ok-to-test PRs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          retries: 3
+          script: |
+            const { owner, repo } = context.repo
+            const pulls = await github.paginate(github.rest.pulls.list, { owner, repo, state: "open", per_page: 100 })
+            const labelled = pulls.filter((pr) => pr.labels.some((label) => label.name === "ok-to-test"))
+            core.info(`Found ${labelled.length} open pull requests with ok-to-test`)
+            for (const pr of labelled) {
+              const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+                owner,
+                repo,
+                event: "pull_request",
+                status: "action_required",
+                head_sha: pr.head.sha,
+              })
+              for (const run of runs) {
+                core.info(`Approving workflow run ${run.id} of #${pr.number}`)
+                await github.rest.actions.approveWorkflowRun({ owner, repo, run_id: run.id })
+              }
             }
